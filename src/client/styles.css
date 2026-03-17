@@ -20,7 +20,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 12px 12px;
+  padding: 12px;
   border-bottom: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
 }
 

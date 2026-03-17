@@ -132,17 +132,20 @@ export function NewsFeed({ channel }: NewsFeedProps) {
 
   const handleMarkAllRead = () => { markAllRead.mutate(channel.id); };
 
-  const [fetchPeriod, setFetchPeriod] = useState<string>('last');
+  const [fetchPeriod, setFetchPeriod] = useState<string>('');
 
   // Reset period selection when channel changes
-  useEffect(() => { setFetchPeriod('last'); }, [channel.id]);
+  useEffect(() => { setFetchPeriod(''); }, [channel.id]);
+
+  const handleFetchDefault = useCallback(() => {
+    setFetchPeriod('');
+    fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
+  }, [channel.id, fetchChannel, onFetchSuccess]);
 
   const handleFetchPeriod = useCallback((val: string | number) => {
     const v = String(val);
     setFetchPeriod(v);
-    if (v === 'last') {
-      fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
-    } else if (v === 'sync') {
+    if (v === 'sync') {
       fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
     } else {
       const days = parseInt(v, 10);
@@ -154,7 +157,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
   const periodOptions = [
-    { value: 'last', label: <Tooltip title="С последнего прочитанного"><SyncOutlined /></Tooltip> },
     { value: '3',    label: '3д'  },
     { value: '5',    label: '5д'  },
     { value: '7',    label: '7д'  },
@@ -175,6 +177,13 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     <div className="news-feed">
       <div className="news-feed__toolbar">
         <Space wrap>
+          <Tooltip title="Выгрузить с последнего прочитанного">
+            <Button
+              icon={<SyncOutlined />}
+              onClick={handleFetchDefault}
+              loading={fetchChannel.isPending}
+            />
+          </Tooltip>
           <Segmented
             options={periodOptions}
             value={fetchPeriod}

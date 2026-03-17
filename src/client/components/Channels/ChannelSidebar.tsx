@@ -84,10 +84,10 @@ export function ChannelSidebar() {
   return (
     <div className="channel-sidebar">
       <div className="channel-sidebar__header">
-        <Text strong style={{ fontSize: 16 }}>
+        <Text strong style={{ fontSize: 14 }}>
           Каналы
         </Text>
-        <Button type="primary" icon={<PlusOutlined />} size="small" onClick={openCreate}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Добавить
         </Button>
       </div>
