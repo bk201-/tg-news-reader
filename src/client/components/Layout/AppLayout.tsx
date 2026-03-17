@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Layout, Typography, theme, Button, Tooltip } from 'antd';
+import { Layout, Typography, theme, Button, Tooltip, Splitter } from 'antd';
 import { MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
 import { NewsFeed } from '../News/NewsFeed';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
 
-const { Sider, Content, Header } = Layout;
+const { Header } = Layout;
 const { Title, Text } = Typography;
 
 export function AppLayout() {
@@ -71,40 +71,27 @@ export function AppLayout() {
         </div>
       </Header>
 
-      <Layout>
-        <Sider
-          width={280}
-          style={{
-            background: token.colorBgContainer,
-            borderRight: `1px solid ${token.colorBorderSecondary}`,
-          }}
+      <Splitter style={{ height: 'calc(100vh - 64px)' }}>
+        <Splitter.Panel
+          defaultSize={280}
+          min={200}
+          max={500}
+          style={{ background: token.colorBgContainer, borderRight: `1px solid ${token.colorBorderSecondary}`, overflow: 'hidden' }}
         >
           <ChannelSidebar />
-        </Sider>
+        </Splitter.Panel>
 
-        <Content style={{ background: token.colorBgLayout }}>
+        <Splitter.Panel style={{ background: token.colorBgLayout, overflow: 'hidden' }}>
           {selectedChannel ? (
             <NewsFeed channel={selectedChannel} />
           ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                flexDirection: 'column',
-                gap: 16,
-                color: token.colorTextSecondary,
-              }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
               <span style={{ fontSize: 64 }}>📡</span>
-              <Text type="secondary" style={{ fontSize: 16 }}>
-                Выберите канал из списка слева
-              </Text>
+              <Text type="secondary" style={{ fontSize: 16 }}>Выберите канал из списка слева</Text>
             </div>
           )}
-        </Content>
-      </Layout>
+        </Splitter.Panel>
+      </Splitter>
     </Layout>
   );
 }

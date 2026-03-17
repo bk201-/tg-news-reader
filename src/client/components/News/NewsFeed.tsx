@@ -1,7 +1,6 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { Button, Space, Typography, Spin, Empty, Tooltip, Badge, Tag, App, Dropdown } from 'antd';
-import type { MenuProps } from 'antd';
-import { FilterOutlined, EyeOutlined, CheckSquareOutlined, ReloadOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Button, Space, Typography, Spin, Empty, Tooltip, Badge, Tag, App, Segmented } from 'antd';
+import { FilterOutlined, EyeOutlined, CheckSquareOutlined, SyncOutlined, CloseCircleOutlined, LoadingOutlined, HistoryOutlined } from '@ant-design/icons';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
@@ -132,27 +131,35 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   );
 
   const handleMarkAllRead = () => { markAllRead.mutate(channel.id); };
-  const handleFetch = () => {
-    fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
-  };
-  const handleFetchSince = useCallback(({ key }: { key: string }) => {
-    if (key === 'lastSync') {
+
+  const [fetchPeriod, setFetchPeriod] = useState<string>('last');
+
+  // Reset period selection when channel changes
+  useEffect(() => { setFetchPeriod('last'); }, [channel.id]);
+
+  const handleFetchPeriod = useCallback((val: string | number) => {
+    const v = String(val);
+    setFetchPeriod(v);
+    if (v === 'last') {
+      fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
+    } else if (v === 'sync') {
       fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
-      return;
+    } else {
+      const days = parseInt(v, 10);
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      since.setHours(0, 0, 0, 0);
+      fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
     }
-    const days = parseInt(key, 10);
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-    since.setHours(0, 0, 0, 0);
-    fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
-  const fetchMenuItems: MenuProps['items'] = [
-    { key: 'lastSync', label: 'С последней синхронизации' },
-    { type: 'divider' },
-    { key: '5',  label: '5 дней'  },
-    { key: '7',  label: '7 дней'  },
-    { key: '14', label: '14 дней' },
+  const periodOptions = [
+    { value: 'last', label: <Tooltip title="С последнего прочитанного"><SyncOutlined /></Tooltip> },
+    { value: '3',    label: '3д'  },
+    { value: '5',    label: '5д'  },
+    { value: '7',    label: '7д'  },
+    { value: '14',   label: '14д' },
+    { value: 'sync', label: <Tooltip title="С последней синхронизации"><HistoryOutlined /></Tooltip> },
   ];
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -168,14 +175,12 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     <div className="news-feed">
       <div className="news-feed__toolbar">
         <Space wrap>
-          <Dropdown.Button
-            icon={<ReloadOutlined />}
-            menu={{ items: fetchMenuItems, onClick: handleFetchSince }}
-            onClick={handleFetch}
-            loading={fetchChannel.isPending}
-          >
-            Выгрузить
-          </Dropdown.Button>
+          <Segmented
+            options={periodOptions}
+            value={fetchPeriod}
+            onChange={handleFetchPeriod}
+            disabled={fetchChannel.isPending}
+          />
           <Tooltip title={showAll ? 'Скрыть отфильтрованные' : 'Показать все'}>
             <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={() => setShowAll(!showAll)}>
               {showAll ? 'Только отфильтрованные' : 'Показать все'}

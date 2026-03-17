@@ -1,9 +1,10 @@
 import React from 'react';
 import { Button, Tooltip, Typography, Space, Divider, Tag } from 'antd';
-import { LinkOutlined, DownloadOutlined, CheckOutlined, ExportOutlined } from '@ant-design/icons';
+import { LinkOutlined, DownloadOutlined, CheckOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { Text, Paragraph } = Typography;
 
@@ -14,6 +15,7 @@ interface NewsDetailProps {
 }
 
 export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps) {
+  const qc = useQueryClient();
   const markRead = useMarkRead();
   const extractContent = useExtractContent();
   const downloadMedia = useDownloadMedia();
@@ -21,6 +23,10 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
   const links = item.links || [];
   const hashtags = item.hashtags || [];
   const isRead = item.isRead === 1;
+
+  const handleRefresh = () => {
+    void qc.invalidateQueries({ queryKey: ['news', item.channelId] });
+  };
 
   const handleMarkRead = () => {
     markRead.mutate(
@@ -51,6 +57,9 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           </div>
         </div>
         <Space>
+          <Tooltip title="Обновить">
+            <Button icon={<ReloadOutlined />} size="small" onClick={handleRefresh} />
+          </Tooltip>
           {firstLink && (
             <Tooltip title="Открыть в браузере">
               <Button icon={<ExportOutlined />} size="small" href={firstLink} target="_blank" rel="noreferrer">
