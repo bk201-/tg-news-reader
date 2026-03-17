@@ -231,26 +231,30 @@ router.get('/:id/media-progress', (c) => {
   });
 });
 
-// POST /api/channels/fetch-all — refresh unread counts for all channels from Telegram
-router.post('/fetch-all', async (c) => {
+// Shared helper — calculates the sinceDate for a channel using stored DB state (no Telegram calls)
+export function getSinceDate(channel: { lastFetchedAt: number | null; lastReadAt: number | null }): Date {
+  if (channel.lastReadAt) return new Date(channel.lastReadAt * 1000);
+  if (channel.lastFetchedAt) return new Date(channel.lastFetchedAt * 1000);
+  // New channel — default to 3 days ago
+  return new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+}
+
+// POST /api/channels/count-unread — counts new messages in Telegram per channel without fetching
+router.post('/count-unread', async (c) => {
   const allChannels = await db.select().from(channels);
+  const counts: Record<number, number> = {};
 
-  const results = await Promise.allSettled(
-    allChannels.map(async (channel) => {
-      // Use same logic as default fetch button: readInboxMaxId from Telegram or lastReadAt fallback
-      const readMaxId = await getReadInboxMaxId(channel.telegramId).catch(() => null);
-      if (readMaxId) {
-        const readMsg = await fetchMessageById(channel.telegramId, readMaxId).catch(() => null);
-        if (readMsg) {
-          await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channel.id));
-        }
-      }
-      return { id: channel.id, telegramId: channel.telegramId };
-    }),
-  );
+  for (const channel of allChannels) {
+    try {
+      const sinceDate = getSinceDate(channel);
+      const messages = await fetchChannelMessages(channel.telegramId, { sinceDate, limit: 200 });
+      counts[channel.id] = messages.length;
+    } catch {
+      counts[channel.id] = 0;
+    }
+  }
 
-  const updated = results.filter((r) => r.status === 'fulfilled').length;
-  return c.json({ updated, total: allChannels.length });
+  return c.json(counts);
 });
 
 // POST /api/channels/:id/fetch
@@ -274,31 +278,21 @@ router.post('/:id/fetch', async (c) => {
     // Dropdown: specific days (ISO date string)
     sinceDate = new Date(body.since);
   } else {
-    // Default button
+    // Default button: try to get freshest readInboxMaxId from Telegram, fallback to stored state
     const isNewChannel = !channel.lastFetchedAt && !channel.lastReadAt;
     if (isNewChannel) {
-      // New channel: fetch last 3 days
       sinceDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
     } else {
-      // Known channel: get readInboxMaxId from Telegram → find message date
       const readMaxId = await getReadInboxMaxId(channel.telegramId);
       if (readMaxId) {
         const readMsg = await fetchMessageById(channel.telegramId, readMaxId);
         if (readMsg) {
           sinceDate = new Date(readMsg.date * 1000);
-          // Persist to DB so future fallbacks work without hitting Telegram
-          await db
-            .update(channels)
-            .set({ lastReadAt: readMsg.date })
-            .where(eq(channels.id, channelId));
+          await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channelId));
         }
       }
-      // Fallback chain if Telegram query failed
-      if (!sinceDate && channel.lastReadAt) {
-        sinceDate = new Date(channel.lastReadAt * 1000);
-      } else if (!sinceDate && channel.lastFetchedAt) {
-        sinceDate = new Date(channel.lastFetchedAt * 1000);
-      }
+      // Fallback to stored state via shared helper
+      if (!sinceDate) sinceDate = getSinceDate(channel);
     }
   }
 

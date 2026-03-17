@@ -3,7 +3,7 @@ import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Sel
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
-import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel, useFetchAllChannels } from '../../api/channels';
+import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel, useCountUnreadChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
@@ -14,9 +14,9 @@ export function ChannelSidebar() {
   const updateChannel = useUpdateChannel();
   const deleteChannel = useDeleteChannel();
   const fetchChannel = useFetchChannel();
-  const fetchAllChannels = useFetchAllChannels();
+  const countUnread = useCountUnreadChannels();
 
-  const { selectedChannelId, setSelectedChannelId } = useUIStore();
+  const { selectedChannelId, setSelectedChannelId, pendingCounts } = useUIStore();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -85,15 +85,15 @@ export function ChannelSidebar() {
   return (
     <div className="channel-sidebar">
       <div className="channel-sidebar__header">
-        <Text strong style={{ fontSize: 14 }}>
+        <Text strong style={{ fontSize: 14 }} className="sidebar-title">
           Каналы
         </Text>
         <Space size={4}>
-          <Tooltip title="Обновить непрочитанные">
+          <Tooltip title="Посчитать непрочитанные в Telegram">
             <Button
               icon={<ReloadOutlined />}
-              onClick={() => fetchAllChannels.mutate()}
-              loading={fetchAllChannels.isPending}
+              onClick={() => countUnread.mutate()}
+              loading={countUnread.isPending}
             >
               <span className="btn-text">Обновить</span>
             </Button>
@@ -113,12 +113,9 @@ export function ChannelSidebar() {
             onClick={() => setSelectedChannelId(ch.id)}
           >
             <div className="channel-item__info">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <Text strong ellipsis style={{ flex: 1, minWidth: 0 }}>
-                  {ch.name}
-                </Text>
-                <Badge count={ch.unreadCount} size="small" style={{ flexShrink: 0 }} />
-              </div>
+              <Text strong ellipsis>
+                {ch.name}
+              </Text>
               <Text type="secondary" style={{ fontSize: 11 }}>
                 @{ch.telegramId}
               </Text>
@@ -128,7 +125,8 @@ export function ChannelSidebar() {
                 </Text>
               )}
             </div>
-            <Space className="channel-item__actions" size={4}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <Space className="channel-item__actions" size={4}>
               <Tooltip title="Загрузить новости">
                 <Button
                   icon={<ReloadOutlined />}
@@ -151,6 +149,11 @@ export function ChannelSidebar() {
                 />
               </Tooltip>
             </Space>
+            <Badge
+              count={(ch.unreadCount || 0) + (pendingCounts[ch.id] || 0)}
+              size="small"
+            />
+          </div>
           </div>
         ))}
       </div>

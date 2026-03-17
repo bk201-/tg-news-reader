@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Channel, ChannelType } from '@shared/types.ts';
+import { useUIStore } from '../store/uiStore';
 
 export const channelKeys = { all: ['channels'] as const };
 
@@ -34,24 +35,26 @@ export function useDeleteChannel() {
   });
 }
 
-export function useFetchAllChannels() {
-  const qc = useQueryClient();
+export function useCountUnreadChannels() {
+  const setPendingCounts = useUIStore((s) => s.setPendingCounts);
   return useMutation({
-    mutationFn: () => api.post<{ updated: number; total: number }>('/channels/fetch-all', {}),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: channelKeys.all });
+    mutationFn: () => api.post<Record<number, number>>('/channels/count-unread', {}),
+    onSuccess: (counts) => {
+      setPendingCounts(counts);
     },
   });
 }
 
 export function useFetchChannel() {
   const qc = useQueryClient();
+  const clearPendingCount = useUIStore((s) => s.clearPendingCount);
   return useMutation({
     mutationFn: ({ id, since, limit }: { id: number; since?: string; limit?: number }) =>
       api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>('/channels/' + id + '/fetch', { since, limit }),
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['news', variables.id] });
       void qc.invalidateQueries({ queryKey: channelKeys.all });
+      clearPendingCount(variables.id);
     },
   });
 }

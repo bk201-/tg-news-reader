@@ -25,7 +25,11 @@ body {
   container-type: inline-size;
 }
 
-@container (max-width: 240px) {
+.channel-sidebar__header .sidebar-title {
+  flex-shrink: 0;
+}
+
+@container (max-width: 300px) {
   .channel-sidebar__header .btn-text {
     display: none;
   }

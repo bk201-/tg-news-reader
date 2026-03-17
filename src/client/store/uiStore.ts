@@ -13,6 +13,10 @@ interface UIStore {
   setHashTagFilter: (tag: string | null) => void;
   isDarkTheme: boolean;
   toggleTheme: () => void;
+  // Pending counts from Telegram (messages not yet fetched, per channel)
+  pendingCounts: Record<number, number>;
+  setPendingCounts: (counts: Record<number, number>) => void;
+  clearPendingCount: (channelId: number) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -32,5 +36,13 @@ export const useUIStore = create<UIStore>()((set) => ({
       const next = !state.isDarkTheme;
       localStorage.setItem('theme', next ? 'dark' : 'light');
       return { isDarkTheme: next };
+    }),
+  pendingCounts: {},
+  setPendingCounts: (counts) => set({ pendingCounts: counts }),
+  clearPendingCount: (channelId) =>
+    set((state) => {
+      const next = { ...state.pendingCounts };
+      delete next[channelId];
+      return { pendingCounts: next };
     }),
 }));
