@@ -21,6 +21,7 @@ export function useMarkRead() {
       api.patch(`/news/${id}/read`, { isRead }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['news'] });
+      void qc.invalidateQueries({ queryKey: ['channels'] });
     },
   });
 }
@@ -31,6 +32,7 @@ export function useMarkAllRead() {
     mutationFn: (channelId?: number) => api.post('/news/read-all', { channelId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['news'] });
+      void qc.invalidateQueries({ queryKey: ['channels'] });
     },
   });
 }

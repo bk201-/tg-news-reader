@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Select } from 'antd';
+import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Select, Badge } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
@@ -101,9 +101,12 @@ export function ChannelSidebar() {
             onClick={() => setSelectedChannelId(ch.id)}
           >
             <div className="channel-item__info">
-              <Text strong ellipsis>
-                {ch.name}
-              </Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <Text strong ellipsis style={{ flex: 1, minWidth: 0 }}>
+                  {ch.name}
+                </Text>
+                <Badge count={ch.unreadCount} size="small" style={{ flexShrink: 0 }} />
+              </div>
               <Text type="secondary" style={{ fontSize: 11 }}>
                 @{ch.telegramId}
               </Text>

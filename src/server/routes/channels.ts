@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db';
 import { channels, news } from '../db/schema.js';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, count } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, downloadMessageMedia, getReadInboxMaxId, type TelegramMessage } from '../services/telegram.js';
@@ -106,7 +106,22 @@ async function postProcess(
 
 // GET /api/channels
 router.get('/', async (c) => {
-  const result = await db.select().from(channels).orderBy(channels.createdAt);
+  const result = await db
+    .select({
+      id: channels.id,
+      telegramId: channels.telegramId,
+      name: channels.name,
+      description: channels.description,
+      channelType: channels.channelType,
+      lastFetchedAt: channels.lastFetchedAt,
+      lastReadAt: channels.lastReadAt,
+      createdAt: channels.createdAt,
+      unreadCount: count(news.id),
+    })
+    .from(channels)
+    .leftJoin(news, and(eq(news.channelId, channels.id), eq(news.isRead, 0)))
+    .groupBy(channels.id)
+    .orderBy(channels.createdAt);
   return c.json(result);
 });
 
@@ -193,7 +208,7 @@ router.get('/:id/media-progress', (c) => {
   const abortSignal = c.req.raw.signal;
 
   return streamSSE(c, async (stream) => {
-    let cleanup: (() => void) | null = null;
+    const cleanupFns: Array<() => void> = [];
 
     await new Promise<void>((resolve) => {
       const onEvent = (event: MediaProgressEvent) => {
@@ -202,17 +217,17 @@ router.get('/:id/media-progress', (c) => {
       };
 
       mediaProgressEmitter.on(`channel:${channelId}`, onEvent);
-      const timeout = setTimeout(resolve, 5 * 60 * 1000); // 5 min safety timeout
+      const timeout = setTimeout(resolve, 5 * 60 * 1000);
 
-      cleanup = () => {
+      cleanupFns.push(() => {
         mediaProgressEmitter.off(`channel:${channelId}`, onEvent);
         clearTimeout(timeout);
-      };
+      });
 
-      abortSignal.addEventListener('abort', resolve);
+      abortSignal.addEventListener('abort', () => resolve());
     });
 
-    cleanup?.();
+    cleanupFns.forEach((fn) => fn());
   });
 });
 

@@ -8,6 +8,7 @@ export interface Channel {
   channelType: ChannelType;
   lastFetchedAt?: number;
   lastReadAt?: number;
+  unreadCount: number;
   createdAt: number;
 }
 
