@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": false,
+    "noEmit": false,
+    "outDir": "dist/server",
+    "jsx": "react-jsx",
+    "lib": ["ES2024"],
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@server/*": ["./src/server/*"]
+    }
+  },
+  "include": ["src/server", "src/shared", "scripts"]
+}
+

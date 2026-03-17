@@ -1,0 +1,36 @@
+import { create } from 'zustand';
+
+interface UIStore {
+  selectedChannelId: number | null;
+  setSelectedChannelId: (id: number | null) => void;
+  selectedNewsId: number | null;
+  setSelectedNewsId: (id: number | null) => void;
+  showAll: boolean;
+  setShowAll: (v: boolean) => void;
+  filterPanelOpen: boolean;
+  setFilterPanelOpen: (v: boolean) => void;
+  hashTagFilter: string | null;
+  setHashTagFilter: (tag: string | null) => void;
+  isDarkTheme: boolean;
+  toggleTheme: () => void;
+}
+
+export const useUIStore = create<UIStore>()((set) => ({
+  selectedChannelId: null,
+  setSelectedChannelId: (id) => set({ selectedChannelId: id, selectedNewsId: null, hashTagFilter: null }),
+  selectedNewsId: null,
+  setSelectedNewsId: (id) => set({ selectedNewsId: id }),
+  showAll: false,
+  setShowAll: (v) => set({ showAll: v }),
+  filterPanelOpen: false,
+  setFilterPanelOpen: (v) => set({ filterPanelOpen: v }),
+  hashTagFilter: null,
+  setHashTagFilter: (tag) => set({ hashTagFilter: tag }),
+  isDarkTheme: localStorage.getItem('theme') === 'dark',
+  toggleTheme: () =>
+    set((state) => {
+      const next = !state.isDarkTheme;
+      localStorage.setItem('theme', next ? 'dark' : 'light');
+      return { isDarkTheme: next };
+    }),
+}));
