@@ -34,6 +34,16 @@ export function useDeleteChannel() {
   });
 }
 
+export function useFetchAllChannels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ updated: number; total: number }>('/channels/fetch-all', {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: channelKeys.all });
+    },
+  });
+}
+
 export function useFetchChannel() {
   const qc = useQueryClient();
   return useMutation({

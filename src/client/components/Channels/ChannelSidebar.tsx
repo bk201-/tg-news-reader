@@ -3,7 +3,7 @@ import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Sel
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
-import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel } from '../../api/channels';
+import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel, useFetchAllChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
@@ -14,6 +14,7 @@ export function ChannelSidebar() {
   const updateChannel = useUpdateChannel();
   const deleteChannel = useDeleteChannel();
   const fetchChannel = useFetchChannel();
+  const fetchAllChannels = useFetchAllChannels();
 
   const { selectedChannelId, setSelectedChannelId } = useUIStore();
 
@@ -87,9 +88,20 @@ export function ChannelSidebar() {
         <Text strong style={{ fontSize: 14 }}>
           Каналы
         </Text>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Добавить
-        </Button>
+        <Space size={4}>
+          <Tooltip title="Обновить непрочитанные">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchAllChannels.mutate()}
+              loading={fetchAllChannels.isPending}
+            >
+              <span className="btn-text">Обновить</span>
+            </Button>
+          </Tooltip>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            <span className="btn-text">Добавить</span>
+          </Button>
+        </Space>
       </div>
 
       <div className="channel-sidebar__list">

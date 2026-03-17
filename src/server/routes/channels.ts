@@ -231,6 +231,28 @@ router.get('/:id/media-progress', (c) => {
   });
 });
 
+// POST /api/channels/fetch-all — refresh unread counts for all channels from Telegram
+router.post('/fetch-all', async (c) => {
+  const allChannels = await db.select().from(channels);
+
+  const results = await Promise.allSettled(
+    allChannels.map(async (channel) => {
+      // Use same logic as default fetch button: readInboxMaxId from Telegram or lastReadAt fallback
+      const readMaxId = await getReadInboxMaxId(channel.telegramId).catch(() => null);
+      if (readMaxId) {
+        const readMsg = await fetchMessageById(channel.telegramId, readMaxId).catch(() => null);
+        if (readMsg) {
+          await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channel.id));
+        }
+      }
+      return { id: channel.id, telegramId: channel.telegramId };
+    }),
+  );
+
+  const updated = results.filter((r) => r.status === 'fulfilled').length;
+  return c.json({ updated, total: allChannels.length });
+});
+
 // POST /api/channels/:id/fetch
 router.post('/:id/fetch', async (c) => {
   const channelId = parseInt(c.req.param('id'), 10);

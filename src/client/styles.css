@@ -22,6 +22,13 @@ body {
   justify-content: space-between;
   padding: 12px;
   border-bottom: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
+  container-type: inline-size;
+}
+
+@container (max-width: 240px) {
+  .channel-sidebar__header .btn-text {
+    display: none;
+  }
 }
 
 .channel-sidebar__list {
