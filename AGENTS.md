@@ -14,6 +14,17 @@ npm run lint         # ESLint check
 npm run build        # Vite build + tsc
 ```
 
+## Before Every Push
+
+Run all four checks — push only if all pass:
+
+```bash
+npm run build          # Vite client build
+npm run build:server   # tsc -p tsconfig.server.json (server type check)
+npm run lint           # ESLint
+npm run format:check   # Prettier (read-only check, use format to fix)
+```
+
 ## Architecture
 
 ```
