@@ -6,10 +6,15 @@ export const newsKeys = {
   byChannel: (channelId: number, filtered = false) => ['news', channelId, filtered ? 'filtered' : 'all'] as const,
 };
 
+export interface NewsResponse {
+  items: NewsItem[];
+  filteredOut: number;
+}
+
 export function useNews(channelId: number, filtered = false) {
   return useQuery({
     queryKey: newsKeys.byChannel(channelId, filtered),
-    queryFn: () => api.get<NewsItem[]>(`/news?channelId=${channelId}${filtered ? '&filtered=1' : ''}`),
+    queryFn: () => api.get<NewsResponse>(`/news?channelId=${channelId}${filtered ? '&filtered=1' : ''}`),
     enabled: channelId > 0,
   });
 }

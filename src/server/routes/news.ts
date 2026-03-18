@@ -69,14 +69,20 @@ router.delete('/read', async (c) => {
 });
 
 // GET /api/news?channelId=&isRead=&filtered=1
+// Response: { items: NewsItem[], filteredOut: number }
 router.get('/', async (c) => {
   const channelId = c.req.query('channelId') ? parseInt(c.req.query('channelId')!, 10) : undefined;
   const isReadParam = c.req.query('isRead');
   const applyServerFilters = c.req.query('filtered') === '1';
 
-  const conditions = [];
-  if (channelId !== undefined) conditions.push(eq(news.channelId, channelId));
-  if (isReadParam !== undefined) conditions.push(eq(news.isRead, parseInt(isReadParam, 10)));
+  // Base conditions (channelId + isRead) — used for total-count query
+  const baseConditions: SQL[] = [];
+  if (channelId !== undefined) baseConditions.push(eq(news.channelId, channelId));
+  if (isReadParam !== undefined) baseConditions.push(eq(news.isRead, parseInt(isReadParam, 10)));
+
+  // Full conditions = base + filter exclusions
+  const conditions: SQL[] = [...baseConditions];
+  let filtersApplied = false;
 
   // Server-side filter application via SQLite json_each()
   if (applyServerFilters && channelId !== undefined) {
@@ -94,17 +100,18 @@ router.get('/', async (c) => {
       .map((f: (typeof activeFilters)[number]) => f.value.toLowerCase());
 
     if (tagValues.length > 0) {
-      // Exclude news where any hashtag matches any tag filter (with or without leading #)
       const orClauses = tagValues.flatMap((tag: string) => [
         sql`lower(value) = ${tag}`,
         sql`lower(value) = ${'#' + tag}`,
       ]);
       const combined = orClauses.reduce((acc: SQL<unknown>, clause: SQL<unknown>) => sql`${acc} OR ${clause}`);
       conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE ${combined})`);
+      filtersApplied = true;
     }
 
     for (const kw of keywordValues) {
       conditions.push(sql`lower(${news.text}) NOT LIKE ${'%' + kw + '%'}`);
+      filtersApplied = true;
     }
   }
 
@@ -114,7 +121,17 @@ router.get('/', async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(news.postedAt));
 
-  const mapped: NewsItem[] = rows.map((r: (typeof rows)[number]) => ({
+  // Count how many rows were excluded by filters
+  let filteredOut = 0;
+  if (filtersApplied) {
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(news)
+      .where(baseConditions.length > 0 ? and(...baseConditions) : undefined);
+    filteredOut = (countResult?.count ?? 0) - rows.length;
+  }
+
+  const items: NewsItem[] = rows.map((r: (typeof rows)[number]) => ({
     ...r,
     links: JSON.parse(r.links) as string[],
     hashtags: JSON.parse(r.hashtags) as string[],
@@ -124,7 +141,7 @@ router.get('/', async (c) => {
     mediaSize: r.mediaSize || undefined,
   }));
 
-  return c.json(mapped);
+  return c.json({ items, filteredOut });
 });
 
 // GET /api/news/:id

@@ -38,7 +38,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     setHashTagFilter,
   } = useUIStore();
 
-  const { data: newsItems = [], isLoading } = useNews(channel.id, !showAll);
+  const { data: newsData, isLoading } = useNews(channel.id, !showAll);
+  const newsItems = newsData?.items ?? [];
+  const serverFilteredOut = newsData?.filteredOut ?? 0;
   const { data: filters = [] } = useFilters(channel.id);
   const markAllRead = useMarkAllRead();
   const fetchChannel = useFetchChannel();
@@ -122,8 +124,10 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [newsItems, filteredIds, showAll, hashTagFilter]);
 
   const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
-  const hiddenByFilters = newsItems.length - filteredIds.size;
-  const totalCount = newsItems.length;
+  // When server-side filtering is active (!showAll): server already excluded items, use serverFilteredOut.
+  // When showAll: client computes dimmed items via applyFilters.
+  const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
+  const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
 
   const handleMarkedRead = useCallback(
     (currentId: number) => {
