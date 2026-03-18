@@ -78,7 +78,9 @@ export function LoginPage() {
         <Space direction="vertical" style={{ width: '100%' }} size={24}>
           <div style={{ textAlign: 'center' }}>
             <span style={{ fontSize: 40 }}>📰</span>
-            <Title level={3} style={{ margin: '8px 0 4px' }}>TG News Reader</Title>
+            <Title level={3} style={{ margin: '8px 0 4px' }}>
+              TG News Reader
+            </Title>
             <Text type="secondary">{step === 'credentials' ? 'Вход в систему' : 'Двухфакторная аутентификация'}</Text>
           </div>
 
@@ -86,16 +88,8 @@ export function LoginPage() {
 
           {step === 'credentials' ? (
             <Form form={form} layout="vertical" onFinish={handleCredentials} autoComplete="off">
-              <Form.Item
-                name="email"
-                rules={[{ required: true, type: 'email', message: 'Введите email' }]}
-              >
-                <Input
-                  prefix={<MailOutlined />}
-                  placeholder="Email"
-                  autoComplete="username"
-                  size="large"
-                />
+              <Form.Item name="email" rules={[{ required: true, type: 'email', message: 'Введите email' }]}>
+                <Input prefix={<MailOutlined />} placeholder="Email" autoComplete="username" size="large" />
               </Form.Item>
               <Form.Item
                 name="password"
@@ -118,14 +112,14 @@ export function LoginPage() {
           ) : (
             <Space direction="vertical" style={{ width: '100%' }} size={16}>
               <Text>Введите 6-значный код из приложения-аутентификатора:</Text>
-              <Input.OTP
-                length={6}
-                value={totpCode}
-                onChange={setTotpCode}
-                size="large"
-              />
+              <Input.OTP length={6} value={totpCode} onChange={setTotpCode} size="large" />
               <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <Button onClick={() => { setStep('credentials'); setError(null); }}>
+                <Button
+                  onClick={() => {
+                    setStep('credentials');
+                    setError(null);
+                  }}
+                >
                   Назад
                 </Button>
                 <Button
@@ -146,4 +140,3 @@ export function LoginPage() {
     </div>
   );
 }
-

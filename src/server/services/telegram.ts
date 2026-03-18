@@ -103,7 +103,7 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
       mediaType = 'photo';
       const photo = msg.media.photo;
       if (photo instanceof Api.Photo) {
-        const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize) as Api.PhotoSize[];
+        const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
         const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
         if (largest) mediaSizeBytes = largest.size;
       }
@@ -209,7 +209,7 @@ export async function getReadInboxMaxId(channelUsername: string): Promise<number
     );
     const dialog = result.dialogs[0];
     if (!dialog || !('readInboxMaxId' in dialog)) return null;
-    const maxId = (dialog as Api.Dialog).readInboxMaxId;
+    const maxId = dialog.readInboxMaxId;
     return maxId > 0 ? maxId : null;
   } catch (err) {
     console.warn('Failed to get readInboxMaxId from Telegram:', err);
@@ -229,8 +229,8 @@ export async function readChannelHistory(channelUsername: string, maxId: number)
   );
 }
 
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024;   // 5 MB  – photos
-const MAX_VIDEO_SIZE = 75 * 1024 * 1024;  // 75 MB – videos
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB  – photos
+const MAX_VIDEO_SIZE = 75 * 1024 * 1024; // 75 MB – videos
 const MAX_IMG_DOC_SIZE = 5 * 1024 * 1024; // 5 MB  – image documents
 
 /** Downloads media for a message. Returns relative path like "channelId/123.jpg" or null.
@@ -278,7 +278,7 @@ export async function downloadMessageMedia(
   if (existsSync(filepath)) return `${channelTelegramId}/${filename}`;
 
   const tg = await getTelegramClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const buffer = await tg.downloadMedia(msg.rawMedia, {} as any);
   if (!buffer) return null;
 
@@ -288,10 +288,7 @@ export async function downloadMessageMedia(
 }
 
 /** Fetches a single message by Telegram message ID (for on-demand media download). */
-export async function fetchMessageById(
-  channelUsername: string,
-  msgId: number,
-): Promise<TelegramMessage | null> {
+export async function fetchMessageById(channelUsername: string, msgId: number): Promise<TelegramMessage | null> {
   const tg = await getTelegramClient();
   try {
     const result = await tg.getMessages(channelUsername, { ids: [msgId] });
@@ -310,7 +307,7 @@ export async function fetchMessageById(
         mediaType = 'photo';
         const photo = msg.media.photo;
         if (photo instanceof Api.Photo) {
-          const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize) as Api.PhotoSize[];
+          const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
           const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
           if (largest) mediaSizeBytes = largest.size;
         }

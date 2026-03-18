@@ -16,4 +16,3 @@ mediaProgressEmitter.setMaxListeners(20);
 export function emitMediaProgress(channelId: number, event: MediaProgressEvent): void {
   mediaProgressEmitter.emit(`channel:${channelId}`, event);
 }
-

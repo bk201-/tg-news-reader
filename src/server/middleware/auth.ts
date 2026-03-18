@@ -9,7 +9,6 @@ export interface AuthPayload {
   exp: number;
 }
 
-
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const authHeader = c.req.header('Authorization');
   // Also accept ?token= query param for browser-native requests (img/video/EventSource)
@@ -22,7 +21,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
   const token = raw;
   try {
-    const payload = await verify(token, JWT_SECRET, 'HS256') as unknown as AuthPayload;
+    const payload = (await verify(token, JWT_SECRET, 'HS256')) as unknown as AuthPayload;
     c.set('userId', Number(payload.sub));
     c.set('userRole', payload.role);
     c.set('sessionId', payload.sessionId);
@@ -31,4 +30,3 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 };
-

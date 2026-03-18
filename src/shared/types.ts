@@ -48,4 +48,3 @@ export interface Filter {
   isActive: number;
   createdAt: number;
 }
-

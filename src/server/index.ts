@@ -50,6 +50,7 @@ app.use('/api/*', async (c, next) => {
   if (PUBLIC_PATHS.has(path) || PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
     return next();
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   return authMiddleware(c, next);
 });
 

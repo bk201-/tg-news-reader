@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Layout, Typography, theme, Button, Tooltip, Splitter, Dropdown, Modal, Input, Alert, Space, Spin } from 'antd';
-import { MoonOutlined, SunOutlined, UserOutlined, LogoutOutlined, SafetyCertificateOutlined, QrcodeOutlined } from '@ant-design/icons';
+import {
+  MoonOutlined,
+  SunOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  SafetyCertificateOutlined,
+  QrcodeOutlined,
+} from '@ant-design/icons';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
 import { GroupPanel } from '../Channels/GroupPanel';
 import { NewsFeed } from '../News/NewsFeed';
@@ -85,7 +92,7 @@ export function AppLayout() {
     }
   };
 
-  const handleDisableTOTP = async () => {
+  const handleDisableTOTP = () => {
     Modal.confirm({
       title: 'Отключить 2FA?',
       content: 'Двухфакторная аутентификация будет отключена.',
@@ -102,7 +109,11 @@ export function AppLayout() {
   const userMenuItems = [
     {
       key: 'email',
-      label: <Text type="secondary" style={{ fontSize: 12 }}>{user?.email}</Text>,
+      label: (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {user?.email}
+        </Text>
+      ),
       disabled: true,
     },
     { type: 'divider' as const },
@@ -163,7 +174,11 @@ export function AppLayout() {
           defaultSize={parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10)}
           min={200}
           max={500}
-          style={{ background: token.colorBgContainer, borderRight: `1px solid ${token.colorBorderSecondary}`, overflow: 'hidden' }}
+          style={{
+            background: token.colorBgContainer,
+            borderRight: `1px solid ${token.colorBorderSecondary}`,
+            overflow: 'hidden',
+          }}
         >
           <div style={{ display: 'flex', height: '100%' }}>
             <GroupPanel />
@@ -177,9 +192,20 @@ export function AppLayout() {
           {selectedChannel ? (
             <NewsFeed channel={selectedChannel} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
               <span style={{ fontSize: 64 }}>📡</span>
-              <Text type="secondary" style={{ fontSize: 16 }}>Выберите канал из списка слева</Text>
+              <Text type="secondary" style={{ fontSize: 16 }}>
+                Выберите канал из списка слева
+              </Text>
             </div>
           )}
         </Splitter.Panel>
@@ -197,8 +223,15 @@ export function AppLayout() {
           <Space direction="vertical" style={{ width: '100%' }} size={16}>
             <Text>Отсканируйте QR-код в приложении Google Authenticator, Microsoft Authenticator или аналогичном:</Text>
             {totpFetchError ? (
-              <Alert type="error" message={totpFetchError} showIcon
-                action={<Button size="small" onClick={openTotpSetup}>Повторить</Button>}
+              <Alert
+                type="error"
+                message={totpFetchError}
+                showIcon
+                action={
+                  <Button size="small" onClick={openTotpSetup}>
+                    Повторить
+                  </Button>
+                }
               />
             ) : totpQr ? (
               <div style={{ textAlign: 'center' }}>
@@ -220,12 +253,7 @@ export function AppLayout() {
             {totpError && <Alert type="error" message={totpError} showIcon />}
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>
               <Button onClick={() => setTotpStep('scan')}>← Назад</Button>
-              <Button
-                type="primary"
-                onClick={handleTotpConfirm}
-                loading={totpLoading}
-                disabled={totpCode.length < 6}
-              >
+              <Button type="primary" onClick={handleTotpConfirm} loading={totpLoading} disabled={totpCode.length < 6}>
                 Подтвердить и включить 2FA
               </Button>
             </Space>

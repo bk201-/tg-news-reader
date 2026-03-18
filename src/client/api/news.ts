@@ -17,8 +17,7 @@ export function useNews(channelId: number, filtered = false) {
 export function useMarkRead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, isRead = 1 }: { id: number; isRead?: number }) =>
-      api.patch(`/news/${id}/read`, { isRead }),
+    mutationFn: ({ id, isRead = 1 }: { id: number; isRead?: number }) => api.patch(`/news/${id}/read`, { isRead }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['news'] });
       void qc.invalidateQueries({ queryKey: ['channels'] });
@@ -56,4 +55,3 @@ export function useDownloadMedia() {
     },
   });
 }
-

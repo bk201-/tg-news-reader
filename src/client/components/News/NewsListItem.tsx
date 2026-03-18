@@ -64,7 +64,7 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
                 <PlayCircleOutlined style={{ fontSize: 22, color: '#fff' }} />
               </div>
             ) : (
-              <img src={mediaUrl(item.localMediaPath!)} alt="" className="news-item__thumb-img" />
+              <img src={mediaUrl(item.localMediaPath)} alt="" className="news-item__thumb-img" />
             )}
           </div>
         )}

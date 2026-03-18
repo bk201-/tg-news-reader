@@ -11,7 +11,7 @@ const router = new Hono();
 router.get('/', async (c) => {
   const result = await db.select().from(groups).orderBy(groups.sortOrder, groups.createdAt);
   return c.json(
-    result.map((g: typeof result[number]) => ({
+    result.map((g: (typeof result)[number]) => ({
       id: g.id,
       name: g.name,
       color: g.color,
@@ -118,7 +118,8 @@ router.post('/:id/verify-pin', async (c) => {
       const current = JSON.parse(session.unlockedGroupIds ?? '[]') as number[];
       const updated = current.includes(id) ? current : [...current, id];
 
-      await db.update(sessions)
+      await db
+        .update(sessions)
         .set({ unlockedGroupIds: JSON.stringify(updated) })
         .where(eq(sessions.id, sessionId));
 
@@ -134,4 +135,3 @@ router.post('/:id/verify-pin', async (c) => {
 });
 
 export default router;
-

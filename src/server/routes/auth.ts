@@ -24,9 +24,18 @@ function refreshCookieOptions() {
   };
 }
 
-async function issueAccessToken(userId: number, role: string, sessionId: string, unlockedGroupIds: number[] = []): Promise<string> {
+async function issueAccessToken(
+  userId: number,
+  role: string,
+  sessionId: string,
+  unlockedGroupIds: number[] = [],
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ sub: String(userId), role, sessionId, unlockedGroupIds, exp: now + JWT_ACCESS_EXPIRES_SEC }, JWT_SECRET, 'HS256');
+  return sign(
+    { sub: String(userId), role, sessionId, unlockedGroupIds, exp: now + JWT_ACCESS_EXPIRES_SEC },
+    JWT_SECRET,
+    'HS256',
+  );
 }
 
 export { issueAccessToken };
@@ -124,16 +133,18 @@ router.use('/totp/*', authMiddleware);
 
 // GET /api/auth/me
 router.get('/me', async (c) => {
-  const userId = c.get('userId') as number;
-  const [user] = await db.select({ id: users.id, email: users.email, role: users.role, hasTOTP: users.totpSecret })
-    .from(users).where(eq(users.id, userId));
+  const userId = c.get('userId');
+  const [user] = await db
+    .select({ id: users.id, email: users.email, role: users.role, hasTOTP: users.totpSecret })
+    .from(users)
+    .where(eq(users.id, userId));
   if (!user) return c.json({ error: 'User not found' }, 404);
   return c.json({ id: user.id, email: user.email, role: user.role, hasTOTP: !!user.hasTOTP });
 });
 
 // GET /api/auth/totp/setup — generate new TOTP secret + QR code
 router.get('/totp/setup', async (c) => {
-  const userId = c.get('userId') as number;
+  const userId = c.get('userId');
   const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
 
   const secret = new OTPAuth.Secret({ size: 20 });
@@ -154,7 +165,7 @@ router.get('/totp/setup', async (c) => {
 
 // POST /api/auth/totp/confirm — verify code and save TOTP secret
 router.post('/totp/confirm', async (c) => {
-  const userId = c.get('userId') as number;
+  const userId = c.get('userId');
   const body = await c.req.json<{ secret: string; code: string }>();
 
   const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(body.secret) });
@@ -167,33 +178,36 @@ router.post('/totp/confirm', async (c) => {
 
 // DELETE /api/auth/totp — disable TOTP
 router.delete('/totp', async (c) => {
-  const userId = c.get('userId') as number;
+  const userId = c.get('userId');
   await db.update(users).set({ totpSecret: null }).where(eq(users.id, userId));
   return c.json({ success: true });
 });
 
 // GET /api/auth/sessions
 router.get('/sessions', async (c) => {
-  const userId = c.get('userId') as number;
-  const currentSessionId = c.get('sessionId') as string;
+  const userId = c.get('userId');
+  const currentSessionId = c.get('sessionId');
 
   const result = await db
-    .select({ id: sessions.id, userAgent: sessions.userAgent, ip: sessions.ip, createdAt: sessions.createdAt, expiresAt: sessions.expiresAt })
+    .select({
+      id: sessions.id,
+      userAgent: sessions.userAgent,
+      ip: sessions.ip,
+      createdAt: sessions.createdAt,
+      expiresAt: sessions.expiresAt,
+    })
     .from(sessions)
     .where(eq(sessions.userId, userId));
 
-  return c.json(result.map((s: typeof result[number]) => ({ ...s, isCurrent: s.id === currentSessionId })));
+  return c.json(result.map((s: (typeof result)[number]) => ({ ...s, isCurrent: s.id === currentSessionId })));
 });
 
 // DELETE /api/auth/sessions/:id
 router.delete('/sessions/:id', async (c) => {
-  const userId = c.get('userId') as number;
+  const userId = c.get('userId');
   const sessionId = c.req.param('id');
 
-  const [deleted] = await db
-    .delete(sessions)
-    .where(eq(sessions.id, sessionId))
-    .returning();
+  const [deleted] = await db.delete(sessions).where(eq(sessions.id, sessionId)).returning();
 
   if (!deleted || deleted.userId !== userId) {
     return c.json({ error: 'Session not found' }, 404);
@@ -202,4 +216,3 @@ router.delete('/sessions/:id', async (c) => {
 });
 
 export default router;
-

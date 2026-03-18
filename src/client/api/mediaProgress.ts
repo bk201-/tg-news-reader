@@ -19,8 +19,12 @@ export function useMediaProgressSSE(
   const qc = useQueryClient();
   const onProgressRef = useRef(onProgress);
   const onCompleteRef = useRef(onComplete);
-  useEffect(() => { onProgressRef.current = onProgress; });
-  useEffect(() => { onCompleteRef.current = onComplete; });
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  });
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
 
   useEffect(() => {
     if (!channelId) return;
@@ -33,11 +37,7 @@ export function useMediaProgressSSE(
 
       qc.setQueriesData<NewsItem[]>({ queryKey: ['news', channelId] }, (old) => {
         if (!old) return old;
-        return old.map((item) =>
-          item.id === data.newsId
-            ? { ...item, localMediaPath: data.localMediaPath }
-            : item,
-        );
+        return old.map((item) => (item.id === data.newsId ? { ...item, localMediaPath: data.localMediaPath } : item));
       });
 
       onProgressRef.current?.(data.done, data.total);

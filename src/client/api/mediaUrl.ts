@@ -10,4 +10,3 @@ export function mediaUrl(localMediaPath: string): string {
   const base = `/api/media/${localMediaPath}`;
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
-

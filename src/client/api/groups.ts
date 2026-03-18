@@ -21,8 +21,16 @@ export function useCreateGroup() {
 export function useUpdateGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number; name?: string; color?: string; pin?: string | null; sortOrder?: number }) =>
-      api.put<Group>('/groups/' + id, data),
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: number;
+      name?: string;
+      color?: string;
+      pin?: string | null;
+      sortOrder?: number;
+    }) => api.put<Group>('/groups/' + id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: groupKeys.all }),
   });
 }

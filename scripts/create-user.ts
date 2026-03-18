@@ -33,11 +33,14 @@ if (existing) {
 }
 
 const passwordHash = await bcrypt.hash(password, 12);
-const [user] = await db.insert(users).values({
-  email: normalizedEmail,
-  passwordHash,
-  role: 'admin',
-}).returning();
+const [user] = await db
+  .insert(users)
+  .values({
+    email: normalizedEmail,
+    passwordHash,
+    role: 'admin',
+  })
+  .returning();
 
 console.log(`✅ Admin user created:`);
 console.log(`   Email: ${user.email}`);
@@ -46,4 +49,3 @@ console.log(`   Role: ${user.role}`);
 console.log('');
 console.log('You can now log in at the app. Enable 2FA in the profile menu after first login.');
 process.exit(0);
-

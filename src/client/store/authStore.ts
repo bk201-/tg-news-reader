@@ -37,10 +37,8 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   isCheckingAuth: true,
   setAuth: (token, user) =>
     set({ accessToken: token, user, unlockedGroupIds: parseUnlockedGroups(token), isCheckingAuth: false }),
-  updateToken: (token) =>
-    set({ accessToken: token, unlockedGroupIds: parseUnlockedGroups(token) }),
+  updateToken: (token) => set({ accessToken: token, unlockedGroupIds: parseUnlockedGroups(token) }),
   clearAuth: () => set({ accessToken: null, user: null, unlockedGroupIds: [], isCheckingAuth: false }),
   setCheckingAuth: (v) => set({ isCheckingAuth: v }),
   updateUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : null })),
 }));
-

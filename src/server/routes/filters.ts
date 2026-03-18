@@ -8,11 +8,7 @@ const router = new Hono();
 // GET /api/channels/:channelId/filters
 router.get('/', async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
-  const result = await db
-    .select()
-    .from(filters)
-    .where(eq(filters.channelId, channelId))
-    .orderBy(filters.createdAt);
+  const result = await db.select().from(filters).where(eq(filters.channelId, channelId)).orderBy(filters.createdAt);
   return c.json(result);
 });
 
@@ -38,7 +34,7 @@ router.post('/', async (c) => {
 // PUT /api/channels/:channelId/filters/:id
 router.put('/:id', async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
-  const id = parseInt(c.req.param('id')!, 10);
+  const id = parseInt(c.req.param('id'), 10);
   const body = await c.req.json<{
     name?: string;
     type?: 'tag' | 'keyword';
@@ -62,7 +58,7 @@ router.put('/:id', async (c) => {
 // DELETE /api/channels/:channelId/filters/:id
 router.delete('/:id', async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
-  const id = parseInt(c.req.param('id')!, 10);
+  const id = parseInt(c.req.param('id'), 10);
   const [deleted] = await db
     .delete(filters)
     .where(and(eq(filters.id, id), eq(filters.channelId, channelId)))

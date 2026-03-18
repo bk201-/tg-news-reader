@@ -13,7 +13,11 @@ function deleteMediaFile(localMediaPath: string | null) {
   if (!localMediaPath) return;
   const filepath = join(process.cwd(), 'data', localMediaPath);
   if (existsSync(filepath)) {
-    try { unlinkSync(filepath); } catch { /* ignore */ }
+    try {
+      unlinkSync(filepath);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -23,7 +27,10 @@ router.post('/read-all', async (c) => {
   const conditions = [eq(news.isRead, 0)];
   if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
 
-  await db.update(news).set({ isRead: 1 }).where(and(...conditions));
+  await db
+    .update(news)
+    .set({ isRead: 1 })
+    .where(and(...conditions));
 
   // Sync read state to Telegram if channelId provided
   if (body.channelId) {
@@ -79,12 +86,12 @@ router.get('/', async (c) => {
       .where(and(eq(filtersTable.channelId, channelId), eq(filtersTable.isActive, 1)));
 
     const tagValues = activeFilters
-      .filter((f: typeof activeFilters[number]) => f.type === 'tag')
-      .map((f: typeof activeFilters[number]) => f.value.replace(/^#/, '').toLowerCase());
+      .filter((f: (typeof activeFilters)[number]) => f.type === 'tag')
+      .map((f: (typeof activeFilters)[number]) => f.value.replace(/^#/, '').toLowerCase());
 
     const keywordValues = activeFilters
-      .filter((f: typeof activeFilters[number]) => f.type === 'keyword')
-      .map((f: typeof activeFilters[number]) => f.value.toLowerCase());
+      .filter((f: (typeof activeFilters)[number]) => f.type === 'keyword')
+      .map((f: (typeof activeFilters)[number]) => f.value.toLowerCase());
 
     if (tagValues.length > 0) {
       // Exclude news where any hashtag matches any tag filter (with or without leading #)
@@ -107,7 +114,7 @@ router.get('/', async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(news.postedAt));
 
-  const mapped: NewsItem[] = rows.map((r: typeof rows[number]) => ({
+  const mapped: NewsItem[] = rows.map((r: (typeof rows)[number]) => ({
     ...r,
     links: JSON.parse(r.links) as string[],
     hashtags: JSON.parse(r.hashtags) as string[],
@@ -140,11 +147,7 @@ router.patch('/:id/read', async (c) => {
   const body = await c.req.json<{ isRead?: number }>().catch(() => ({ isRead: 1 }));
   const isRead = body.isRead ?? 1;
 
-  const [updated] = await db
-    .update(news)
-    .set({ isRead })
-    .where(eq(news.id, id))
-    .returning();
+  const [updated] = await db.update(news).set({ isRead }).where(eq(news.id, id)).returning();
   if (!updated) return c.json({ error: 'News not found' }, 404);
 
   // When marking as read — sync to Telegram and update lastReadAt in DB
@@ -160,10 +163,7 @@ router.patch('/:id/read', async (c) => {
         }
         // Update lastReadAt only if this message is newer than what we have
         if (!channel.lastReadAt || updated.postedAt > channel.lastReadAt) {
-          await db
-            .update(channels)
-            .set({ lastReadAt: updated.postedAt })
-            .where(eq(channels.id, updated.channelId));
+          await db.update(channels).set({ lastReadAt: updated.postedAt }).where(eq(channels.id, updated.channelId));
         }
       })();
     }
@@ -180,7 +180,7 @@ router.patch('/:id/read', async (c) => {
 
 // POST /api/news/:id/download-media — on-demand download (no size limit)
 router.post('/:id/download-media', async (c) => {
-  const id = parseInt(c.req.param('id')!, 10);
+  const id = parseInt(c.req.param('id'), 10);
   const [row] = await db.select().from(news).where(eq(news.id, id));
   if (!row) return c.json({ error: 'News not found' }, 404);
   if (row.localMediaPath) return c.json({ localMediaPath: row.localMediaPath }); // already downloaded
@@ -194,11 +194,7 @@ router.post('/:id/download-media', async (c) => {
   const localPath = await downloadMessageMedia(msg, channel.telegramId, { ignoreLimit: true });
   if (!localPath) return c.json({ error: 'Failed to download media' }, 500);
 
-  const [updated] = await db
-    .update(news)
-    .set({ localMediaPath: localPath })
-    .where(eq(news.id, id))
-    .returning();
+  const [updated] = await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, id)).returning();
 
   return c.json({
     ...updated,

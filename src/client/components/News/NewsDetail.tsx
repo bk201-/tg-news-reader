@@ -32,11 +32,19 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
   const handleMarkRead = () => {
     markRead.mutate(
       { id: item.id, isRead: isRead ? 0 : 1 },
-      { onSuccess: () => { if (!isRead) onMarkedRead?.(item.id); } },
+      {
+        onSuccess: () => {
+          if (!isRead) onMarkedRead?.(item.id);
+        },
+      },
     );
   };
-  const handleExtract = async () => { await extractContent.mutateAsync(item.id); };
-  const handleDownloadMedia = () => { downloadMedia.mutate(item.id); };
+  const handleExtract = async () => {
+    await extractContent.mutateAsync(item.id);
+  };
+  const handleDownloadMedia = () => {
+    downloadMedia.mutate(item.id);
+  };
 
   const firstLink = links[0];
   const isVideo = /\.(mp4|webm)$/i.test(item.localMediaPath ?? '');
@@ -53,7 +61,9 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           </Text>
           <div style={{ marginTop: 4 }}>
             {hashtags.map((tag) => (
-              <Tag key={tag} color="blue">{tag}</Tag>
+              <Tag key={tag} color="blue">
+                {tag}
+              </Tag>
             ))}
           </div>
         </div>
@@ -68,8 +78,14 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
               </Button>
             </Tooltip>
           )}
-          {firstLink && !item.fullContent && channelType !== 'link_continuation' && (            <Tooltip title="Загрузить полный текст статьи">
-              <Button icon={<DownloadOutlined />} size="small" onClick={handleExtract} loading={extractContent.isPending}>
+          {firstLink && !item.fullContent && channelType !== 'link_continuation' && (
+            <Tooltip title="Загрузить полный текст статьи">
+              <Button
+                icon={<DownloadOutlined />}
+                size="small"
+                onClick={handleExtract}
+                loading={extractContent.isPending}
+              >
                 Загрузить текст
               </Button>
             </Tooltip>
@@ -86,14 +102,13 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
         </Space>
       </div>
 
-
       <div className="news-detail__content">
         {/* Media content */}
         {item.localMediaPath ? (
           <div className="news-detail__media">
             {isVideo ? (
               <video
-                src={mediaUrl(item.localMediaPath!)}
+                src={mediaUrl(item.localMediaPath)}
                 controls
                 muted
                 autoPlay
@@ -102,9 +117,16 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
               />
             ) : (
               <img
-                src={mediaUrl(item.localMediaPath!)}
+                src={mediaUrl(item.localMediaPath)}
                 alt="media"
-                style={{ maxHeight: '80vh', maxWidth: '100%', objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 8 }}
+                style={{
+                  maxHeight: '80vh',
+                  maxWidth: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: '0 auto',
+                  borderRadius: 8,
+                }}
               />
             )}
           </div>
@@ -120,7 +142,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
             </Button>
             {downloadMedia.isError && (
               <Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-                Не удалось скачать: {(downloadMedia.error as Error)?.message}
+                Не удалось скачать: {downloadMedia.error?.message}
               </Text>
             )}
           </div>
@@ -129,9 +151,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
         {/* For link_continuation: show fullContent if available, original text as fallback */}
         {channelType === 'link_continuation' ? (
           item.fullContent ? (
-            <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>
-              {item.fullContent}
-            </Paragraph>
+            <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>{item.fullContent}</Paragraph>
           ) : (
             <>
               <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7 }}>
@@ -156,7 +176,15 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           )
         ) : channelType === 'media_content' ? (
           item.text ? (
-            <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6, color: 'var(--tgr-color-text-secondary, #666)', marginTop: 8 }}>
+            <Paragraph
+              style={{
+                whiteSpace: 'pre-wrap',
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: 'var(--tgr-color-text-secondary, #666)',
+                marginTop: 8,
+              }}
+            >
               {item.text}
             </Paragraph>
           ) : null
@@ -169,7 +197,9 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
         {/* Links */}
         {links.length > 0 && (
           <div style={{ marginTop: 12 }}>
-            <Text type="secondary" strong style={{ fontSize: 12 }}>Ссылки:</Text>
+            <Text type="secondary" strong style={{ fontSize: 12 }}>
+              Ссылки:
+            </Text>
             {links.map((link, i) => (
               <div key={i} style={{ marginTop: 4 }}>
                 <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
@@ -183,7 +213,11 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
         {/* Extra fullContent for non-link_continuation channels */}
         {channelType !== 'link_continuation' && item.fullContent && (
           <>
-            <Divider><Text type="secondary" style={{ fontSize: 12 }}>Полный текст статьи</Text></Divider>
+            <Divider>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Полный текст статьи
+              </Text>
+            </Divider>
             <div className="news-detail__full-content">
               <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>
                 {item.fullContent}

@@ -86,8 +86,8 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
     >
       <div style={{ marginBottom: 16 }}>
         <Text type="secondary">
-          Новости, совпадающие с активными фильтрами, будут <strong>скрыты</strong>. Сначала проверяются теги (#),
-          затем ключевые слова.
+          Новости, совпадающие с активными фильтрами, будут <strong>скрыты</strong>. Сначала проверяются теги (#), затем
+          ключевые слова.
         </Text>
       </div>
 

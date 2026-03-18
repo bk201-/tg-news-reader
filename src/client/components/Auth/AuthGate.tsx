@@ -14,12 +14,15 @@ export function AuthGate({ children }: Props) {
   useEffect(() => {
     fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
       .then(async (res) => {
-        if (!res.ok) { clearAuth(); return; }
+        if (!res.ok) {
+          clearAuth();
+          return;
+        }
         const data = (await res.json()) as { accessToken: string; user: AuthUser };
         setAuth(data.accessToken, data.user);
       })
       .catch(() => clearAuth());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isCheckingAuth) {
@@ -36,4 +39,3 @@ export function AuthGate({ children }: Props) {
 
   return <>{children}</>;
 }
-

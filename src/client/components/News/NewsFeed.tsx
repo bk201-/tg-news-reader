@@ -1,6 +1,14 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { Button, Space, Typography, Spin, Empty, Tooltip, Badge, Tag, App, Segmented } from 'antd';
-import { FilterOutlined, EyeOutlined, CheckSquareOutlined, SyncOutlined, CloseCircleOutlined, LoadingOutlined, HistoryOutlined } from '@ant-design/icons';
+import {
+  FilterOutlined,
+  EyeOutlined,
+  CheckSquareOutlined,
+  SyncOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
+  HistoryOutlined,
+} from '@ant-design/icons';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
@@ -21,10 +29,13 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
 
   const {
-    selectedNewsId, setSelectedNewsId,
-    showAll, setShowAll,
+    selectedNewsId,
+    setSelectedNewsId,
+    showAll,
+    setShowAll,
     setFilterPanelOpen,
-    hashTagFilter, setHashTagFilter,
+    hashTagFilter,
+    setHashTagFilter,
   } = useUIStore();
 
   const { data: newsItems = [], isLoading } = useNews(channel.id, !showAll);
@@ -41,11 +52,15 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     mediaProgressActive ? channel.id : null,
     sseKey,
     (done, total) => setMediaProgress({ done, total }),
-    () => { setMediaProgressActive(false); setMediaProgress(null); },
+    () => {
+      setMediaProgressActive(false);
+      setMediaProgress(null);
+    },
   );
 
   // Reset SSE state when channel changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMediaProgressActive(false);
     setMediaProgress(null);
   }, [channel.id]);
@@ -66,7 +81,11 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   // Sync URL hash (write)
   useEffect(() => {
     if (hashTagFilter) {
-      history.replaceState(null, '', `${window.location.pathname}${window.location.search}#tag=${encodeURIComponent(hashTagFilter)}`);
+      history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}#tag=${encodeURIComponent(hashTagFilter)}`,
+      );
     } else {
       history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     }
@@ -99,9 +118,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     const base = showAll ? newsItems : newsItems.filter((item) => filteredIds.has(item.id));
     if (!hashTagFilter) return base;
     const normalized = hashTagFilter.toLowerCase().replace(/^#/, '');
-    return base.filter((item) =>
-      (item.hashtags || []).some((h) => h.toLowerCase().replace(/^#/, '') === normalized),
-    );
+    return base.filter((item) => (item.hashtags || []).some((h) => h.toLowerCase().replace(/^#/, '') === normalized));
   }, [newsItems, filteredIds, showAll, hashTagFilter]);
 
   const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
@@ -117,7 +134,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [displayItems, setSelectedNewsId],
   );
 
-  const handleTagClick = useCallback(    (tag: string, action: 'show' | 'addFilter') => {
+  const handleTagClick = useCallback(
+    (tag: string, action: 'show' | 'addFilter') => {
       if (action === 'show') {
         setHashTagFilter(tag);
         setShowAll(false);
@@ -130,38 +148,53 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [setHashTagFilter, setShowAll, createFilter, message],
   );
 
-  const handleMarkAllRead = () => { markAllRead.mutate(channel.id); };
+  const handleMarkAllRead = () => {
+    markAllRead.mutate(channel.id);
+  };
 
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
 
   // Reset period selection when channel changes
-  useEffect(() => { setFetchPeriod(''); }, [channel.id]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFetchPeriod('');
+  }, [channel.id]);
 
   const handleFetchDefault = useCallback(() => {
     setFetchPeriod('');
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
-  const handleFetchPeriod = useCallback((val: string | number) => {
-    const v = String(val);
-    setFetchPeriod(v);
-    if (v === 'sync') {
-      fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
-    } else {
-      const days = parseInt(v, 10);
-      const since = new Date();
-      since.setDate(since.getDate() - days);
-      since.setHours(0, 0, 0, 0);
-      fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
-    }
-  }, [channel.id, fetchChannel, onFetchSuccess]);
+  const handleFetchPeriod = useCallback(
+    (val: string | number) => {
+      const v = String(val);
+      setFetchPeriod(v);
+      if (v === 'sync') {
+        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
+      } else {
+        const days = parseInt(v, 10);
+        const since = new Date();
+        since.setDate(since.getDate() - days);
+        since.setHours(0, 0, 0, 0);
+        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
+      }
+    },
+    [channel.id, fetchChannel, onFetchSuccess],
+  );
 
   const periodOptions = [
-    { value: '3',    label: '3д'  },
-    { value: '5',    label: '5д'  },
-    { value: '7',    label: '7д'  },
-    { value: '14',   label: '14д' },
-    { value: 'sync', label: <Tooltip title="С последней синхронизации"><HistoryOutlined /></Tooltip> },
+    { value: '3', label: '3д' },
+    { value: '5', label: '5д' },
+    { value: '7', label: '7д' },
+    { value: '14', label: '14д' },
+    {
+      value: 'sync',
+      label: (
+        <Tooltip title="С последней синхронизации">
+          <HistoryOutlined />
+        </Tooltip>
+      ),
+    },
   ];
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -178,11 +211,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       <div className="news-feed__toolbar">
         <Space wrap>
           <Tooltip title="Выгрузить с последнего прочитанного">
-            <Button
-              icon={<SyncOutlined />}
-              onClick={handleFetchDefault}
-              loading={fetchChannel.isPending}
-            />
+            <Button icon={<SyncOutlined />} onClick={handleFetchDefault} loading={fetchChannel.isPending} />
           </Tooltip>
           <Segmented
             options={periodOptions}
@@ -222,7 +251,10 @@ export function NewsFeed({ channel }: NewsFeedProps) {
           {mediaProgress && (
             <Text type="secondary">
               <LoadingOutlined style={{ marginRight: 4 }} />
-              Медиа: <strong>{mediaProgress.done}/{mediaProgress.total}</strong>
+              Медиа:{' '}
+              <strong>
+                {mediaProgress.done}/{mediaProgress.total}
+              </strong>
             </Text>
           )}
           <Text type="secondary">

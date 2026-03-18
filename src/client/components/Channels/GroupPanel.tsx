@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { Button, Modal, Form, Input, Tooltip, Dropdown, Typography, theme } from 'antd';
-import { FolderFilled, PlusOutlined, EditOutlined, DeleteOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
+import {
+  FolderFilled,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  LockOutlined,
+  UnlockOutlined,
+} from '@ant-design/icons';
 import type { Group } from '@shared/types.ts';
 import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useVerifyGroupPIN } from '../../api/groups';
 import { useChannels } from '../../api/channels';
@@ -101,9 +108,10 @@ export function GroupPanel() {
       okText: 'Удалить',
       okType: 'danger',
       cancelText: 'Отмена',
-      onOk: () => deleteGroup.mutateAsync(g.id).then(() => {
-        if (selectedGroupId === g.id) setSelectedGroupId(null);
-      }),
+      onOk: () =>
+        deleteGroup.mutateAsync(g.id).then(() => {
+          if (selectedGroupId === g.id) setSelectedGroupId(null);
+        }),
     });
   };
 
@@ -164,15 +172,16 @@ export function GroupPanel() {
               <FolderFilled style={{ fontSize: 22, color: g.color }} />
             )}
             {count > 0 && (
-              <span
-                className="group-item__badge"
-                style={{ background: token.colorPrimary }}
-              >
+              <span className="group-item__badge" style={{ background: token.colorPrimary }}>
                 {count > 99 ? '99+' : count}
               </span>
             )}
           </div>
-          <Text className="group-item__label" style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, marginTop: 2 }} ellipsis>
+          <Text
+            className="group-item__label"
+            style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, marginTop: 2 }}
+            ellipsis
+          >
             {g.name}
           </Text>
         </div>
@@ -192,15 +201,22 @@ export function GroupPanel() {
           <div className="group-item__icon-wrap">
             <FolderFilled style={{ fontSize: 22, color: token.colorTextSecondary }} />
             {generalCount > 0 && (
-              <span
-                className="group-item__badge"
-                style={{ background: token.colorPrimary }}
-              >
+              <span className="group-item__badge" style={{ background: token.colorPrimary }}>
                 {generalCount > 99 ? '99+' : generalCount}
               </span>
             )}
           </div>
-          <Text className="group-item__label" style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, marginTop: 2, color: token.colorTextSecondary }} ellipsis>
+          <Text
+            className="group-item__label"
+            style={{
+              fontSize: 10,
+              textAlign: 'center',
+              lineHeight: 1.2,
+              marginTop: 2,
+              color: token.colorTextSecondary,
+            }}
+            ellipsis
+          >
             Общее
           </Text>
         </div>
@@ -256,7 +272,9 @@ export function GroupPanel() {
           </Form.Item>
           <Form.Item
             name="pin"
-            label={editingGroup?.hasPIN ? 'Новый PIN (оставьте пустым чтобы не менять)' : 'PIN (необязательно, 4 цифры)'}
+            label={
+              editingGroup?.hasPIN ? 'Новый PIN (оставьте пустым чтобы не менять)' : 'PIN (необязательно, 4 цифры)'
+            }
             rules={[{ pattern: /^\d{4}$/, message: 'PIN должен быть 4 цифры', warningOnly: false }]}
           >
             <Input.Password
@@ -314,4 +332,3 @@ export function GroupPanel() {
     </div>
   );
 }
-

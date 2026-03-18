@@ -5,7 +5,13 @@ import { channels, news } from '../db/schema.js';
 import { eq, and, isNull, inArray, count } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { fetchChannelMessages, fetchMessageById, downloadMessageMedia, getReadInboxMaxId, type TelegramMessage } from '../services/telegram.js';
+import {
+  fetchChannelMessages,
+  fetchMessageById,
+  downloadMessageMedia,
+  getReadInboxMaxId,
+  type TelegramMessage,
+} from '../services/telegram.js';
 import { extractContentFromUrl, buildFullContent } from '../services/readability.js';
 import { emitMediaProgress, mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
 import type { ChannelType } from '../../shared/types.js';
@@ -25,9 +31,7 @@ async function postProcess(
   abortSignal: AbortSignal,
 ): Promise<void> {
   if (channelType === 'link_continuation') {
-    const toExtract = messages
-      .filter((m) => m.links.length > 0 && insertedMap.has(m.id))
-      .slice(0, 30);
+    const toExtract = messages.filter((m) => m.links.length > 0 && insertedMap.has(m.id)).slice(0, 30);
 
     for (const msg of toExtract) {
       const newsId = insertedMap.get(msg.id)!;
@@ -52,13 +56,9 @@ async function postProcess(
       .select({ id: news.id, telegramMsgId: news.telegramMsgId })
       .from(news)
       .where(
-        and(
-          eq(news.channelId, channelId),
-          isNull(news.localMediaPath),
-          inArray(news.mediaType, ['photo', 'document']),
-        ),
+        and(eq(news.channelId, channelId), isNull(news.localMediaPath), inArray(news.mediaType, ['photo', 'document'])),
       );
-    const pendingToRetry = pendingRows.filter((r: typeof pendingRows[number]) => !newIds.has(r.id));
+    const pendingToRetry = pendingRows.filter((r: (typeof pendingRows)[number]) => !newIds.has(r.id));
     const total = toDownload.length + pendingToRetry.length;
     let done = 0;
 
@@ -130,7 +130,13 @@ router.get('/', async (c) => {
 
 // POST /api/channels
 router.post('/', async (c) => {
-  const body = await c.req.json<{ telegramId: string; name: string; description?: string; channelType?: ChannelType; groupId?: number | null }>();
+  const body = await c.req.json<{
+    telegramId: string;
+    name: string;
+    description?: string;
+    channelType?: ChannelType;
+    groupId?: number | null;
+  }>();
   if (!body.telegramId || !body.name) {
     return c.json({ error: 'telegramId and name are required' }, 400);
   }
@@ -327,7 +333,11 @@ router.post('/:id/fetch', async (c) => {
       if (!row.localMediaPath) continue;
       const filepath = join(process.cwd(), 'data', row.localMediaPath);
       if (existsSync(filepath)) {
-        try { unlinkSync(filepath); } catch { /* ignore */ }
+        try {
+          unlinkSync(filepath);
+        } catch {
+          /* ignore */
+        }
       }
     }
 
@@ -365,8 +375,7 @@ router.post('/:id/fetch', async (c) => {
     const now = Math.floor(Date.now() / 1000);
     await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
 
-    const mediaProcessing = channel.channelType === 'media_content' &&
-      messages.some((m) => m.rawMedia !== undefined);
+    const mediaProcessing = channel.channelType === 'media_content' && messages.some((m) => m.rawMedia !== undefined);
 
     // Cancel any ongoing postProcess for this channel before starting a new one
     activeProcessing.get(channelId)?.abort();
@@ -374,10 +383,16 @@ router.post('/:id/fetch', async (c) => {
     activeProcessing.set(channelId, ac);
 
     // Fire post-processing in background — client gets response immediately
-    void postProcess(channelId, channel.channelType as ChannelType, channel.telegramId, messages, insertedMap, ac.signal)
-      .finally(() => {
-        if (activeProcessing.get(channelId) === ac) activeProcessing.delete(channelId);
-      });
+    void postProcess(
+      channelId,
+      channel.channelType as ChannelType,
+      channel.telegramId,
+      messages,
+      insertedMap,
+      ac.signal,
+    ).finally(() => {
+      if (activeProcessing.get(channelId) === ac) activeProcessing.delete(channelId);
+    });
 
     return c.json({ inserted, total: messages.length, mediaProcessing });
   } catch (err: unknown) {

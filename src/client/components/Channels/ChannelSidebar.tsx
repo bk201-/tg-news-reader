@@ -3,7 +3,14 @@ import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Sel
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
-import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel, useCountUnreadChannels } from '../../api/channels';
+import {
+  useChannels,
+  useCreateChannel,
+  useUpdateChannel,
+  useDeleteChannel,
+  useFetchChannel,
+  useCountUnreadChannels,
+} from '../../api/channels';
 import { useGroups } from '../../api/groups';
 import { useUIStore } from '../../store/uiStore';
 
@@ -22,7 +29,7 @@ export function ChannelSidebar() {
 
   // Filter channels by selected group
   const channels = allChannels.filter((ch) =>
-    selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId
+    selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId,
   );
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -112,11 +119,7 @@ export function ChannelSidebar() {
         </Text>
         <Space size={4}>
           <Tooltip title="Посчитать непрочитанные в Telegram">
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => countUnread.mutate()}
-              loading={countUnread.isPending}
-            >
+            <Button icon={<ReloadOutlined />} onClick={() => countUnread.mutate()} loading={countUnread.isPending}>
               <span className="btn-text">Обновить</span>
             </Button>
           </Tooltip>
@@ -154,33 +157,30 @@ export function ChannelSidebar() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
               <Space className="channel-item__actions" size={4}>
-              <Tooltip title="Загрузить новости">
-                <Button
-                  icon={<ReloadOutlined />}
-                  size="small"
-                  type="text"
-                  loading={fetchChannel.isPending && fetchTargetId === ch.id}
-                  onClick={(e) => openFetchModal(ch, e)}
-                />
-              </Tooltip>
-              <Tooltip title="Редактировать">
-                <Button icon={<EditOutlined />} size="small" type="text" onClick={(e) => openEdit(ch, e)} />
-              </Tooltip>
-              <Tooltip title="Удалить">
-                <Button
-                  icon={<DeleteOutlined />}
-                  size="small"
-                  type="text"
-                  danger
-                  onClick={(e) => handleDelete(ch, e)}
-                />
-              </Tooltip>
-            </Space>
-            <Badge
-              count={(ch.unreadCount || 0) + (pendingCounts[ch.id] || 0)}
-              size="small"
-            />
-          </div>
+                <Tooltip title="Загрузить новости">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    size="small"
+                    type="text"
+                    loading={fetchChannel.isPending && fetchTargetId === ch.id}
+                    onClick={(e) => openFetchModal(ch, e)}
+                  />
+                </Tooltip>
+                <Tooltip title="Редактировать">
+                  <Button icon={<EditOutlined />} size="small" type="text" onClick={(e) => openEdit(ch, e)} />
+                </Tooltip>
+                <Tooltip title="Удалить">
+                  <Button
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    type="text"
+                    danger
+                    onClick={(e) => handleDelete(ch, e)}
+                  />
+                </Tooltip>
+              </Space>
+              <Badge count={(ch.unreadCount || 0) + (pendingCounts[ch.id] || 0)} size="small" />
+            </div>
           </div>
         ))}
       </div>
