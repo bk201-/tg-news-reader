@@ -126,10 +126,12 @@ export function GroupPanel() {
     setSelectedGroupId(g.id);
   };
 
-  const handleVerifyPIN = async () => {
+  const handleVerifyPIN = async (pin?: string) => {
     if (!pinTarget) return;
+    const value = pin ?? pinValue;
+    if (!value) return;
     try {
-      await verifyPIN.mutateAsync({ id: pinTarget.id, pin: pinValue });
+      await verifyPIN.mutateAsync({ id: pinTarget.id, pin: value });
       // token updated in useVerifyGroupPIN.onSuccess → unlockedGroupIds in authStore updated
       setSelectedGroupId(pinTarget.id);
       setPinModalOpen(false);
@@ -307,18 +309,29 @@ export function GroupPanel() {
           </span>
         }
         onCancel={() => setPinModalOpen(false)}
-        onOk={handleVerifyPIN}
+        onOk={() => void handleVerifyPIN()}
         okText="Открыть"
         cancelText="Отмена"
         confirmLoading={verifyPIN.isPending}
+        afterOpenChange={(open) => {
+          if (open) setPinValue('');
+        }}
       >
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
+        <div
+          style={{ marginTop: 16, textAlign: 'center' }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleVerifyPIN();
+          }}
+        >
           <Input.OTP
             length={4}
+            autoFocus
             value={pinValue}
             onChange={(val) => {
               setPinValue(val);
               setPinError('');
+              // Auto-submit when all 4 digits entered
+              if (val.length === 4) void handleVerifyPIN(val);
             }}
             styles={{ root: { justifyContent: 'center' }, input: { width: 56, height: 56, fontSize: 24 } }}
           />
