@@ -85,72 +85,105 @@ function extractHashtags(text: string, entities?: Api.TypeMessageEntity[]): stri
   return hashtags;
 }
 
+const BATCH_SIZE = 100; // Telegram's practical per-request limit
+
+function parseMessageFields(msg: Api.Message, channelUsername: string): TelegramMessage | null {
+  void channelUsername;
+  if (!msg.message && !msg.media) return null;
+
+  const text = msg.message || '';
+  const links = extractLinks(text, msg.entities);
+  const hashtags = extractHashtags(text, msg.entities);
+
+  let mediaType: string | undefined;
+  let mediaSizeBytes: number | undefined;
+
+  if (msg.media) {
+    if (msg.media instanceof Api.MessageMediaPhoto) {
+      mediaType = 'photo';
+      const photo = msg.media.photo;
+      if (photo instanceof Api.Photo) {
+        const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize) as Api.PhotoSize[];
+        const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
+        if (largest) mediaSizeBytes = largest.size;
+      }
+    } else if (msg.media instanceof Api.MessageMediaDocument) {
+      mediaType = 'document';
+      const doc = msg.media.document;
+      if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
+    } else if (msg.media instanceof Api.MessageMediaWebPage) {
+      mediaType = 'webpage';
+    } else {
+      mediaType = 'other';
+    }
+  }
+
+  return {
+    id: msg.id,
+    message: text,
+    date: msg.date || 0,
+    links,
+    hashtags,
+    mediaType,
+    mediaSizeBytes,
+    rawMedia: msg.media ?? undefined,
+  };
+}
+
 export async function fetchChannelMessages(
   channelUsername: string,
   options: { sinceDate?: Date; limit?: number; offsetId?: number } = {},
 ): Promise<TelegramMessage[]> {
   const tg = await getTelegramClient();
-  const { sinceDate, limit = 100, offsetId } = options;
+  const { sinceDate, limit = 500 } = options;
 
-  const messages: TelegramMessage[] = [];
+  const allMessages: TelegramMessage[] = [];
+  let offsetId = options.offsetId ?? 0;
 
   try {
-    const result = await tg.getMessages(channelUsername, {
-      limit,
-      offsetId,
-    });
+    while (true) {
+      const result = await tg.getMessages(channelUsername, {
+        limit: BATCH_SIZE,
+        ...(offsetId ? { offsetId } : {}),
+      });
 
-    for (const msg of result) {
-      if (!(msg instanceof Api.Message)) continue;
-      if (!msg.message && !msg.media) continue;
+      if (!result || result.length === 0) break;
 
-      const msgDate = new Date((msg.date || 0) * 1000);
-      if (sinceDate && msgDate <= sinceDate) continue;
+      let reachedSinceDate = false;
 
-      const text = msg.message || '';
-      const links = extractLinks(text, msg.entities);
-      const hashtags = extractHashtags(text, msg.entities);
+      for (const msg of result) {
+        if (!(msg instanceof Api.Message)) continue;
 
-      let mediaType: string | undefined;
-      let mediaSizeBytes: number | undefined;
+        const msgDate = new Date((msg.date || 0) * 1000);
 
-      if (msg.media) {
-        if (msg.media instanceof Api.MessageMediaPhoto) {
-          mediaType = 'photo';
-          const photo = msg.media.photo;
-          if (photo instanceof Api.Photo) {
-            const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize) as Api.PhotoSize[];
-            const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
-            if (largest) mediaSizeBytes = largest.size;
-          }
-        } else if (msg.media instanceof Api.MessageMediaDocument) {
-          mediaType = 'document';
-          const doc = msg.media.document;
-          if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
-        } else if (msg.media instanceof Api.MessageMediaWebPage) {
-          mediaType = 'webpage';
-        } else {
-          mediaType = 'other';
+        // Messages come newest-first; once we hit sinceDate, stop
+        if (sinceDate && msgDate <= sinceDate) {
+          reachedSinceDate = true;
+          break;
         }
+
+        const parsed = parseMessageFields(msg, channelUsername);
+        if (parsed) allMessages.push(parsed);
       }
 
-      messages.push({
-        id: msg.id,
-        message: text,
-        date: msg.date || 0,
-        links,
-        hashtags,
-        mediaType,
-        mediaSizeBytes,
-        rawMedia: msg.media ?? undefined,
-      });
+      if (reachedSinceDate) break;
+      if (result.length < BATCH_SIZE) break; // no more messages in channel
+      if (allMessages.length >= limit) break; // safety cap
+
+      // Oldest message ID in this batch → next batch starts from there
+      const lastMsg = result[result.length - 1];
+      if (lastMsg instanceof Api.Message) {
+        offsetId = lastMsg.id;
+      } else {
+        break;
+      }
     }
   } catch (err) {
     console.error('Error fetching Telegram messages:', err);
     throw err;
   }
 
-  return messages.sort((a, b) => a.date - b.date);
+  return allMessages.sort((a, b) => a.date - b.date);
 }
 
 export async function getChannelInfo(username: string) {

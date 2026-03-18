@@ -1,22 +1,29 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Select, Badge } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
 import { useChannels, useCreateChannel, useUpdateChannel, useDeleteChannel, useFetchChannel, useCountUnreadChannels } from '../../api/channels';
+import { useGroups } from '../../api/groups';
 import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
 
 export function ChannelSidebar() {
-  const { data: channels = [], isLoading } = useChannels();
+  const { data: allChannels = [], isLoading } = useChannels();
+  const { data: groups = [] } = useGroups();
   const createChannel = useCreateChannel();
   const updateChannel = useUpdateChannel();
   const deleteChannel = useDeleteChannel();
   const fetchChannel = useFetchChannel();
   const countUnread = useCountUnreadChannels();
 
-  const { selectedChannelId, setSelectedChannelId, pendingCounts } = useUIStore();
+  const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
+
+  // Filter channels by selected group
+  const channels = allChannels.filter((ch) =>
+    selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -29,13 +36,20 @@ export function ChannelSidebar() {
   const openCreate = () => {
     setEditingChannel(null);
     form.resetFields();
+    form.setFieldValue('groupId', selectedGroupId ?? undefined);
     setModalOpen(true);
   };
 
   const openEdit = (ch: Channel, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingChannel(ch);
-    form.setFieldsValue({ telegramId: ch.telegramId, name: ch.name, description: ch.description, channelType: ch.channelType });
+    form.setFieldsValue({
+      telegramId: ch.telegramId,
+      name: ch.name,
+      description: ch.description,
+      channelType: ch.channelType,
+      groupId: ch.groupId ?? undefined,
+    });
     setModalOpen(true);
   };
 
@@ -45,11 +59,19 @@ export function ChannelSidebar() {
       name: string;
       description?: string;
       channelType: 'none' | 'link_continuation' | 'media_content';
+      groupId?: number;
     };
     if (editingChannel) {
-      await updateChannel.mutateAsync({ id: editingChannel.id, ...values });
+      await updateChannel.mutateAsync({
+        id: editingChannel.id,
+        ...values,
+        groupId: values.groupId ?? null,
+      });
     } else {
-      await createChannel.mutateAsync(values);
+      await createChannel.mutateAsync({
+        ...values,
+        groupId: values.groupId ?? null,
+      });
     }
     setModalOpen(false);
   };
@@ -114,6 +136,11 @@ export function ChannelSidebar() {
           >
             <div className="channel-item__info">
               <Text strong ellipsis>
+                {ch.isUnavailable ? (
+                  <Tooltip title="Канал недоступен в Telegram (удалён или закрыт)">
+                    <WarningOutlined style={{ color: '#ff4d4f', marginRight: 4 }} />
+                  </Tooltip>
+                ) : null}
                 {ch.name}
               </Text>
               <Text type="secondary" style={{ fontSize: 11 }}>
@@ -187,6 +214,15 @@ export function ChannelSidebar() {
               <Select.Option value="none">Не выбрано</Select.Option>
               <Select.Option value="link_continuation">Ссылка — продолжение новости</Select.Option>
               <Select.Option value="media_content">Медиа контент (фото/видео)</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="groupId" label="Группа">
+            <Select allowClear placeholder="Общее (без группы)">
+              {groups.map((g) => (
+                <Select.Option key={g.id} value={g.id}>
+                  <span style={{ color: g.color }}>■</span> {g.name}
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
         </Form>

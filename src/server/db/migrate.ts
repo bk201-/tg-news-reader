@@ -1,6 +1,14 @@
 ﻿import { client } from './index.js';
 await client.execute('PRAGMA foreign_keys = ON');
 await client.executeMultiple(`
+  CREATE TABLE IF NOT EXISTS groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#1677ff',
+    pin_hash TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
   CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     telegram_id TEXT NOT NULL UNIQUE,
@@ -35,19 +43,42 @@ await client.executeMultiple(`
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    totp_secret TEXT,
+    role TEXT NOT NULL DEFAULT 'admin',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    user_agent TEXT,
+    ip TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 `);
+
 const alterMigrations = [
   "ALTER TABLE channels ADD COLUMN channel_type TEXT NOT NULL DEFAULT 'none'",
   'ALTER TABLE news ADD COLUMN local_media_path TEXT',
   'ALTER TABLE news ADD COLUMN media_size INTEGER',
   'ALTER TABLE filters ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE',
   'ALTER TABLE channels ADD COLUMN last_read_at INTEGER',
+  'ALTER TABLE channels ADD COLUMN group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL',
+  'ALTER TABLE channels ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0',
+  "ALTER TABLE sessions ADD COLUMN unlocked_group_ids TEXT NOT NULL DEFAULT '[]'",
+  'ALTER TABLE channels ADD COLUMN is_unavailable INTEGER NOT NULL DEFAULT 0',
 ];
 for (const sql of alterMigrations) {
   try {
     await client.execute(sql);
   } catch {
-    // Column already exists
+    // Column already exists — skip
   }
 }
 

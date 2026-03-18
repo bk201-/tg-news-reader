@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
 import { useQueryClient } from '@tanstack/react-query';
+import { mediaUrl } from '../../api/mediaUrl';
 
 const { Text, Paragraph } = Typography;
 
@@ -92,7 +93,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           <div className="news-detail__media">
             {isVideo ? (
               <video
-                src={`/api/media/${item.localMediaPath}`}
+                src={mediaUrl(item.localMediaPath!)}
                 controls
                 muted
                 autoPlay
@@ -101,7 +102,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
               />
             ) : (
               <img
-                src={`/api/media/${item.localMediaPath}`}
+                src={mediaUrl(item.localMediaPath!)}
                 alt="media"
                 style={{ maxHeight: '80vh', maxWidth: '100%', objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 8 }}
               />

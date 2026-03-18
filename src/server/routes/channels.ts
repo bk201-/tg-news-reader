@@ -113,21 +113,24 @@ router.get('/', async (c) => {
       name: channels.name,
       description: channels.description,
       channelType: channels.channelType,
+      groupId: channels.groupId,
+      sortOrder: channels.sortOrder,
       lastFetchedAt: channels.lastFetchedAt,
       lastReadAt: channels.lastReadAt,
+      isUnavailable: channels.isUnavailable,
       createdAt: channels.createdAt,
       unreadCount: count(news.id),
     })
     .from(channels)
     .leftJoin(news, and(eq(news.channelId, channels.id), eq(news.isRead, 0)))
     .groupBy(channels.id)
-    .orderBy(channels.createdAt);
+    .orderBy(channels.sortOrder, channels.createdAt);
   return c.json(result);
 });
 
 // POST /api/channels
 router.post('/', async (c) => {
-  const body = await c.req.json<{ telegramId: string; name: string; description?: string; channelType?: ChannelType }>();
+  const body = await c.req.json<{ telegramId: string; name: string; description?: string; channelType?: ChannelType; groupId?: number | null }>();
   if (!body.telegramId || !body.name) {
     return c.json({ error: 'telegramId and name are required' }, 400);
   }
@@ -146,6 +149,7 @@ router.post('/', async (c) => {
         name: body.name.trim(),
         description: body.description?.trim(),
         channelType: body.channelType ?? 'none',
+        groupId: body.groupId ?? null,
       })
       .returning();
     return c.json(created, 201);
@@ -165,6 +169,7 @@ router.put('/:id', async (c) => {
     name?: string;
     description?: string;
     channelType?: ChannelType;
+    groupId?: number | null;
     lastFetchedAt?: number;
   }>();
 
@@ -174,6 +179,7 @@ router.put('/:id', async (c) => {
       ...(body.name && { name: body.name.trim() }),
       ...(body.description !== undefined && { description: body.description }),
       ...(body.channelType !== undefined && { channelType: body.channelType }),
+      ...(body.groupId !== undefined && { groupId: body.groupId }),
       ...(body.lastFetchedAt !== undefined && { lastFetchedAt: body.lastFetchedAt }),
     })
     .where(eq(channels.id, id))
@@ -249,7 +255,22 @@ router.post('/count-unread', async (c) => {
       const sinceDate = getSinceDate(channel);
       const messages = await fetchChannelMessages(channel.telegramId, { sinceDate, limit: 200 });
       counts[channel.id] = messages.length;
-    } catch {
+      // Reset unavailable flag if channel is reachable again
+      if (channel.isUnavailable) {
+        await db.update(channels).set({ isUnavailable: 0 }).where(eq(channels.id, channel.id));
+      }
+    } catch (err) {
+      const msg = String(err instanceof Error ? err.message : err).toLowerCase();
+      const isGone =
+        msg.includes('username_not_occupied') ||
+        msg.includes('channel_invalid') ||
+        msg.includes('username_invalid') ||
+        msg.includes('could not find the input entity') ||
+        msg.includes('no user has') ||
+        msg.includes('channelprivate');
+      if (isGone) {
+        await db.update(channels).set({ isUnavailable: 1 }).where(eq(channels.id, channel.id));
+      }
       counts[channel.id] = 0;
     }
   }
@@ -312,7 +333,7 @@ router.post('/:id/fetch', async (c) => {
 
     const messages = await fetchChannelMessages(channel.telegramId, {
       sinceDate,
-      limit: body.limit || 200,
+      limit: body.limit || 1000, // up to 1000 messages, paginated in batches of 100
     });
 
     // Insert messages and collect inserted IDs

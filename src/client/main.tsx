@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, App as AntApp, theme } from 'antd';
 import ruRU from 'antd/locale/ru_RU';
 import { AppLayout } from './components/Layout/AppLayout';
+import { AuthGate } from './components/Auth/AuthGate';
 import { useUIStore } from './store/uiStore';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -27,7 +28,9 @@ function ThemedApp() {
       }}
     >
       <AntApp>
-        <AppLayout />
+        <AuthGate>
+          <AppLayout />
+        </AuthGate>
       </AntApp>
     </ConfigProvider>
   );

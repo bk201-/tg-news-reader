@@ -4,6 +4,7 @@ import { FilterOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/ic
 import dayjs from 'dayjs';
 import type { NewsItem, Filter } from '@shared/types.ts';
 import { useMarkRead } from '../../api/news';
+import { mediaUrl } from '../../api/mediaUrl';
 
 const { Text } = Typography;
 
@@ -63,7 +64,7 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
                 <PlayCircleOutlined style={{ fontSize: 22, color: '#fff' }} />
               </div>
             ) : (
-              <img src={`/api/media/${item.localMediaPath}`} alt="" className="news-item__thumb-img" />
+              <img src={mediaUrl(item.localMediaPath!)} alt="" className="news-item__thumb-img" />
             )}
           </div>
         )}

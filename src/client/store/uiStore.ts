@@ -5,6 +5,9 @@ interface UIStore {
   setSelectedChannelId: (id: number | null) => void;
   selectedNewsId: number | null;
   setSelectedNewsId: (id: number | null) => void;
+  // null = "Общее" (ungrouped channels), number = specific group id
+  selectedGroupId: number | null;
+  setSelectedGroupId: (id: number | null) => void;
   showAll: boolean;
   setShowAll: (v: boolean) => void;
   filterPanelOpen: boolean;
@@ -24,6 +27,8 @@ export const useUIStore = create<UIStore>()((set) => ({
   setSelectedChannelId: (id) => set({ selectedChannelId: id, selectedNewsId: null, hashTagFilter: null }),
   selectedNewsId: null,
   setSelectedNewsId: (id) => set({ selectedNewsId: id }),
+  selectedGroupId: null,
+  setSelectedGroupId: (id) => set({ selectedGroupId: id, selectedChannelId: null, selectedNewsId: null }),
   showAll: false,
   setShowAll: (v) => set({ showAll: v }),
   filterPanelOpen: false,
