@@ -182,7 +182,7 @@ router.get('/sessions', async (c) => {
     .from(sessions)
     .where(eq(sessions.userId, userId));
 
-  return c.json(result.map((s) => ({ ...s, isCurrent: s.id === currentSessionId })));
+  return c.json(result.map((s: typeof result[number]) => ({ ...s, isCurrent: s.id === currentSessionId })));
 });
 
 // DELETE /api/auth/sessions/:id

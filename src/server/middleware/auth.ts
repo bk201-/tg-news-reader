@@ -2,12 +2,28 @@ import type { MiddlewareHandler } from 'hono';
 import { verify } from 'hono/jwt';
 import { JWT_SECRET } from '../config.js';
 
+// Globally extend Hono's context so c.get('userId') etc. work on any router
+declare module 'hono' {
+  interface ContextVariableMap {
+    userId: number;
+    userRole: string;
+    sessionId: string;
+  }
+}
+
 export interface AuthPayload {
-  sub: string;     // user id
+  sub: string;
   role: string;
   sessionId: string;
   exp: number;
 }
+
+/** @deprecated use ContextVariableMap augmentation above instead */
+export type HonoVariables = {
+  userId: number;
+  userRole: string;
+  sessionId: string;
+};
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const authHeader = c.req.header('Authorization');
