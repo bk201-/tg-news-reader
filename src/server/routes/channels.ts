@@ -10,6 +10,7 @@ import {
   fetchMessageById,
   downloadMessageMedia,
   getReadInboxMaxId,
+  getChannelInfo,
   type TelegramMessage,
 } from '../services/telegram.js';
 import { extractContentFromUrl, buildFullContent } from '../services/readability.js';
@@ -103,6 +104,23 @@ async function postProcess(
     });
   }
 }
+
+// GET /api/channels/lookup?username=durov  — fetch channel title+description from Telegram
+router.get('/lookup', async (c) => {
+  const raw = c.req.query('username') ?? '';
+  const username = raw
+    .trim()
+    .replace(/^https?:\/\/t\.me\//i, '')
+    .replace(/^@/, '')
+    .split('/')[0];
+  if (!username) return c.json({ error: 'username is required' }, 400);
+  try {
+    const info = await getChannelInfo(username);
+    return c.json(info);
+  } catch {
+    return c.json({ error: 'Channel not found or inaccessible' }, 404);
+  }
+});
 
 // GET /api/channels
 router.get('/', async (c) => {

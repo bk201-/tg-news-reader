@@ -186,11 +186,36 @@ export async function fetchChannelMessages(
   return allMessages.sort((a, b) => a.date - b.date);
 }
 
-export async function getChannelInfo(username: string) {
+export interface ChannelInfo {
+  name: string;
+  username: string | null;
+  description: string | null;
+}
+
+export async function getChannelInfo(username: string): Promise<ChannelInfo> {
   const tg = await getTelegramClient();
   try {
     const entity = await tg.getEntity(username);
-    return entity;
+    let name = 'Unknown';
+    let resolvedUsername: string | null = null;
+    let description: string | null = null;
+
+    if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
+      name = (entity as Api.Channel).title ?? name;
+      resolvedUsername = (entity as Api.Channel).username ?? null;
+      // Try to fetch full info for description
+      try {
+        const full = await tg.invoke(new Api.channels.GetFullChannel({ channel: entity as Api.Channel }));
+        description = (full.fullChat as Api.ChannelFull).about || null;
+      } catch {
+        // description not critical
+      }
+    } else if (entity instanceof Api.User) {
+      name = [entity.firstName, entity.lastName].filter(Boolean).join(' ') || name;
+      resolvedUsername = entity.username ?? null;
+    }
+
+    return { name, username: resolvedUsername, description };
   } catch (err) {
     console.error('Error getting channel info:', err);
     throw err;

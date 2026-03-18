@@ -75,3 +75,16 @@ export function useFetchChannel() {
     },
   });
 }
+
+export interface ChannelLookupResult {
+  name: string;
+  username: string | null;
+  description: string | null;
+}
+
+export function useChannelLookup() {
+  return useMutation({
+    mutationFn: (username: string) =>
+      api.get<ChannelLookupResult>('/channels/lookup?username=' + encodeURIComponent(username)),
+  });
+}

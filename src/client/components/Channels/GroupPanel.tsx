@@ -320,7 +320,7 @@ export function GroupPanel() {
               setPinValue(val);
               setPinError('');
             }}
-            style={{ justifyContent: 'center' }}
+            styles={{ root: { justifyContent: 'center' }, input: { width: 56, height: 56, fontSize: 24 } }}
           />
           {pinError && (
             <Text type="danger" style={{ display: 'block', marginTop: 8 }}>

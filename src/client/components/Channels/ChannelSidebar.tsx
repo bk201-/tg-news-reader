@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Select, Badge } from 'antd';
+import { Modal, Form, Input, DatePicker, Button, Space, Typography, Tooltip, Select, Badge, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
@@ -10,6 +10,7 @@ import {
   useDeleteChannel,
   useFetchChannel,
   useCountUnreadChannels,
+  useChannelLookup,
 } from '../../api/channels';
 import { useGroups } from '../../api/groups';
 import { useUIStore } from '../../store/uiStore';
@@ -24,6 +25,7 @@ export function ChannelSidebar() {
   const deleteChannel = useDeleteChannel();
   const fetchChannel = useFetchChannel();
   const countUnread = useCountUnreadChannels();
+  const lookupChannel = useChannelLookup();
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
 
@@ -37,6 +39,7 @@ export function ChannelSidebar() {
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [fetchTargetId, setFetchTargetId] = useState<number | null>(null);
   const [fetchSince, setFetchSince] = useState<dayjs.Dayjs | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const [form] = Form.useForm();
 
@@ -109,6 +112,27 @@ export function ChannelSidebar() {
       since: fetchSince ? fetchSince.toISOString() : undefined,
     });
     setFetchModalOpen(false);
+  };
+
+  const handleTelegramIdBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    // Only auto-fill when creating a new channel and name is still empty
+    if (editingChannel) return;
+    const raw = e.target.value.trim();
+    if (!raw) return;
+    const currentName = form.getFieldValue('name') as string | undefined;
+    if (currentName) return; // don't overwrite if user already typed a name
+    setLookupLoading(true);
+    try {
+      const info = await lookupChannel.mutateAsync(raw);
+      form.setFieldsValue({
+        name: info.name,
+        ...(info.description ? { description: info.description } : {}),
+      });
+    } catch {
+      // lookup failed silently — user can fill manually
+    } finally {
+      setLookupLoading(false);
+    }
   };
 
   return (
@@ -201,14 +225,20 @@ export function ChannelSidebar() {
             label="Telegram ID / username"
             rules={[{ required: true, message: 'Введите username канала' }]}
           >
-            <Input placeholder="durov, @durov или https://t.me/durov" autoComplete="off" />
+            <Input
+              placeholder="durov, @durov или https://t.me/durov"
+              autoComplete="off"
+              onBlur={handleTelegramIdBlur}
+            />
           </Form.Item>
-          <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
-            <Input placeholder="Мой любимый канал" autoComplete="off" />
-          </Form.Item>
-          <Form.Item name="description" label="Описание">
-            <Input.TextArea rows={2} placeholder="Необязательно" autoComplete="off" />
-          </Form.Item>
+          <Spin spinning={lookupLoading} size="small">
+            <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
+              <Input placeholder="Мой любимый канал" autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="description" label="Описание">
+              <Input.TextArea rows={2} placeholder="Необязательно" autoComplete="off" />
+            </Form.Item>
+          </Spin>
           <Form.Item name="channelType" label="Тип канала" initialValue="none">
             <Select>
               <Select.Option value="none">Не выбрано</Select.Option>

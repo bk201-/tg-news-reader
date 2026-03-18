@@ -90,6 +90,13 @@ export function useCreateThing() { return useMutation({ onSuccess: () => qc.inva
 - CSS Container Queries used for responsive sidebar buttons (`.channel-sidebar__header`)
 - Ant Design dark/light theme toggled via `ConfigProvider` in `main.tsx`
 
+## Security — NEVER Read or Print
+
+**NEVER read, display, or include in output the contents of `.env`** — it contains `TG_SESSION` (a live Telegram auth token equivalent to full account access), `TG_API_HASH`, and other secrets.
+
+If a task requires knowing env variable names, refer to the list in `ROADMAP.md` (section 9, "Переменные окружения") — names only, never values.  
+To rotate the session: `npm run tg:auth` (interactive), then terminate the old session in Telegram → Settings → Active Sessions.
+
 ## Media Files
 
 - Downloaded to `data/{telegramId}/{filename}` on server disk
