@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
-import { db } from '../db';
+import { db } from '../db/index.js';
 import { users, sessions } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';

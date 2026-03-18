@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { db } from '../db';
+import { db } from '../db/index.js';
 import { news, channels, filters as filtersTable } from '../db/schema.js';
-import { eq, and, asc, max, sql } from 'drizzle-orm';
+import { eq, and, asc, max, sql, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
@@ -57,7 +57,7 @@ router.delete('/read', async (c) => {
     .delete(news)
     .where(and(...conditions))
     .returning({ localMediaPath: news.localMediaPath });
-  deleted.forEach((r) => deleteMediaFile(r.localMediaPath));
+  deleted.forEach((r: { localMediaPath: string | null }) => deleteMediaFile(r.localMediaPath));
   return c.json({ deleted: deleted.length });
 });
 
@@ -79,20 +79,20 @@ router.get('/', async (c) => {
       .where(and(eq(filtersTable.channelId, channelId), eq(filtersTable.isActive, 1)));
 
     const tagValues = activeFilters
-      .filter((f) => f.type === 'tag')
-      .map((f) => f.value.replace(/^#/, '').toLowerCase());
+      .filter((f: typeof activeFilters[number]) => f.type === 'tag')
+      .map((f: typeof activeFilters[number]) => f.value.replace(/^#/, '').toLowerCase());
 
     const keywordValues = activeFilters
-      .filter((f) => f.type === 'keyword')
-      .map((f) => f.value.toLowerCase());
+      .filter((f: typeof activeFilters[number]) => f.type === 'keyword')
+      .map((f: typeof activeFilters[number]) => f.value.toLowerCase());
 
     if (tagValues.length > 0) {
       // Exclude news where any hashtag matches any tag filter (with or without leading #)
-      const orClauses = tagValues.flatMap((tag) => [
+      const orClauses = tagValues.flatMap((tag: string) => [
         sql`lower(value) = ${tag}`,
         sql`lower(value) = ${'#' + tag}`,
       ]);
-      const combined = orClauses.reduce((acc, clause) => sql`${acc} OR ${clause}`);
+      const combined = orClauses.reduce((acc: SQL<unknown>, clause: SQL<unknown>) => sql`${acc} OR ${clause}`);
       conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE ${combined})`);
     }
 
@@ -107,7 +107,7 @@ router.get('/', async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(news.postedAt));
 
-  const mapped: NewsItem[] = rows.map((r) => ({
+  const mapped: NewsItem[] = rows.map((r: typeof rows[number]) => ({
     ...r,
     links: JSON.parse(r.links) as string[],
     hashtags: JSON.parse(r.hashtags) as string[],

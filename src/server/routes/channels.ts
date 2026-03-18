@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { db } from '../db';
+import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
 import { eq, and, isNull, inArray, count } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
@@ -58,7 +58,7 @@ async function postProcess(
           inArray(news.mediaType, ['photo', 'document']),
         ),
       );
-    const pendingToRetry = pendingRows.filter((r) => !newIds.has(r.id));
+    const pendingToRetry = pendingRows.filter((r: typeof pendingRows[number]) => !newIds.has(r.id));
     const total = toDownload.length + pendingToRetry.length;
     let done = 0;
 

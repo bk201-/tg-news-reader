@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db } from '../db';
+import { db } from '../db/index.js';
 import { groups, channels, sessions, users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
@@ -11,7 +11,7 @@ const router = new Hono();
 router.get('/', async (c) => {
   const result = await db.select().from(groups).orderBy(groups.sortOrder, groups.createdAt);
   return c.json(
-    result.map((g) => ({
+    result.map((g: typeof result[number]) => ({
       id: g.id,
       name: g.name,
       color: g.color,
