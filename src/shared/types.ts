@@ -1,5 +1,24 @@
 export type ChannelType = 'none' | 'link_continuation' | 'media_content';
 
+export type DownloadType = 'media' | 'article';
+export type DownloadStatus = 'pending' | 'processing' | 'done' | 'failed';
+
+export interface DownloadTask {
+  id: number;
+  newsId: number;
+  type: DownloadType;
+  url?: string | null;
+  priority: number;
+  status: DownloadStatus;
+  error?: string | null;
+  createdAt: number;
+  processedAt?: number | null;
+  // Context joined from news + channels
+  newsText?: string;
+  channelId?: number;
+  channelName?: string;
+}
+
 export interface Group {
   id: number;
   name: string;

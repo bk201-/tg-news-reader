@@ -73,6 +73,24 @@ export const sessions = sqliteTable('sessions', {
     .default(sql`(unixepoch())`),
 });
 
+export const downloads = sqliteTable('downloads', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  newsId: integer('news_id')
+    .notNull()
+    .references(() => news.id, { onDelete: 'cascade' }),
+  type: text('type', { enum: ['media', 'article'] }).notNull(),
+  url: text('url'),
+  priority: integer('priority').notNull().default(0),
+  status: text('status', { enum: ['pending', 'processing', 'done', 'failed'] })
+    .notNull()
+    .default('pending'),
+  error: text('error'),
+  createdAt: integer('created_at')
+    .notNull()
+    .default(sql`(unixepoch())`),
+  processedAt: integer('processed_at'),
+});
+
 export const filters = sqliteTable('filters', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   channelId: integer('channel_id')

@@ -11,6 +11,7 @@ import {
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
 import { GroupPanel } from '../Channels/GroupPanel';
 import { NewsFeed } from '../News/NewsFeed';
+import { DownloadsPanel, DownloadsPinnedContent } from './DownloadsPanel';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { useChannels } from '../../api/channels';
@@ -20,7 +21,7 @@ const { Header } = Layout;
 const { Title, Text } = Typography;
 
 export function AppLayout() {
-  const { selectedChannelId, setSelectedChannelId, isDarkTheme, toggleTheme } = useUIStore();
+  const { selectedChannelId, setSelectedChannelId, isDarkTheme, toggleTheme, downloadsPanelPinned } = useUIStore();
   const { user, clearAuth, updateUser } = useAuthStore();
   const { data: channels = [] } = useChannels();
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) || null;
@@ -152,6 +153,7 @@ export function AppLayout() {
           <Text style={{ color: 'rgba(255,255,255,0.75)', marginLeft: 12 }}>— {selectedChannel.name}</Text>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <DownloadsPanel />
           <Tooltip title={isDarkTheme ? 'Светлая тема' : 'Тёмная тема'}>
             <Button
               type="text"
@@ -189,25 +191,30 @@ export function AppLayout() {
         </Splitter.Panel>
 
         <Splitter.Panel style={{ background: token.colorBgLayout, overflow: 'hidden' }}>
-          {selectedChannel ? (
-            <NewsFeed channel={selectedChannel} />
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
-              <span style={{ fontSize: 64 }}>📡</span>
-              <Text type="secondary" style={{ fontSize: 16 }}>
-                Выберите канал из списка слева
-              </Text>
+          <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              {selectedChannel ? (
+                <NewsFeed channel={selectedChannel} />
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  <span style={{ fontSize: 64 }}>📡</span>
+                  <Text type="secondary" style={{ fontSize: 16 }}>
+                    Выберите канал из списка слева
+                  </Text>
+                </div>
+              )}
             </div>
-          )}
+            {downloadsPanelPinned && <DownloadsPinnedContent />}
+          </div>
         </Splitter.Panel>
       </Splitter>
 

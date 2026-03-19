@@ -44,9 +44,11 @@ export function useMarkAllRead() {
 export function useExtractContent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (newsId: number) => api.post<NewsItem>(`/content/news/${newsId}`, {}),
+    mutationFn: ({ newsId, url }: { newsId: number; url: string }) =>
+      api.post<{ success: boolean }>('/downloads', { newsId, type: 'article', url, priority: 10 }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['news'] });
+      void qc.invalidateQueries({ queryKey: ['downloads'] });
     },
   });
 }
@@ -54,9 +56,11 @@ export function useExtractContent() {
 export function useDownloadMedia() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (newsId: number) => api.post<NewsItem>(`/news/${newsId}/download-media`, {}),
+    mutationFn: (newsId: number) =>
+      api.post<{ success: boolean }>('/downloads', { newsId, type: 'media', priority: 10 }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['news'] });
+      void qc.invalidateQueries({ queryKey: ['downloads'] });
     },
   });
 }

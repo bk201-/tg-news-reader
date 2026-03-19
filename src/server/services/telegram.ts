@@ -254,9 +254,7 @@ export async function readChannelHistory(channelUsername: string, maxId: number)
   );
 }
 
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB  – photos
-const MAX_VIDEO_SIZE = 75 * 1024 * 1024; // 75 MB – videos
-const MAX_IMG_DOC_SIZE = 5 * 1024 * 1024; // 5 MB  – image documents
+import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
 
 /** Downloads media for a message. Returns relative path like "channelId/123.jpg" or null.
  *  Pass ignoreLimit=true for user-initiated (on-demand) downloads. */
@@ -271,7 +269,7 @@ export async function downloadMessageMedia(
 
   if (msg.rawMedia instanceof Api.MessageMediaPhoto) {
     ext = 'jpg';
-    if (!options.ignoreLimit && msg.mediaSizeBytes && msg.mediaSizeBytes > MAX_PHOTO_SIZE) return null;
+    if (!options.ignoreLimit && msg.mediaSizeBytes && msg.mediaSizeBytes > MAX_PHOTO_SIZE_BYTES) return null;
   } else if (msg.rawMedia instanceof Api.MessageMediaDocument) {
     const doc = msg.rawMedia.document;
     if (!(doc instanceof Api.Document)) return null;
@@ -287,7 +285,7 @@ export async function downloadMessageMedia(
 
     if (!options.ignoreLimit) {
       const isVideo = ext === 'mp4' || ext === 'webm';
-      const limit = isVideo ? MAX_VIDEO_SIZE : MAX_IMG_DOC_SIZE;
+      const limit = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMG_DOC_SIZE_BYTES;
       if (sizeNum > limit) return null;
     }
   } else {

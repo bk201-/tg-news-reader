@@ -16,6 +16,9 @@ interface UIStore {
   setHashTagFilter: (tag: string | null) => void;
   isDarkTheme: boolean;
   toggleTheme: () => void;
+  // Downloads panel — when pinned, renders as inline sidebar next to news feed
+  downloadsPanelPinned: boolean;
+  toggleDownloadsPanelPin: () => void;
   // Pending counts from Telegram (messages not yet fetched, per channel)
   pendingCounts: Record<number, number>;
   setPendingCounts: (counts: Record<number, number>) => void;
@@ -41,6 +44,13 @@ export const useUIStore = create<UIStore>()((set) => ({
       const next = !state.isDarkTheme;
       localStorage.setItem('theme', next ? 'dark' : 'light');
       return { isDarkTheme: next };
+    }),
+  downloadsPanelPinned: localStorage.getItem('downloadsPanelPinned') === 'true',
+  toggleDownloadsPanelPin: () =>
+    set((state) => {
+      const next = !state.downloadsPanelPinned;
+      localStorage.setItem('downloadsPanelPinned', String(next));
+      return { downloadsPanelPinned: next };
     }),
   pendingCounts: {},
   setPendingCounts: (counts) => set({ pendingCounts: counts }),

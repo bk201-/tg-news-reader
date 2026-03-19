@@ -30,19 +30,20 @@ npm run format:check   # Prettier (read-only check, use format to fix)
 ```
 src/
   server/
-    index.ts          # Hono app, registers all routers
+    index.ts          # Hono app, registers all routers + calls startWorkerPool(10)
     db/
       schema.ts       # Drizzle schema (source of truth for types)
       migrate.ts      # Manual migration runner (CREATE TABLE IF NOT EXISTS + ALTER TABLE)
       index.ts        # libsql client + drizzle instance
-    routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts
-    services/         # telegram.ts (gramjs), readability.ts, mediaProgress.ts
+    routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts
+    services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
+                      # downloadManager.ts, downloadProgress.ts
   client/
-    components/       # Channels/, News/, Filters/, Layout/
-    api/              # React Query hooks: channels.ts, news.ts, groups.ts, filters.ts
+    components/       # Channels/, News/, Filters/, Layout/ (includes DownloadsPanel.tsx)
+    api/              # React Query hooks: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts
     store/uiStore.ts  # Zustand store (selectedChannelId, selectedGroupId, theme, etc.)
     styles.css        # All CSS (BEM-like, CSS custom props for theming)
-  shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter)
+  shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter, DownloadTask)
 ```
 
 ## DB Migration Pattern
@@ -58,6 +59,34 @@ src/
 - All API routes mounted under `/api/` in `server/index.ts`
 - Each route file exports a Hono `router` as default
 - `channels.ts` exports `getSinceDate()` helper (used by count-unread)
+
+## Channel Strategy Pattern
+
+Channel post-processing is implemented as the Strategy pattern in `src/server/services/channelStrategies.ts`:
+
+| Strategy class | `channelType` | `postProcess` behaviour |
+|---|---|---|
+| `NoneStrategy` | `'none'` | no-op |
+| `LinkContinuationStrategy` | `'link_continuation'` | no-op (content loaded on demand) |
+| `MediaContentStrategy` | `'media_content'` | calls `enqueueTask(newsId, 'media', undefined, 0)` for each media post |
+
+Use `getChannelStrategy(channelType)` factory to get the right instance. Adding a new channel type = new class + one line in `strategyMap`.
+
+## Download Manager
+
+All async work (media downloads, article extraction) goes through `src/server/services/downloadManager.ts`:
+
+- **`downloads` table**: `id, news_id (→ news ON DELETE CASCADE), type ('media'|'article'), url, priority (0=background, 10=user), status, error, created_at, processed_at` + `UNIQUE(news_id, type)`
+- **`enqueueTask(newsId, type, url?, priority=0)`** — INSERT with `onConflictDoUpdate` that keeps `MAX(priority)` and resets `failed → pending`
+- **`startWorkerPool(10)`** — called in `server/index.ts`; 10 concurrent workers; resets `processing → pending` on startup (crash recovery)
+- **Priority**: background=0 (media strategy auto-queue), user-initiated=10 (Download button); size limits bypassed for priority≥10
+- **Auto-cleanup**: done tasks deleted after 30 s
+- **SSE stream**: `GET /api/downloads/stream` — sends `init` event on connect, then `task_update` events; consumed by `useDownloadsSSE()` in `DownloadsPanel`
+- **REST**: `GET/POST /api/downloads`, `PATCH /api/downloads/:id/prioritize`, `DELETE /api/downloads/:id`
+
+Client: `src/client/api/downloads.ts` — `useDownloads()`, `useCreateDownload()`, `usePrioritizeDownload()`, `useCancelDownload()`, `useNewsDownloadTask(newsId, type)`, `useDownloadsSSE()`
+
+`DownloadsPanel` (in `AppLayout` header) mounts `useDownloadsSSE()` once for the whole app lifetime.
 
 ## State Management
 
@@ -97,10 +126,25 @@ export function useCreateThing() { return useMutation({ onSuccess: () => qc.inva
 If a task requires knowing env variable names, refer to the list in `ROADMAP.md` (section 9, "Переменные окружения") — names only, never values.  
 To rotate the session: `npm run tg:auth` (interactive), then terminate the old session in Telegram → Settings → Active Sessions.
 
+## Auth for Browser-Native Requests
+
+**`EventSource`, `<img src>`, `<video src>` cannot send `Authorization` headers.** Use `?token=` query param instead — `authMiddleware` accepts both forms:
+
+```ts
+// ✅ correct pattern (see mediaUrl.ts, useDownloadsSSE)
+const token = useAuthStore.getState().accessToken;
+const url = `/api/some/stream?token=${encodeURIComponent(token)}`;
+const es = new EventSource(url);
+
+// ❌ wrong — EventSource ignores custom headers
+new EventSource('/api/some/stream', { headers: { Authorization: '...' } });
+```
+
+Always add `accessToken` to `useEffect` deps so the connection re-creates on token refresh.
+
 ## Media Files
 
 - Downloaded to `data/{telegramId}/{filename}` on server disk
 - Served via `GET /api/media/:channel/:filename`
-- Auto-download thresholds: photos ≤ 5 MB, videos ≤ 75 MB (enforced in `postProcess` in channels.ts)
-- SSE progress stream: `GET /api/channels/:id/media-progress`
-
+- Downloads managed by `downloadManager.ts` — background tasks use size limits (photos ≤ 5 MB, videos ≤ 75 MB); user-initiated (`priority ≥ 10`) bypass limits
+- Progress visible in `DownloadsPanel` (header badge + Drawer) via SSE

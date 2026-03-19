@@ -2,108 +2,16 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, and, isNull, inArray, count } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import {
-  fetchChannelMessages,
-  fetchMessageById,
-  downloadMessageMedia,
-  getReadInboxMaxId,
-  getChannelInfo,
-  type TelegramMessage,
-} from '../services/telegram.js';
-import { extractContentFromUrl, buildFullContent } from '../services/readability.js';
-import { emitMediaProgress, mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
+import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
+import { mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
+import { getChannelStrategy, type PostProcessArgs } from '../services/channelStrategies.js';
+import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
 import type { ChannelType } from '../../shared/types.js';
 
 const router = new Hono();
-
-// Tracks ongoing postProcess per channel — abort when a new fetch starts
-const activeProcessing = new Map<number, AbortController>();
-
-// Background post-processing after messages are inserted
-async function postProcess(
-  channelId: number,
-  channelType: ChannelType,
-  channelTelegramId: string,
-  messages: TelegramMessage[],
-  insertedMap: Map<number, number>,
-  abortSignal: AbortSignal,
-): Promise<void> {
-  if (channelType === 'link_continuation') {
-    const toExtract = messages.filter((m) => m.links.length > 0 && insertedMap.has(m.id)).slice(0, 30);
-
-    for (const msg of toExtract) {
-      const newsId = insertedMap.get(msg.id)!;
-      try {
-        const extracted = await extractContentFromUrl(msg.links[0]);
-        const content = buildFullContent(extracted);
-        if (content) {
-          await db.update(news).set({ fullContent: content }).where(eq(news.id, newsId));
-        }
-      } catch {
-        // extraction failed — skip
-      }
-    }
-  }
-
-  if (channelType === 'media_content') {
-    const toDownload = messages.filter((m) => m.rawMedia !== undefined && insertedMap.has(m.id));
-    const newIds = new Set(insertedMap.values());
-
-    // Pre-query retries so we know total upfront
-    const pendingRows = await db
-      .select({ id: news.id, telegramMsgId: news.telegramMsgId })
-      .from(news)
-      .where(
-        and(eq(news.channelId, channelId), isNull(news.localMediaPath), inArray(news.mediaType, ['photo', 'document'])),
-      );
-    const pendingToRetry = pendingRows.filter((r: (typeof pendingRows)[number]) => !newIds.has(r.id));
-    const total = toDownload.length + pendingToRetry.length;
-    let done = 0;
-
-    // Download newly inserted messages (rawMedia already in memory — fast)
-    for (const msg of toDownload) {
-      if (abortSignal.aborted) break;
-      const newsId = insertedMap.get(msg.id)!;
-      try {
-        const localPath = await downloadMessageMedia(msg, channelTelegramId);
-        if (localPath) {
-          await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, newsId));
-          done++;
-          emitMediaProgress(channelId, { type: 'item', newsId, localMediaPath: localPath, done, total });
-        }
-      } catch (err) {
-        console.error(`Failed to download media for msg ${msg.id}:`, err);
-      }
-    }
-
-    // Retry existing items that have no localMediaPath yet
-    for (const row of pendingToRetry) {
-      if (abortSignal.aborted) break;
-      try {
-        const msg = await fetchMessageById(channelTelegramId, row.telegramMsgId);
-        if (!msg?.rawMedia) continue;
-        const localPath = await downloadMessageMedia(msg, channelTelegramId);
-        if (localPath) {
-          await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, row.id));
-          done++;
-          emitMediaProgress(channelId, { type: 'item', newsId: row.id, localMediaPath: localPath, done, total });
-          console.log(`Retried media download for news ${row.id} → ${localPath}`);
-        }
-      } catch (err) {
-        console.error(`Failed to retry media for news ${row.id}:`, err);
-      }
-    }
-
-    emitMediaProgress(channelId, {
-      type: abortSignal.aborted ? 'aborted' : 'complete',
-      done,
-      total,
-    });
-  }
-}
 
 // GET /api/channels/lookup?username=durov  — fetch channel title+description from Telegram
 router.get('/lookup', async (c) => {
@@ -265,8 +173,8 @@ router.get('/:id/media-progress', (c) => {
 export function getSinceDate(channel: { lastFetchedAt: number | null; lastReadAt: number | null }): Date {
   if (channel.lastReadAt) return new Date(channel.lastReadAt * 1000);
   if (channel.lastFetchedAt) return new Date(channel.lastFetchedAt * 1000);
-  // New channel — default to 3 days ago
-  return new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  // New channel — default to configured days ago
+  return new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
 }
 
 // POST /api/channels/count-unread — counts new messages in Telegram per channel without fetching
@@ -326,7 +234,7 @@ router.post('/:id/fetch', async (c) => {
     // Default button: try to get freshest readInboxMaxId from Telegram, fallback to stored state
     const isNewChannel = !channel.lastFetchedAt && !channel.lastReadAt;
     if (isNewChannel) {
-      sinceDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+      sinceDate = new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
     } else {
       const readMaxId = await getReadInboxMaxId(channel.telegramId);
       if (readMaxId) {
@@ -361,7 +269,7 @@ router.post('/:id/fetch', async (c) => {
 
     const messages = await fetchChannelMessages(channel.telegramId, {
       sinceDate,
-      limit: body.limit || 1000, // up to 1000 messages, paginated in batches of 100
+      limit: body.limit || NEWS_FETCH_LIMIT,
     });
 
     // Insert messages and collect inserted IDs
@@ -393,24 +301,18 @@ router.post('/:id/fetch', async (c) => {
     const now = Math.floor(Date.now() / 1000);
     await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
 
-    const mediaProcessing = channel.channelType === 'media_content' && messages.some((m) => m.rawMedia !== undefined);
+    const strategy = getChannelStrategy(channel.channelType as ChannelType);
+    const mediaProcessing = strategy.requiresMediaProcessing(messages);
 
-    // Cancel any ongoing postProcess for this channel before starting a new one
-    activeProcessing.get(channelId)?.abort();
-    const ac = new AbortController();
-    activeProcessing.set(channelId, ac);
-
-    // Fire post-processing in background — client gets response immediately
-    void postProcess(
+    const args: PostProcessArgs = {
       channelId,
-      channel.channelType as ChannelType,
-      channel.telegramId,
+      channelTelegramId: channel.telegramId,
       messages,
       insertedMap,
-      ac.signal,
-    ).finally(() => {
-      if (activeProcessing.get(channelId) === ac) activeProcessing.delete(channelId);
-    });
+    };
+
+    // Fire post-processing in background — just queues tasks, returns immediately
+    void strategy.postProcess(args);
 
     return c.json({ inserted, total: messages.length, mediaProcessing });
   } catch (err: unknown) {

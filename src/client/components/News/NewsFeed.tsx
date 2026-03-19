@@ -6,14 +6,12 @@ import {
   CheckSquareOutlined,
   SyncOutlined,
   CloseCircleOutlined,
-  LoadingOutlined,
   HistoryOutlined,
 } from '@ant-design/icons';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
 import { useFetchChannel } from '../../api/channels';
-import { useMediaProgressSSE } from '../../api/mediaProgress';
 import { useUIStore } from '../../store/uiStore';
 import { NewsListItem, applyFilters } from './NewsListItem';
 import { NewsDetail } from './NewsDetail';
@@ -46,33 +44,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
 
-  const [mediaProgressActive, setMediaProgressActive] = useState(false);
-  const [sseKey, setSseKey] = useState(0);
-  const [mediaProgress, setMediaProgress] = useState<{ done: number; total: number } | null>(null);
-
-  useMediaProgressSSE(
-    mediaProgressActive ? channel.id : null,
-    sseKey,
-    (done, total) => setMediaProgress({ done, total }),
-    () => {
-      setMediaProgressActive(false);
-      setMediaProgress(null);
-    },
-  );
-
-  // Reset SSE state when channel changes
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMediaProgressActive(false);
-    setMediaProgress(null);
-  }, [channel.id]);
-
-  const onFetchSuccess = useCallback((data: { mediaProcessing?: boolean }) => {
-    if (data.mediaProcessing) {
-      setMediaProgressActive(true);
-      setSseKey((k) => k + 1); // Force SSE reconnect even if already active
-      setMediaProgress(null);
-    }
+  const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {
+    // Media tasks are now visible in the Downloads panel (top-right)
   }, []);
 
   // Reset hash filter when channel changes
@@ -187,6 +160,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   );
 
   const periodOptions = [
+    { value: '1', label: '1д' },
     { value: '3', label: '3д' },
     { value: '5', label: '5д' },
     { value: '7', label: '7д' },
@@ -252,15 +226,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
           )}
         </Space>
         <Space size={12} style={{ fontSize: 12 }}>
-          {mediaProgress && (
-            <Text type="secondary">
-              <LoadingOutlined style={{ marginRight: 4 }} />
-              Медиа:{' '}
-              <strong>
-                {mediaProgress.done}/{mediaProgress.total}
-              </strong>
-            </Text>
-          )}
           <Text type="secondary">
             Показано: <strong>{displayItems.length}</strong>
           </Text>

@@ -61,6 +61,19 @@ await client.executeMultiple(`
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+  CREATE TABLE IF NOT EXISTS downloads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK(type IN ('media', 'article')),
+    url TEXT,
+    priority INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'done', 'failed')),
+    error TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    processed_at INTEGER,
+    UNIQUE(news_id, type)
+  );
+  CREATE INDEX IF NOT EXISTS idx_downloads_queue ON downloads(status, priority DESC, created_at ASC);
 `);
 
 const alterMigrations = [

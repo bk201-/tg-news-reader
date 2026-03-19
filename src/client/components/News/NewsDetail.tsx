@@ -1,9 +1,17 @@
-import React from 'react';
-import { Button, Tooltip, Typography, Space, Divider, Tag } from 'antd';
-import { LinkOutlined, DownloadOutlined, CheckOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons';
+import React, { useState } from 'react';
+import { Button, Tooltip, Typography, Space, Divider, Tag, Modal, Radio, App } from 'antd';
+import {
+  LinkOutlined,
+  DownloadOutlined,
+  CheckOutlined,
+  ExportOutlined,
+  ReloadOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
+import { useNewsDownloadTask } from '../../api/downloads';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediaUrl } from '../../api/mediaUrl';
 
@@ -16,10 +24,17 @@ interface NewsDetailProps {
 }
 
 export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps) {
+  const { message } = App.useApp();
   const qc = useQueryClient();
   const markRead = useMarkRead();
   const extractContent = useExtractContent();
   const downloadMedia = useDownloadMedia();
+
+  const mediaTask = useNewsDownloadTask(item.id, 'media');
+  const articleTask = useNewsDownloadTask(item.id, 'article');
+
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [selectedUrl, setSelectedUrl] = useState<string>('');
 
   const links = item.links || [];
   const hashtags = item.hashtags || [];
@@ -39,11 +54,31 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
       },
     );
   };
-  const handleExtract = async () => {
-    await extractContent.mutateAsync(item.id);
+
+  const handleExtract = (url: string) => {
+    extractContent.mutate(
+      { newsId: item.id, url },
+      {
+        onSuccess: () => void message.success('Статья поставлена в очередь загрузки'),
+      },
+    );
   };
+
+  const handleExtractClick = () => {
+    const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
+    if (nonYtLinks.length === 0) return;
+    if (nonYtLinks.length === 1) {
+      handleExtract(nonYtLinks[0]);
+    } else {
+      setSelectedUrl(nonYtLinks[0]);
+      setLinkModalOpen(true);
+    }
+  };
+
   const handleDownloadMedia = () => {
-    downloadMedia.mutate(item.id);
+    downloadMedia.mutate(item.id, {
+      onSuccess: () => void message.success('Медиа поставлено в очередь загрузки'),
+    });
   };
 
   const firstLink = links[0];
@@ -51,6 +86,13 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
 
   const formatBytes = (bytes: number) =>
     bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} МБ` : `${(bytes / 1024).toFixed(0)} КБ`;
+
+  // Determine article button state
+  const articleLoading = extractContent.isPending || articleTask?.status === 'processing';
+  const articleQueued = articleTask?.status === 'pending';
+  // Media button state
+  const mediaLoading = downloadMedia.isPending || mediaTask?.status === 'processing';
+  const mediaQueued = mediaTask?.status === 'pending';
 
   return (
     <div className="news-detail">
@@ -81,12 +123,13 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           {firstLink && !item.fullContent && channelType !== 'link_continuation' && (
             <Tooltip title="Загрузить полный текст статьи">
               <Button
-                icon={<DownloadOutlined />}
+                icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
                 size="small"
-                onClick={handleExtract}
-                loading={extractContent.isPending}
+                onClick={handleExtractClick}
+                loading={articleLoading}
+                disabled={articleQueued}
               >
-                Загрузить текст
+                {articleQueued ? 'В очереди' : 'Загрузить текст'}
               </Button>
             </Tooltip>
           )}
@@ -133,22 +176,27 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
         ) : item.mediaType && item.mediaType !== 'webpage' && item.mediaType !== 'other' ? (
           <div className="news-detail__media-download">
             <Button
-              icon={<DownloadOutlined />}
+              icon={mediaLoading ? <LoadingOutlined /> : <DownloadOutlined />}
               onClick={handleDownloadMedia}
-              loading={downloadMedia.isPending}
+              loading={mediaLoading}
+              disabled={mediaQueued}
               size="large"
             >
-              Скачать медиа{item.mediaSize ? ` (${formatBytes(item.mediaSize)})` : ''}
+              {mediaQueued
+                ? 'В очереди…'
+                : mediaTask?.status === 'failed'
+                  ? 'Повторить загрузку'
+                  : `Скачать медиа${item.mediaSize ? ` (${formatBytes(item.mediaSize)})` : ''}`}
             </Button>
-            {downloadMedia.isError && (
+            {mediaTask?.status === 'failed' && (
               <Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-                Не удалось скачать: {downloadMedia.error?.message}
+                Ошибка: {mediaTask.error}
               </Text>
             )}
           </div>
         ) : null}
 
-        {/* For link_continuation: show fullContent if available, original text as fallback */}
+        {/* For link_continuation: show fullContent if available, otherwise text + load button */}
         {channelType === 'link_continuation' ? (
           item.fullContent ? (
             <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>{item.fullContent}</Paragraph>
@@ -157,19 +205,20 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
               <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7 }}>
                 {item.text || <Text type="secondary">(нет текста)</Text>}
               </Paragraph>
-              {firstLink && (
+              {links.filter((l) => !isYouTubeUrl(l)).length > 0 && (
                 <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExtract}
-                  loading={extractContent.isPending}
+                  icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+                  onClick={handleExtractClick}
+                  loading={articleLoading}
+                  disabled={articleQueued}
                   style={{ marginTop: 8 }}
                 >
-                  Загрузить полный текст
+                  {articleQueued ? 'В очереди…' : 'Загрузить полный текст'}
                 </Button>
               )}
-              {extractContent.isError && (
+              {articleTask?.status === 'failed' && (
                 <Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                  Не удалось загрузить: {extractContent.error?.message}
+                  Ошибка: {articleTask.error}
                 </Text>
               )}
             </>
@@ -194,7 +243,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           </Paragraph>
         )}
 
-        {/* Links */}
+        {/* Links panel */}
         {links.length > 0 && (
           <div style={{ marginTop: 12 }}>
             <Text type="secondary" strong style={{ fontSize: 12 }}>
@@ -210,7 +259,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           </div>
         )}
 
-        {/* Extra fullContent for non-link_continuation channels */}
+        {/* Extra fullContent for non-link_continuation */}
         {channelType !== 'link_continuation' && item.fullContent && (
           <>
             <Divider>
@@ -225,14 +274,38 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
             </div>
           </>
         )}
-
-        {/* Extra error for non-link_continuation channels */}
-        {channelType !== 'link_continuation' && extractContent.isError && (
-          <Text type="danger" style={{ fontSize: 12 }}>
-            Не удалось загрузить текст: {extractContent.error?.message}
-          </Text>
-        )}
       </div>
+
+      {/* Multi-link selection modal for link_continuation */}
+      <Modal
+        open={linkModalOpen}
+        title="Выберите ссылку для загрузки"
+        okText="Загрузить"
+        cancelText="Отмена"
+        onOk={() => {
+          setLinkModalOpen(false);
+          handleExtract(selectedUrl);
+        }}
+        onCancel={() => setLinkModalOpen(false)}
+      >
+        <Radio.Group
+          value={selectedUrl}
+          onChange={(e) => setSelectedUrl(e.target.value as string)}
+          style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+        >
+          {links
+            .filter((l) => !isYouTubeUrl(l))
+            .map((link) => (
+              <Radio key={link} value={link}>
+                <Text style={{ fontSize: 12 }}>{link.length > 70 ? link.substring(0, 70) + '…' : link}</Text>
+              </Radio>
+            ))}
+        </Radio.Group>
+      </Modal>
     </div>
   );
+}
+
+function isYouTubeUrl(url: string): boolean {
+  return /youtu\.be\/|youtube\.com\/(watch|shorts|embed)/i.test(url);
 }

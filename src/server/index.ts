@@ -11,9 +11,12 @@ import contentRouter from './routes/content.js';
 import mediaRouter from './routes/media.js';
 import groupsRouter from './routes/groups.js';
 import authRouter from './routes/auth.js';
+import downloadsRouter from './routes/downloads.js';
 import { authMiddleware } from './middleware/auth.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
+import { startWorkerPool } from './services/downloadManager.js';
+import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 
 // Run DB migration on startup
 import './db/migrate.js';
@@ -61,6 +64,7 @@ app.route('/api/news', newsRouter);
 app.route('/api/channels/:channelId/filters', filtersRouter);
 app.route('/api/content', contentRouter);
 app.route('/api/media', mediaRouter);
+app.route('/api/downloads', downloadsRouter);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
@@ -73,5 +77,8 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = parseInt(process.env.SERVER_PORT || '3173', 10);
 console.log(`🚀 Server running on http://localhost:${port}`);
+
+// Start download manager workers
+startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
 
 serve({ fetch: app.fetch, port });
