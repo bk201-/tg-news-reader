@@ -55,6 +55,7 @@ export interface NewsItem {
   postedAt: number;
   fullContent?: string;
   localMediaPath?: string;
+  localMediaPaths?: string[]; // album: all downloaded paths (JSON-decoded)
   mediaSize?: number;
 }
 

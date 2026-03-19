@@ -1,0 +1,72 @@
+import React from 'react';
+import { Modal, Input, Typography } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
+import type { Group } from '@shared/types.ts';
+
+const { Text } = Typography;
+
+interface GroupPinModalProps {
+  open: boolean;
+  pinTarget: Group | null;
+  pinValue: string;
+  pinError: string;
+  confirmLoading: boolean;
+  onClose: () => void;
+  /** Called on manual OK click (no arg) or auto-submit with the completed PIN value */
+  onConfirm: (pin?: string) => void;
+  onPinChange: (val: string) => void;
+}
+
+export function GroupPinModal({
+  open,
+  pinTarget,
+  pinValue,
+  pinError,
+  confirmLoading,
+  onClose,
+  onConfirm,
+  onPinChange,
+}: GroupPinModalProps) {
+  return (
+    <Modal
+      open={open}
+      title={
+        <span>
+          <LockOutlined style={{ marginRight: 8, color: pinTarget?.color }} />
+          Введите PIN для «{pinTarget?.name}»
+        </span>
+      }
+      onCancel={onClose}
+      onOk={onConfirm}
+      okText="Открыть"
+      cancelText="Отмена"
+      confirmLoading={confirmLoading}
+      afterOpenChange={(visible) => {
+        if (visible) onPinChange('');
+      }}
+    >
+      <div
+        style={{ marginTop: 16, textAlign: 'center' }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onConfirm();
+        }}
+      >
+        <Input.OTP
+          length={4}
+          autoFocus
+          value={pinValue}
+          onChange={(val) => {
+            onPinChange(val);
+            if (val.length === 4) onConfirm(val);
+          }}
+          styles={{ root: { justifyContent: 'center' }, input: { width: 56, height: 56, fontSize: 24 } }}
+        />
+        {pinError && (
+          <Text type="danger" style={{ display: 'block', marginTop: 8 }}>
+            {pinError}
+          </Text>
+        )}
+      </div>
+    </Modal>
+  );
+}

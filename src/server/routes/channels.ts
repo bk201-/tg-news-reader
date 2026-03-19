@@ -184,7 +184,11 @@ router.post('/count-unread', async (c) => {
 
   for (const channel of allChannels) {
     try {
-      const sinceDate = getSinceDate(channel);
+      // Use lastFetchedAt (not lastReadAt) so we only count messages that are NOT yet in the DB.
+      // getSinceDate() uses lastReadAt first, which would double-count already-fetched unread messages.
+      const sinceDate = channel.lastFetchedAt
+        ? new Date(channel.lastFetchedAt * 1000)
+        : new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
       const messages = await fetchChannelMessages(channel.telegramId, { sinceDate, limit: 200 });
       counts[channel.id] = messages.length;
       // Reset unavailable flag if channel is reachable again
@@ -254,15 +258,21 @@ router.post('/:id/fetch', async (c) => {
     const deletedRead = await db
       .delete(news)
       .where(and(eq(news.channelId, channelId), eq(news.isRead, 1)))
-      .returning({ localMediaPath: news.localMediaPath });
+      .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
     for (const row of deletedRead) {
-      if (!row.localMediaPath) continue;
-      const filepath = join(process.cwd(), 'data', row.localMediaPath);
-      if (existsSync(filepath)) {
-        try {
-          unlinkSync(filepath);
-        } catch {
-          /* ignore */
+      const paths: string[] = row.localMediaPaths
+        ? (JSON.parse(row.localMediaPaths) as string[])
+        : row.localMediaPath
+          ? [row.localMediaPath]
+          : [];
+      for (const p of paths) {
+        const filepath = join(process.cwd(), 'data', p);
+        if (existsSync(filepath)) {
+          try {
+            unlinkSync(filepath);
+          } catch {
+            /* ignore */
+          }
         }
       }
     }
@@ -288,6 +298,7 @@ router.post('/:id/fetch', async (c) => {
           mediaType: msg.mediaType,
           postedAt: msg.date,
           mediaSize: msg.mediaSizeBytes,
+          albumMsgIds: msg.albumTelegramIds ? JSON.stringify(msg.albumTelegramIds) : null,
         })
         .onConflictDoNothing()
         .returning({ id: news.id });

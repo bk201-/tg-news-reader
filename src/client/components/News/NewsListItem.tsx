@@ -29,7 +29,9 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
   const title = getTitle(item);
   const hashtags = item.hashtags || [];
   const isRead = item.isRead === 1;
-  const isVideo = /\.(mp4|webm)$/i.test(item.localMediaPath ?? '');
+  const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
+  const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
+  const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
 
   // If filtered out and not showAll, don't render
   if (!isFiltered && !showAll) return null;
@@ -57,14 +59,17 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
         >
           {title}
         </Text>
-        {item.localMediaPath && (
+        {firstMediaPath && (
           <div className="news-item__thumb" style={{ opacity: dimmed ? 0.4 : 1 }}>
             {isVideo ? (
               <div className="news-item__thumb-video">
                 <PlayCircleOutlined style={{ fontSize: 22, color: '#fff' }} />
               </div>
             ) : (
-              <img src={mediaUrl(item.localMediaPath)} alt="" className="news-item__thumb-img" />
+              <div className="news-item__thumb-photo">
+                <img src={mediaUrl(firstMediaPath)} alt="" className="news-item__thumb-img" />
+                {isAlbum && <span className="news-item__album-badge">{item.localMediaPaths!.length}</span>}
+              </div>
             )}
           </div>
         )}

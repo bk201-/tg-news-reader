@@ -86,6 +86,8 @@ const alterMigrations = [
   'ALTER TABLE channels ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0',
   "ALTER TABLE sessions ADD COLUMN unlocked_group_ids TEXT NOT NULL DEFAULT '[]'",
   'ALTER TABLE channels ADD COLUMN is_unavailable INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE news ADD COLUMN local_media_paths TEXT',
+  'ALTER TABLE news ADD COLUMN album_msg_ids TEXT',
 ];
 for (const sql of alterMigrations) {
   try {

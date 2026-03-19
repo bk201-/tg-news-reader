@@ -44,6 +44,8 @@ export const news = sqliteTable('news', {
   postedAt: integer('posted_at').notNull(),
   fullContent: text('full_content'),
   localMediaPath: text('local_media_path'),
+  localMediaPaths: text('local_media_paths'), // JSON array of paths for albums, e.g. ["ch/101.jpg","ch/102.jpg"]
+  albumMsgIds: text('album_msg_ids'), // JSON array of telegram msg IDs, e.g. [101,102,103]
   mediaSize: integer('media_size'),
 });
 

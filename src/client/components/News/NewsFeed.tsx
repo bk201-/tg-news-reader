@@ -1,23 +1,15 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { Button, Space, Typography, Spin, Empty, Tooltip, Badge, Tag, App, Segmented } from 'antd';
-import {
-  FilterOutlined,
-  EyeOutlined,
-  CheckSquareOutlined,
-  SyncOutlined,
-  CloseCircleOutlined,
-  HistoryOutlined,
-} from '@ant-design/icons';
+import { App, Empty } from 'antd';
 import type { Channel } from '../../../shared/types';
-import { useNews, useMarkAllRead } from '../../api/news';
+import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
 import { useFetchChannel } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
-import { NewsListItem, applyFilters } from './NewsListItem';
+import { applyFilters } from './NewsListItem';
 import { NewsDetail } from './NewsDetail';
 import { FilterPanel } from '../Filters/FilterPanel';
-
-const { Text } = Typography;
+import { NewsFeedToolbar } from './NewsFeedToolbar';
+import { NewsFeedList } from './NewsFeedList';
 
 interface NewsFeedProps {
   channel: Channel;
@@ -41,19 +33,17 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const serverFilteredOut = newsData?.filteredOut ?? 0;
   const { data: filters = [] } = useFilters(channel.id);
   const markAllRead = useMarkAllRead();
+  const markRead = useMarkRead();
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
 
-  const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {
-    // Media tasks are now visible in the Downloads panel (top-right)
-  }, []);
+  const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {}, []);
 
-  // Reset hash filter when channel changes
+  // ── URL hash sync ─────────────────────────────────────────────────────
   useEffect(() => {
     setHashTagFilter(null);
   }, [channel.id, setHashTagFilter]);
 
-  // Sync URL hash (write)
   useEffect(() => {
     if (hashTagFilter) {
       history.replaceState(
@@ -66,27 +56,22 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     }
   }, [hashTagFilter]);
 
-  // Listen for manual hash changes (e.g. user deletes hash from address bar)
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash;
-      if (!hash || hash === '#') {
-        setHashTagFilter(null);
-      } else if (hash.startsWith('#tag=')) {
-        setHashTagFilter(decodeURIComponent(hash.slice(5)));
-      }
+      if (!hash || hash === '#') setHashTagFilter(null);
+      else if (hash.startsWith('#tag=')) setHashTagFilter(decodeURIComponent(hash.slice(5)));
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [setHashTagFilter]);
 
+  // ── Derived values ────────────────────────────────────────────────────
   const selectedItem = useMemo(
     () => newsItems.find((n) => n.id === selectedNewsId) || null,
     [newsItems, selectedNewsId],
   );
-
   const filteredIds = useMemo(() => applyFilters(newsItems, filters), [newsItems, filters]);
-
   const activeFilterCount = filters.filter((f) => f.isActive === 1).length;
 
   const displayItems = useMemo(() => {
@@ -97,18 +82,22 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [newsItems, filteredIds, showAll, hashTagFilter]);
 
   const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
-  // When server-side filtering is active (!showAll): server already excluded items, use serverFilteredOut.
-  // When showAll: client computes dimmed items via applyFilters.
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
   const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
 
+  // ── Handlers ─────────────────────────────────────────────────────────
   const handleMarkedRead = useCallback(
     (currentId: number) => {
       const currentIndex = displayItems.findIndex((item) => item.id === currentId);
       const nextUnread = displayItems.slice(currentIndex + 1).find((item) => item.isRead === 0);
-      if (nextUnread) setSelectedNewsId(nextUnread.id);
+      if (nextUnread) {
+        setSelectedNewsId(nextUnread.id);
+      } else {
+        const remainingVisible = displayItems.filter((item) => item.id !== currentId && item.isRead === 0);
+        if (!showAll && remainingVisible.length === 0 && serverFilteredOut > 0) markAllRead.mutate(channel.id);
+      }
     },
-    [displayItems, setSelectedNewsId],
+    [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id],
   );
 
   const handleTagClick = useCallback(
@@ -117,23 +106,17 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         setHashTagFilter(tag);
         setShowAll(false);
       } else {
-        void createFilter.mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() }).then(() => {
-          void message.success(`Тег ${tag} добавлен в фильтры`);
-        });
+        void createFilter
+          .mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() })
+          .then(() => void message.success(`Тег ${tag} добавлен в фильтры`));
       }
     },
     [setHashTagFilter, setShowAll, createFilter, message],
   );
 
-  const handleMarkAllRead = () => {
-    markAllRead.mutate(channel.id);
-  };
-
+  // ── Fetch period ──────────────────────────────────────────────────────
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
-
-  // Reset period selection when channel changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFetchPeriod('');
   }, [channel.id]);
 
@@ -149,9 +132,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       if (v === 'sync') {
         fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
       } else {
-        const days = parseInt(v, 10);
         const since = new Date();
-        since.setDate(since.getDate() - days);
+        since.setDate(since.getDate() - parseInt(v, 10));
         since.setHours(0, 0, 0, 0);
         fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
       }
@@ -159,127 +141,103 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [channel.id, fetchChannel, onFetchSuccess],
   );
 
-  const periodOptions = [
-    { value: '1', label: '1д' },
-    { value: '3', label: '3д' },
-    { value: '5', label: '5д' },
-    { value: '7', label: '7д' },
-    { value: '14', label: '14д' },
-    {
-      value: 'sync',
-      label: (
-        <Tooltip title="С последней синхронизации">
-          <HistoryOutlined />
-        </Tooltip>
-      ),
-    },
-  ];
+  // ── Hotkeys: ↑/↓ navigate, Space = mark read + advance ───────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement).isContentEditable) return;
 
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (displayItems.length === 0) return;
+        if (!selectedNewsId) {
+          setSelectedNewsId(displayItems[0].id);
+          return;
+        }
+        const idx = displayItems.findIndex((n) => n.id === selectedNewsId);
+        if (e.key === 'ArrowDown' && idx < displayItems.length - 1) setSelectedNewsId(displayItems[idx + 1].id);
+        if (e.key === 'ArrowUp' && idx > 0) setSelectedNewsId(displayItems[idx - 1].id);
+        return;
+      }
+      if (e.key === ' ' && selectedNewsId) {
+        e.preventDefault();
+        const item = displayItems.find((n) => n.id === selectedNewsId);
+        if (!item) return;
+        if (item.isRead === 0) {
+          markRead.mutate({ id: item.id, isRead: 1 }, { onSuccess: () => handleMarkedRead(item.id) });
+        } else {
+          const idx = displayItems.findIndex((n) => n.id === selectedNewsId);
+          const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
+          if (next) setSelectedNewsId(next.id);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [displayItems, selectedNewsId, setSelectedNewsId, markRead, handleMarkedRead]);
+
+  // ── Auto-mark read when selected post gets filtered out ───────────────
+  useEffect(() => {
+    if (showAll || !selectedNewsId) return;
+    if (displayItems.some((n) => n.id === selectedNewsId)) return;
+    const item = newsItems.find((n) => n.id === selectedNewsId);
+    if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1 });
+    setSelectedNewsId(displayItems.find((n) => n.isRead === 0)?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayItems]);
+
+  // ── Scroll selected into view ─────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null);
-
-  // Scroll selected item into center of the list
   useEffect(() => {
     if (!selectedNewsId || !listRef.current) return;
-    const el = listRef.current.querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    listRef.current
+      .querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [selectedNewsId]);
 
   return (
     <div className="news-feed">
-      <div className="news-feed__toolbar">
-        <Space wrap>
-          <Tooltip title="Выгрузить с последнего прочитанного">
-            <Button icon={<SyncOutlined />} onClick={handleFetchDefault} loading={fetchChannel.isPending} />
-          </Tooltip>
-          <Segmented
-            options={periodOptions}
-            value={fetchPeriod}
-            onChange={handleFetchPeriod}
-            disabled={fetchChannel.isPending}
-          />
-          <Tooltip title={showAll ? 'Скрыть отфильтрованные' : 'Показать все'}>
-            <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={() => setShowAll(!showAll)}>
-              {showAll ? 'Только отфильтрованные' : 'Показать все'}
-            </Button>
-          </Tooltip>
-          <Tooltip title="Отметить все прочитанными и очистить список">
-            <Button icon={<CheckSquareOutlined />} onClick={handleMarkAllRead} loading={markAllRead.isPending}>
-              Прочитать все
-            </Button>
-          </Tooltip>
-          <Badge count={activeFilterCount} size="small">
-            <Tooltip title="Фильтры">
-              <Button icon={<FilterOutlined />} onClick={() => setFilterPanelOpen(true)}>
-                Фильтр
-              </Button>
-            </Tooltip>
-          </Badge>
-          {hashTagFilter && (
-            <Tag
-              color="blue"
-              closeIcon={<CloseCircleOutlined />}
-              onClose={() => setHashTagFilter(null)}
-              style={{ fontSize: 13, padding: '2px 8px' }}
-            >
-              {hashTagFilter}
-            </Tag>
-          )}
-        </Space>
-        <Space size={12} style={{ fontSize: 12 }}>
-          <Text type="secondary">
-            Показано: <strong>{displayItems.length}</strong>
-          </Text>
-          {hiddenByFilters > 0 && (
-            <Text type="secondary">
-              Скрыто: <strong>{hiddenByFilters}</strong>
-            </Text>
-          )}
-          <Text type="secondary">
-            Всего: <strong>{totalCount}</strong>
-          </Text>
-          {unreadCount > 0 && (
-            <Text type="secondary">
-              Непрочит.: <strong>{unreadCount}</strong>
-            </Text>
-          )}
-        </Space>
-      </div>
+      <NewsFeedToolbar
+        fetchPending={fetchChannel.isPending}
+        fetchPeriod={fetchPeriod}
+        onFetchDefault={handleFetchDefault}
+        onFetchPeriod={handleFetchPeriod}
+        showAll={showAll}
+        onToggleShowAll={() => setShowAll(!showAll)}
+        markAllPending={markAllRead.isPending}
+        onMarkAllRead={() => markAllRead.mutate(channel.id)}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFilterPanelOpen(true)}
+        hashTagFilter={hashTagFilter}
+        onClearHashTag={() => setHashTagFilter(null)}
+        shownCount={displayItems.length}
+        hiddenCount={hiddenByFilters}
+        totalCount={totalCount}
+        unreadCount={unreadCount}
+      />
 
       <div className="news-feed__body">
-        <div className="news-feed__list" ref={listRef}>
-          {isLoading && (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-              <Spin size="large" />
-            </div>
-          )}
-          {!isLoading && displayItems.length === 0 && (
-            <Empty
-              description={
-                hashTagFilter
-                  ? `Нет новостей с тегом ${hashTagFilter}`
-                  : activeFilterCount > 0
-                    ? 'Нет новостей, соответствующих фильтрам. Нажмите "Показать все".'
-                    : 'Нет новостей. Нажмите "Выгрузить".'
-              }
-              style={{ marginTop: 48 }}
-            />
-          )}
-          {displayItems.map((item) => (
-            <NewsListItem
-              key={item.id}
-              item={item}
-              isSelected={selectedNewsId === item.id}
-              isFiltered={filteredIds.has(item.id)}
-              showAll={showAll}
-              onClick={() => setSelectedNewsId(item.id)}
-              onTagClick={handleTagClick}
-            />
-          ))}
-        </div>
+        <NewsFeedList
+          isLoading={isLoading}
+          items={displayItems}
+          filteredIds={filteredIds}
+          showAll={showAll}
+          selectedNewsId={selectedNewsId}
+          hashTagFilter={hashTagFilter}
+          activeFilterCount={activeFilterCount}
+          onSelect={setSelectedNewsId}
+          onTagClick={handleTagClick}
+          listRef={listRef}
+        />
 
         <div className="news-feed__detail">
           {selectedItem ? (
-            <NewsDetail item={selectedItem} channelType={channel.channelType} onMarkedRead={handleMarkedRead} />
+            <NewsDetail
+              key={selectedItem.id}
+              item={selectedItem}
+              channelType={channel.channelType}
+              onMarkedRead={handleMarkedRead}
+            />
           ) : (
             <div className="news-feed__detail-empty">
               <Empty description="Выберите новость из списка" />

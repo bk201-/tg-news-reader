@@ -33,6 +33,10 @@ export interface TelegramMessage {
   mediaType?: string;
   mediaSizeBytes?: number;
   rawMedia?: Api.TypeMessageMedia;
+  // Album support
+  groupedId?: string; // BigInt serialised as string
+  rawMediaItems?: Api.TypeMessageMedia[]; // all media in album (index 0 = primary)
+  albumTelegramIds?: number[]; // telegram msg IDs for every album member
 }
 
 function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
@@ -127,6 +131,7 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
     mediaType,
     mediaSizeBytes,
     rawMedia: msg.media ?? undefined,
+    groupedId: msg.groupedId != null ? String(msg.groupedId) : undefined,
   };
 }
 
@@ -183,7 +188,38 @@ export async function fetchChannelMessages(
     throw err;
   }
 
-  return allMessages.sort((a, b) => a.date - b.date);
+  // ── Album grouping ──────────────────────────────────────────────────────────
+  // Messages in the same album share a groupedId. Merge them into one primary
+  // message (lowest ID = has the caption) so we store one news row per album.
+  const groupMap = new Map<string, TelegramMessage[]>();
+  const singles: TelegramMessage[] = [];
+
+  for (const msg of allMessages) {
+    if (msg.groupedId) {
+      const bucket = groupMap.get(msg.groupedId) ?? [];
+      bucket.push(msg);
+      groupMap.set(msg.groupedId, bucket);
+    } else {
+      singles.push(msg);
+    }
+  }
+
+  const albumPrimaries: TelegramMessage[] = [];
+  for (const group of groupMap.values()) {
+    group.sort((a, b) => a.id - b.id); // lowest id = caption message
+    const primary = group[0];
+    const rawMediaItems = group.map((g) => g.rawMedia).filter((m): m is Api.TypeMessageMedia => m !== undefined);
+    const totalSize = group.reduce((sum, g) => sum + (g.mediaSizeBytes ?? 0), 0);
+
+    albumPrimaries.push({
+      ...primary,
+      rawMediaItems: rawMediaItems.length > 1 ? rawMediaItems : undefined,
+      albumTelegramIds: group.length > 1 ? group.map((g) => g.id) : undefined,
+      mediaSizeBytes: totalSize > 0 ? totalSize : primary.mediaSizeBytes,
+    });
+  }
+
+  return [...singles, ...albumPrimaries].sort((a, b) => a.date - b.date);
 }
 
 export interface ChannelInfo {

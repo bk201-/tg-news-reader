@@ -51,23 +51,48 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
     .select({
       telegramMsgId: news.telegramMsgId,
       localMediaPath: news.localMediaPath,
+      localMediaPaths: news.localMediaPaths,
+      albumMsgIds: news.albumMsgIds,
       channelTelegramId: channels.telegramId,
     })
     .from(news)
     .innerJoin(channels, eq(news.channelId, channels.id))
     .where(eq(news.id, newsId));
   if (!row) throw new Error(`News ${newsId} not found`);
-  if (row.localMediaPath) return; // Already downloaded
 
-  const msg = await fetchMessageById(row.channelTelegramId, row.telegramMsgId);
-  if (!msg?.rawMedia) throw new Error('No media in message');
+  // Already downloaded — skip
+  if (row.albumMsgIds ? row.localMediaPaths !== null : row.localMediaPath !== null) return;
 
-  // Ignore size limits for user-initiated; respect them for background tasks
   const ignoreLimit = priority >= 10;
-  const localPath = await downloadMessageMedia(msg, row.channelTelegramId, { ignoreLimit });
-  if (!localPath) throw new Error('Media exceeds size limit or download failed');
 
-  await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, newsId));
+  if (row.albumMsgIds) {
+    // ── Album: download each member message sequentially ──────────────────────
+    const albumIds = JSON.parse(row.albumMsgIds) as number[];
+    const paths: string[] = [];
+
+    for (const msgId of albumIds) {
+      const msg = await fetchMessageById(row.channelTelegramId, msgId);
+      if (!msg?.rawMedia) continue;
+      const localPath = await downloadMessageMedia(msg, row.channelTelegramId, { ignoreLimit });
+      if (localPath) paths.push(localPath);
+    }
+
+    if (paths.length === 0) throw new Error('No media files downloaded for album');
+
+    await db
+      .update(news)
+      .set({ localMediaPath: paths[0], localMediaPaths: JSON.stringify(paths) })
+      .where(eq(news.id, newsId));
+  } else {
+    // ── Single media ──────────────────────────────────────────────────────────
+    const msg = await fetchMessageById(row.channelTelegramId, row.telegramMsgId);
+    if (!msg?.rawMedia) throw new Error('No media in message');
+
+    const localPath = await downloadMessageMedia(msg, row.channelTelegramId, { ignoreLimit });
+    if (!localPath) throw new Error('Media exceeds size limit or download failed');
+
+    await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, newsId));
+  }
 }
 
 async function processArticleTask(newsId: number, url: string): Promise<void> {
@@ -90,13 +115,18 @@ async function runWorker(): Promise<never> {
       .limit(1);
 
     if (!task) {
-      // Sleep until wakeup signal or 1s polling timeout
+      // Sleep until wakeup signal or 1s polling timeout.
+      // Important: always remove the 'once' listener when the timeout fires,
+      // otherwise it accumulates (10 workers × N sleep cycles → memory leak).
       await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, 1000);
         const onWakeup = () => {
           clearTimeout(timer);
           resolve();
         };
+        const timer = setTimeout(() => {
+          downloadProgressEmitter.off(WAKEUP_EVENT, onWakeup);
+          resolve();
+        }, 1000);
         downloadProgressEmitter.once(WAKEUP_EVENT, onWakeup);
       });
       continue;
