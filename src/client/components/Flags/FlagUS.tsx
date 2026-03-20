@@ -20,8 +20,10 @@ function starPath(cx: number, cy: number): string {
 
 function buildStars(): [number, number][] {
   const stars: [number, number][] = [];
-  const cw = 76, ch = 7 * (100 / 13);
-  const hStep = cw / 12, vStep = ch / 10;
+  const cw = 76,
+    ch = 7 * (100 / 13);
+  const hStep = cw / 12,
+    vStep = ch / 10;
   for (let row = 0; row < 9; row++) {
     const cols = row % 2 === 0 ? 6 : 5;
     const xStart = row % 2 === 0 ? hStep / 2 : hStep;
@@ -39,7 +41,7 @@ const CANTON_H = 7 * SH;
 /** US flag: 13 stripes + blue canton with 50 stars */
 export function FlagUS({ size = 20 }: FlagProps) {
   const w = size;
-  const h = Math.round(size * 10 / 19);
+  const h = Math.round((size * 10) / 19);
   return (
     <svg
       width={w}
@@ -57,4 +59,3 @@ export function FlagUS({ size = 20 }: FlagProps) {
     </svg>
   );
 }
-

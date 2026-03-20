@@ -91,10 +91,24 @@ export function LoginPage() {
           {step === 'credentials' ? (
             <Form form={form} layout="vertical" onFinish={handleCredentials} autoComplete="off">
               <Form.Item name="email" rules={[{ required: true, type: 'email', message: t('auth.email_required') }]}>
-                <Input prefix={<MailOutlined />} placeholder={t('auth.email_placeholder')} autoComplete="username" size="large" />
+                <Input
+                  prefix={<MailOutlined />}
+                  placeholder={t('auth.email_placeholder')}
+                  autoComplete="username"
+                  size="large"
+                />
               </Form.Item>
-              <Form.Item name="password" rules={[{ required: true, message: t('auth.password_required') }]} style={{ marginBottom: 24 }}>
-                <Input.Password prefix={<LockOutlined />} placeholder={t('auth.password_placeholder')} autoComplete="current-password" size="large" />
+              <Form.Item
+                name="password"
+                rules={[{ required: true, message: t('auth.password_required') }]}
+                style={{ marginBottom: 24 }}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder={t('auth.password_placeholder')}
+                  autoComplete="current-password"
+                  size="large"
+                />
               </Form.Item>
               <Form.Item style={{ marginBottom: 0 }}>
                 <Button type="primary" htmlType="submit" block size="large" loading={loading}>
@@ -107,10 +121,22 @@ export function LoginPage() {
               <Text>{t('auth.totp_prompt')}</Text>
               <Input.OTP length={6} value={totpCode} onChange={setTotpCode} size="large" />
               <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <Button onClick={() => { setStep('credentials'); setError(null); }}>
+                <Button
+                  onClick={() => {
+                    setStep('credentials');
+                    setError(null);
+                  }}
+                >
                   {t('auth.back')}
                 </Button>
-                <Button type="primary" icon={<SafetyCertificateOutlined />} onClick={handleTOTP} loading={loading} disabled={totpCode.length < 6} size="large">
+                <Button
+                  type="primary"
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={handleTOTP}
+                  loading={loading}
+                  disabled={totpCode.length < 6}
+                  size="large"
+                >
                   {t('auth.confirm_totp')}
                 </Button>
               </Space>

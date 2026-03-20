@@ -112,7 +112,9 @@ export function NewsDetailToolbar({
               loading={articleLoading}
               disabled={articleQueued}
             >
-              <span className="nd-btn-text">{articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}</span>
+              <span className="nd-btn-text">
+                {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
+              </span>
             </Button>
           </Tooltip>
         )}

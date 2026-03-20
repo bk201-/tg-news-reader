@@ -41,9 +41,7 @@ export function ChannelFetchModal({
           style={{ width: '100%' }}
           format="DD.MM.YYYY HH:mm"
         />
-        <p style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
-          {t('channels.fetch_modal.hint')}
-        </p>
+        <p style={{ marginTop: 8, color: '#888', fontSize: 12 }}>{t('channels.fetch_modal.hint')}</p>
       </div>
     </Modal>
   );

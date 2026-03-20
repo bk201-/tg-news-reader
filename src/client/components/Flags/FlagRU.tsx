@@ -6,7 +6,7 @@ interface FlagProps {
 
 /** Russian flag: white / blue / red horizontal stripes */
 export function FlagRU({ size = 20 }: FlagProps) {
-  const h = Math.round(size * 2 / 3);
+  const h = Math.round((size * 2) / 3);
   return (
     <svg
       width={size}
@@ -20,4 +20,3 @@ export function FlagRU({ size = 20 }: FlagProps) {
     </svg>
   );
 }
-

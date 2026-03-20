@@ -69,7 +69,11 @@ export function GroupFormModal({
       }}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Form.Item name="name" label={t('groups.form.name_label')} rules={[{ required: true, message: t('groups.form.name_required') }]}>
+        <Form.Item
+          name="name"
+          label={t('groups.form.name_label')}
+          rules={[{ required: true, message: t('groups.form.name_required') }]}
+        >
           <Input placeholder={t('groups.form.name_placeholder')} autoComplete="off" />
         </Form.Item>
 

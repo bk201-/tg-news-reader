@@ -1,7 +1,12 @@
 import React from 'react';
 import { List, Typography, Tag, Space, Button, Tooltip, Spin } from 'antd';
 import {
-  CloudDownloadOutlined, DeleteOutlined, RocketOutlined, WarningOutlined, FileTextOutlined, PictureOutlined,
+  CloudDownloadOutlined,
+  DeleteOutlined,
+  RocketOutlined,
+  WarningOutlined,
+  FileTextOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { DownloadTask } from '@shared/types.ts';
@@ -11,7 +16,12 @@ const { Text } = Typography;
 function TaskStatus({ task }: { task: DownloadTask }) {
   const { t } = useTranslation();
   if (task.status === 'processing') return <Tag color="processing">{t('downloads.status_processing')}</Tag>;
-  if (task.status === 'failed') return <Tag color="error" icon={<WarningOutlined />}>{t('downloads.status_error')}</Tag>;
+  if (task.status === 'failed')
+    return (
+      <Tag color="error" icon={<WarningOutlined />}>
+        {t('downloads.status_error')}
+      </Tag>
+    );
   if (task.priority >= 10) return <Tag color="warning">{t('downloads.status_priority')}</Tag>;
   return <Tag>{t('downloads.status_queued')}</Tag>;
 }
@@ -66,7 +76,9 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
             }
             title={
               <Space size={4} wrap>
-                <Text strong style={{ fontSize: 12 }}>{task.channelName ?? '—'}</Text>
+                <Text strong style={{ fontSize: 12 }}>
+                  {task.channelName ?? '—'}
+                </Text>
                 <TaskStatus task={task} />
               </Space>
             }
@@ -76,7 +88,9 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
                   {task.newsText?.substring(0, 80) || t('downloads.no_text')}
                 </Text>
                 {task.status === 'failed' && task.error && (
-                  <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>{task.error}</Text>
+                  <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                    {task.error}
+                  </Text>
                 )}
               </>
             }

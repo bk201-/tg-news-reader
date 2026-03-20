@@ -149,7 +149,13 @@ export function GroupPanel() {
           </div>
           <Text
             className="group-item__label"
-            style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, marginTop: 2, color: token.colorTextSecondary }}
+            style={{
+              fontSize: 10,
+              textAlign: 'center',
+              lineHeight: 1.2,
+              marginTop: 2,
+              color: token.colorTextSecondary,
+            }}
             ellipsis
           >
             {t('groups.general')}

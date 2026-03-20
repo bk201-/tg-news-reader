@@ -23,7 +23,6 @@ import { api } from '../../api/client';
 const { Header } = Layout;
 const { Title, Text } = Typography;
 
-
 export function AppHeader() {
   const { selectedChannelId, isDarkTheme, toggleTheme } = useUIStore();
   const { user, clearAuth, updateUser } = useAuthStore();
@@ -102,7 +101,10 @@ export function AppHeader() {
           <Button
             size="small"
             type={!i18n.language.startsWith('ru') ? 'primary' : 'default'}
-            onClick={(e) => { e.stopPropagation(); void i18n.changeLanguage('en'); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              void i18n.changeLanguage('en');
+            }}
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <FlagUS size={18} /> EN
@@ -110,7 +112,10 @@ export function AppHeader() {
           <Button
             size="small"
             type={i18n.language.startsWith('ru') ? 'primary' : 'default'}
-            onClick={(e) => { e.stopPropagation(); void i18n.changeLanguage('ru'); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              void i18n.changeLanguage('ru');
+            }}
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <FlagRU size={18} /> RU

@@ -44,10 +44,18 @@ export function ChannelFormModal({
           label={t('channels.form.telegram_id_label')}
           rules={[{ required: true, message: t('channels.form.telegram_id_required') }]}
         >
-          <Input placeholder={t('channels.form.telegram_id_placeholder')} autoComplete="off" onBlur={onTelegramIdBlur} />
+          <Input
+            placeholder={t('channels.form.telegram_id_placeholder')}
+            autoComplete="off"
+            onBlur={onTelegramIdBlur}
+          />
         </Form.Item>
         <Spin spinning={lookupLoading} size="small">
-          <Form.Item name="name" label={t('channels.form.name_label')} rules={[{ required: true, message: t('channels.form.name_required') }]}>
+          <Form.Item
+            name="name"
+            label={t('channels.form.name_label')}
+            rules={[{ required: true, message: t('channels.form.name_required') }]}
+          >
             <Input placeholder={t('channels.form.name_placeholder')} autoComplete="off" />
           </Form.Item>
           <Form.Item name="description" label={t('channels.form.description_label')}>

@@ -43,12 +43,17 @@ export function DownloadsPanel() {
 
   return (
     <>
-      <Tooltip title={downloadsPanelPinned ? t('downloads.panel_tooltip_pinned') : t('downloads.panel_tooltip')} placement="bottomLeft">
+      <Tooltip
+        title={downloadsPanelPinned ? t('downloads.panel_tooltip_pinned') : t('downloads.panel_tooltip')}
+        placement="bottomLeft"
+      >
         <Badge count={activeCount} size="small" offset={[-4, 4]}>
           <Button
             type="text"
             icon={<CloudDownloadOutlined />}
-            onClick={() => { if (!downloadsPanelPinned) setOpen(true); }}
+            onClick={() => {
+              if (!downloadsPanelPinned) setOpen(true);
+            }}
             style={{ color: '#fff', opacity: downloadsPanelPinned ? 0.75 : 1 }}
           />
         </Badge>

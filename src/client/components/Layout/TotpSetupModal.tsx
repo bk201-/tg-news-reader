@@ -71,15 +71,24 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
         <Flex vertical gap={16}>
           <Text>{t('auth.totp_setup.scan_prompt')}</Text>
           {fetchError ? (
-            <Alert type="error" description={fetchError} showIcon
-              action={<Button size="small" onClick={() => void fetchQr()}>{t('common.retry')}</Button>}
+            <Alert
+              type="error"
+              description={fetchError}
+              showIcon
+              action={
+                <Button size="small" onClick={() => void fetchQr()}>
+                  {t('common.retry')}
+                </Button>
+              }
             />
           ) : qr ? (
             <div style={{ textAlign: 'center' }}>
               <img src={qr} alt="TOTP QR Code" style={{ width: 200, height: 200 }} />
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Spin />
+            </div>
           )}
           <Button type="primary" block onClick={() => setStep('confirm')} disabled={!qr}>
             {t('auth.totp_setup.scanned_button')}
