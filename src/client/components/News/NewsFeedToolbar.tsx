@@ -8,24 +8,9 @@ import {
   CloseCircleOutlined,
   HistoryOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
-
-const PERIOD_OPTIONS = [
-  { value: '1', label: '1д' },
-  { value: '3', label: '3д' },
-  { value: '5', label: '5д' },
-  { value: '7', label: '7д' },
-  { value: '14', label: '14д' },
-  {
-    value: 'sync',
-    label: (
-      <Tooltip title="С последней синхронизации">
-        <HistoryOutlined />
-      </Tooltip>
-    ),
-  },
-];
 
 interface NewsFeedToolbarProps {
   fetchPending: boolean;
@@ -64,27 +49,45 @@ export function NewsFeedToolbar({
   totalCount,
   unreadCount,
 }: NewsFeedToolbarProps) {
+  const { t } = useTranslation();
+
+  const periodOptions = [
+    { value: '1', label: t('news.period.1d') },
+    { value: '3', label: t('news.period.3d') },
+    { value: '5', label: t('news.period.5d') },
+    { value: '7', label: t('news.period.7d') },
+    { value: '14', label: t('news.period.14d') },
+    {
+      value: 'sync',
+      label: (
+        <Tooltip title={t('news.period.sync_tooltip')}>
+          <HistoryOutlined />
+        </Tooltip>
+      ),
+    },
+  ];
+
   return (
     <div className="news-feed__toolbar">
       <Space wrap>
-        <Tooltip title="Выгрузить с последнего прочитанного">
+        <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
           <Button icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
         </Tooltip>
-        <Segmented options={PERIOD_OPTIONS} value={fetchPeriod} onChange={onFetchPeriod} disabled={fetchPending} />
-        <Tooltip title={showAll ? 'Скрыть отфильтрованные' : 'Показать все'}>
+        <Segmented options={periodOptions} value={fetchPeriod} onChange={onFetchPeriod} disabled={fetchPending} />
+        <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
           <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
-            {showAll ? 'Только отфильтрованные' : 'Показать все'}
+            {showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all')}
           </Button>
         </Tooltip>
-        <Tooltip title="Отметить все прочитанными и очистить список">
+        <Tooltip title={t('news.toolbar.mark_all_read_tooltip')}>
           <Button icon={<CheckSquareOutlined />} onClick={onMarkAllRead} loading={markAllPending}>
-            Прочитать все
+            {t('news.toolbar.mark_all_read')}
           </Button>
         </Tooltip>
         <Badge count={activeFilterCount} size="small">
-          <Tooltip title="Фильтры">
+          <Tooltip title={t('news.toolbar.filter_tooltip')}>
             <Button icon={<FilterOutlined />} onClick={onOpenFilters}>
-              Фильтр
+              {t('news.toolbar.filter')}
             </Button>
           </Tooltip>
         </Badge>
@@ -101,22 +104,10 @@ export function NewsFeedToolbar({
       </Space>
 
       <Space size={12} style={{ fontSize: 12 }}>
-        <Text type="secondary">
-          Показано: <strong>{shownCount}</strong>
-        </Text>
-        {hiddenCount > 0 && (
-          <Text type="secondary">
-            Скрыто: <strong>{hiddenCount}</strong>
-          </Text>
-        )}
-        <Text type="secondary">
-          Всего: <strong>{totalCount}</strong>
-        </Text>
-        {unreadCount > 0 && (
-          <Text type="secondary">
-            Непрочит.: <strong>{unreadCount}</strong>
-          </Text>
-        )}
+        <Text type="secondary">{t('news.toolbar.shown', { count: shownCount })}</Text>
+        {hiddenCount > 0 && <Text type="secondary">{t('news.toolbar.hidden', { count: hiddenCount })}</Text>}
+        <Text type="secondary">{t('news.toolbar.total', { count: totalCount })}</Text>
+        {unreadCount > 0 && <Text type="secondary">{t('news.toolbar.unread', { count: unreadCount })}</Text>}
       </Space>
     </div>
   );

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Input, Typography } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
 
 const { Text } = Typography;
@@ -27,19 +28,20 @@ export function GroupPinModal({
   onConfirm,
   onPinChange,
 }: GroupPinModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       open={open}
       title={
         <span>
           <LockOutlined style={{ marginRight: 8, color: pinTarget?.color }} />
-          Введите PIN для «{pinTarget?.name}»
+          {t('groups.pin_modal.title', { name: pinTarget?.name })}
         </span>
       }
       onCancel={onClose}
       onOk={onConfirm}
-      okText="Открыть"
-      cancelText="Отмена"
+      okText={t('groups.pin_modal.ok_text')}
+      cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
       afterOpenChange={(visible) => {
         if (visible) onPinChange('');

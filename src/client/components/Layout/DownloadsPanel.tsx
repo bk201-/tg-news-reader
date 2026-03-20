@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Badge, Button, Drawer, Space, Tooltip, Spin } from 'antd';
 import { CloudDownloadOutlined, PushpinOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
 import { useDownloads, useDownloadsSSE, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
 import { useUIStore } from '../../store/uiStore';
@@ -13,6 +14,7 @@ export function DownloadsPanel() {
   const cancelDownload = useCancelDownload();
   const prioritizeDownload = usePrioritizeDownload();
   const { downloadsPanelPinned, toggleDownloadsPanelPin } = useUIStore();
+  const { t } = useTranslation();
 
   // SSE always active — mounted once for the whole app lifetime
   useDownloadsSSE();
@@ -23,9 +25,9 @@ export function DownloadsPanel() {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 4 }}>
       <Space size={6}>
         {activeCount > 0 && <Spin size="small" />}
-        <span>{activeCount > 0 ? `Загрузки — ${activeCount} активных` : 'Загрузки'}</span>
+        <span>{activeCount > 0 ? t('downloads.title_active', { count: activeCount }) : t('downloads.title')}</span>
       </Space>
-      <Tooltip title="Закрепить панель справа" placement="left">
+      <Tooltip title={t('downloads.pin_tooltip')} placement="left">
         <Button
           size="small"
           type="text"
@@ -41,14 +43,12 @@ export function DownloadsPanel() {
 
   return (
     <>
-      <Tooltip title={downloadsPanelPinned ? 'Загрузки (закреплена)' : 'Загрузки'} placement="bottomLeft">
+      <Tooltip title={downloadsPanelPinned ? t('downloads.panel_tooltip_pinned') : t('downloads.panel_tooltip')} placement="bottomLeft">
         <Badge count={activeCount} size="small" offset={[-4, 4]}>
           <Button
             type="text"
             icon={<CloudDownloadOutlined />}
-            onClick={() => {
-              if (!downloadsPanelPinned) setOpen(true);
-            }}
+            onClick={() => { if (!downloadsPanelPinned) setOpen(true); }}
             style={{ color: '#fff', opacity: downloadsPanelPinned ? 0.75 : 1 }}
           />
         </Badge>

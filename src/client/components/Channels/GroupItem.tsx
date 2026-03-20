@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dropdown, Typography, theme } from 'antd';
 import { FolderFilled, LockOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
 
 const { Text } = Typography;
@@ -17,13 +18,14 @@ interface GroupItemProps {
 
 export function GroupItem({ group, isActive, isLocked, count, onClick, onEdit, onDelete }: GroupItemProps) {
   const { token } = theme.useToken();
+  const { t } = useTranslation();
 
   return (
     <Dropdown
       menu={{
         items: [
-          { key: 'edit', label: 'Редактировать', icon: <EditOutlined /> },
-          { key: 'delete', label: 'Удалить', icon: <DeleteOutlined />, danger: true },
+          { key: 'edit', label: t('groups.context_edit'), icon: <EditOutlined /> },
+          { key: 'delete', label: t('groups.context_delete'), icon: <DeleteOutlined />, danger: true },
         ],
         onClick: ({ key }) => {
           if (key === 'edit') onEdit();

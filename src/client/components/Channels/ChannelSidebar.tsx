@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Space, Typography, Tooltip, Form } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
 import {
@@ -29,6 +30,7 @@ export function ChannelSidebar() {
   const fetchChannel = useFetchChannel();
   const countUnread = useCountUnreadChannels();
   const lookupChannel = useChannelLookup();
+  const { t } = useTranslation();
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
 
@@ -114,11 +116,11 @@ export function ChannelSidebar() {
   const handleDelete = (ch: Channel, e: React.MouseEvent) => {
     e.stopPropagation();
     Modal.confirm({
-      title: `Удалить канал "${ch.name}"?`,
-      content: 'Все новости этого канала будут удалены.',
-      okText: 'Удалить',
+      title: t('channels.delete_confirm_title', { name: ch.name }),
+      content: t('channels.delete_confirm_content'),
+      okText: t('common.delete'),
       okType: 'danger',
-      cancelText: 'Отмена',
+      cancelText: t('common.cancel'),
       onOk: () => deleteChannel.mutateAsync(ch.id),
     });
   };
@@ -127,22 +129,22 @@ export function ChannelSidebar() {
     <div className="channel-sidebar">
       <div className="channel-sidebar__header">
         <Text strong style={{ fontSize: 14 }} className="sidebar-title">
-          Каналы
+          {t('sidebar.channels')}
         </Text>
         <Space size={4}>
-          <Tooltip title="Посчитать непрочитанные в Telegram">
+          <Tooltip title={t('sidebar.refresh_tooltip')}>
             <Button icon={<ReloadOutlined />} onClick={() => countUnread.mutate()} loading={countUnread.isPending}>
-              <span className="btn-text">Обновить</span>
+              <span className="btn-text">{t('sidebar.refresh')}</span>
             </Button>
           </Tooltip>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            <span className="btn-text">Добавить</span>
+            <span className="btn-text">{t('sidebar.add')}</span>
           </Button>
         </Space>
       </div>
 
       <div className="channel-sidebar__list">
-        {isLoading && <div style={{ padding: 16 }}>Загрузка...</div>}
+        {isLoading && <div style={{ padding: 16 }}>{t('common.loading')}</div>}
         {channels.map((ch) => (
           <ChannelItem
             key={ch.id}

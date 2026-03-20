@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Space, Tooltip, Badge, Typography } from 'antd';
 import { ReloadOutlined, EditOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
 
@@ -27,12 +28,13 @@ export function ChannelItem({
   onEdit,
   onDelete,
 }: ChannelItemProps) {
+  const { t } = useTranslation();
   return (
     <div className={`channel-item ${isSelected ? 'channel-item--active' : ''}`} onClick={onSelect}>
       <div className="channel-item__info">
         <Text strong ellipsis>
           {ch.isUnavailable ? (
-            <Tooltip title="Канал недоступен в Telegram (удалён или закрыт)">
+            <Tooltip title={t('channels.unavailable_tooltip')}>
               <WarningOutlined style={{ color: '#ff4d4f', marginRight: 4 }} />
             </Tooltip>
           ) : null}
@@ -43,19 +45,19 @@ export function ChannelItem({
         </Text>
         {ch.lastFetchedAt && (
           <Text type="secondary" style={{ fontSize: 11 }}>
-            Обновлено: {dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm')}
+            {t('channels.updated', { date: dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm') })}
           </Text>
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
         <Space className="channel-item__actions" size={4}>
-          <Tooltip title="Загрузить новости">
+          <Tooltip title={t('channels.fetch_tooltip')}>
             <Button icon={<ReloadOutlined />} size="small" type="text" loading={isFetchingThis} onClick={onFetch} />
           </Tooltip>
-          <Tooltip title="Редактировать">
+          <Tooltip title={t('channels.edit_tooltip')}>
             <Button icon={<EditOutlined />} size="small" type="text" onClick={onEdit} />
           </Tooltip>
-          <Tooltip title="Удалить">
+          <Tooltip title={t('channels.delete_tooltip')}>
             <Button icon={<DeleteOutlined />} size="small" type="text" danger onClick={onDelete} />
           </Tooltip>
         </Space>

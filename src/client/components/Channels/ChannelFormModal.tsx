@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, Select, Spin } from 'antd';
 import type { FormInstance } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { Channel, Group } from '@shared/types.ts';
 
 interface ChannelFormModalProps {
@@ -26,41 +27,42 @@ export function ChannelFormModal({
   onSave,
   onTelegramIdBlur,
 }: ChannelFormModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       open={open}
-      title={editingChannel ? 'Редактировать канал' : 'Добавить канал'}
+      title={editingChannel ? t('channels.form.title_edit') : t('channels.form.title_add')}
       onCancel={onClose}
       onOk={onSave}
-      okText="Сохранить"
-      cancelText="Отмена"
+      okText={t('common.save')}
+      cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }} autoComplete="off">
         <Form.Item
           name="telegramId"
-          label="Telegram ID / username"
-          rules={[{ required: true, message: 'Введите username канала' }]}
+          label={t('channels.form.telegram_id_label')}
+          rules={[{ required: true, message: t('channels.form.telegram_id_required') }]}
         >
-          <Input placeholder="durov, @durov или https://t.me/durov" autoComplete="off" onBlur={onTelegramIdBlur} />
+          <Input placeholder={t('channels.form.telegram_id_placeholder')} autoComplete="off" onBlur={onTelegramIdBlur} />
         </Form.Item>
         <Spin spinning={lookupLoading} size="small">
-          <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
-            <Input placeholder="Мой любимый канал" autoComplete="off" />
+          <Form.Item name="name" label={t('channels.form.name_label')} rules={[{ required: true, message: t('channels.form.name_required') }]}>
+            <Input placeholder={t('channels.form.name_placeholder')} autoComplete="off" />
           </Form.Item>
-          <Form.Item name="description" label="Описание">
-            <Input.TextArea rows={2} placeholder="Необязательно" autoComplete="off" />
+          <Form.Item name="description" label={t('channels.form.description_label')}>
+            <Input.TextArea rows={2} placeholder={t('channels.form.description_placeholder')} autoComplete="off" />
           </Form.Item>
         </Spin>
-        <Form.Item name="channelType" label="Тип канала" initialValue="none">
+        <Form.Item name="channelType" label={t('channels.form.channel_type_label')} initialValue="none">
           <Select>
-            <Select.Option value="none">Не выбрано</Select.Option>
-            <Select.Option value="link_continuation">Ссылка — продолжение новости</Select.Option>
-            <Select.Option value="media_content">Медиа контент (фото/видео)</Select.Option>
+            <Select.Option value="none">{t('channels.form.type_none')}</Select.Option>
+            <Select.Option value="link_continuation">{t('channels.form.type_link')}</Select.Option>
+            <Select.Option value="media_content">{t('channels.form.type_media')}</Select.Option>
           </Select>
         </Form.Item>
-        <Form.Item name="groupId" label="Группа">
-          <Select allowClear placeholder="Общее (без группы)">
+        <Form.Item name="groupId" label={t('channels.form.group_label')}>
+          <Select allowClear placeholder={t('channels.form.group_placeholder')}>
             {groups.map((g) => (
               <Select.Option key={g.id} value={g.id}>
                 <span style={{ color: g.color }}>■</span> {g.name}

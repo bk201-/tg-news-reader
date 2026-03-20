@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Input, Button, Alert, Flex, Spin, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 
@@ -12,6 +13,7 @@ interface TotpSetupModalProps {
 
 export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
   const { updateUser } = useAuthStore();
+  const { t } = useTranslation();
 
   const [step, setStep] = useState<'scan' | 'confirm'>('scan');
   const [qr, setQr] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
       setQr(data.qrCode);
       setSecret(data.secret);
     } catch (e: unknown) {
-      setFetchError(e instanceof Error ? e.message : 'Не удалось загрузить QR-код');
+      setFetchError(e instanceof Error ? e.message : t('common.retry'));
     }
   };
 
@@ -50,7 +52,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
       updateUser({ hasTOTP: true });
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Неверный код');
+      setError(e instanceof Error ? e.message : t('common.retry'));
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
   return (
     <Modal
       open={open}
-      title="Настройка двухфакторной аутентификации"
+      title={t('auth.totp_setup.title')}
       onCancel={onClose}
       afterOpenChange={handleAfterOpen}
       footer={null}
@@ -67,40 +69,31 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
     >
       {step === 'scan' ? (
         <Flex vertical gap={16}>
-          <Text>Отсканируйте QR-код в приложении Google Authenticator, Microsoft Authenticator или аналогичном:</Text>
+          <Text>{t('auth.totp_setup.scan_prompt')}</Text>
           {fetchError ? (
-            <Alert
-              type="error"
-              description={fetchError}
-              showIcon
-              action={
-                <Button size="small" onClick={() => void fetchQr()}>
-                  Повторить
-                </Button>
-              }
+            <Alert type="error" description={fetchError} showIcon
+              action={<Button size="small" onClick={() => void fetchQr()}>{t('common.retry')}</Button>}
             />
           ) : qr ? (
             <div style={{ textAlign: 'center' }}>
               <img src={qr} alt="TOTP QR Code" style={{ width: 200, height: 200 }} />
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: 40 }}>
-              <Spin />
-            </div>
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
           )}
           <Button type="primary" block onClick={() => setStep('confirm')} disabled={!qr}>
-            Я отсканировал, ввести код →
+            {t('auth.totp_setup.scanned_button')}
           </Button>
         </Flex>
       ) : (
         <Flex vertical gap={16}>
-          <Text>Введите 6-значный код из приложения для подтверждения:</Text>
+          <Text>{t('auth.totp_setup.confirm_prompt')}</Text>
           <Input.OTP length={6} value={code} onChange={setCode} size="large" />
           {error && <Alert type="error" description={error} showIcon />}
           <Flex justify="space-between">
-            <Button onClick={() => setStep('scan')}>← Назад</Button>
+            <Button onClick={() => setStep('scan')}>{t('auth.totp_setup.back')}</Button>
             <Button type="primary" onClick={() => void handleConfirm()} loading={loading} disabled={code.length < 6}>
-              Подтвердить и включить 2FA
+              {t('auth.totp_setup.enable_button')}
             </Button>
           </Flex>
         </Flex>

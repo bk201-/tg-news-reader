@@ -1,0 +1,193 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "none": "None",
+    "retry": "Retry"
+  },
+  "sidebar": {
+    "channels": "Channels",
+    "refresh": "Refresh",
+    "refresh_tooltip": "Count unread in Telegram",
+    "add": "Add"
+  },
+  "channels": {
+    "updated": "Updated: {{date}}",
+    "unavailable_tooltip": "Channel unavailable in Telegram (deleted or closed)",
+    "fetch_tooltip": "Fetch news",
+    "edit_tooltip": "Edit",
+    "delete_tooltip": "Delete",
+    "delete_confirm_title": "Delete channel \"{{name}}\"?",
+    "delete_confirm_content": "All news from this channel will be deleted.",
+    "form": {
+      "title_add": "Add channel",
+      "title_edit": "Edit channel",
+      "telegram_id_label": "Telegram ID / username",
+      "telegram_id_required": "Enter channel username",
+      "telegram_id_placeholder": "durov, @durov or https://t.me/durov",
+      "name_label": "Name",
+      "name_required": "Enter name",
+      "name_placeholder": "My favourite channel",
+      "description_label": "Description",
+      "description_placeholder": "Optional",
+      "channel_type_label": "Channel type",
+      "type_none": "None",
+      "type_link": "Link — article continuation",
+      "type_media": "Media content (photos/videos)",
+      "group_label": "Group",
+      "group_placeholder": "General (no group)"
+    },
+    "fetch_modal": {
+      "title": "Fetch news",
+      "label": "Fetch news since:",
+      "date_placeholder": "Date (leave empty for last sync)",
+      "hint": "If no date selected, the last sync date will be used.",
+      "ok_text": "Fetch"
+    }
+  },
+  "groups": {
+    "general": "General",
+    "general_tooltip": "General (no group)",
+    "new_group_tooltip": "New group",
+    "delete_confirm_title": "Delete group \"{{name}}\"?",
+    "delete_confirm_content": "Channels in this group will be moved to General.",
+    "context_edit": "Edit",
+    "context_delete": "Delete",
+    "form": {
+      "title_add": "New group",
+      "title_edit": "Edit group",
+      "name_label": "Name",
+      "name_required": "Enter name",
+      "name_placeholder": "News, Work, Hobbies...",
+      "color_label": "Color",
+      "pin_label_new": "PIN (optional, 4 digits)",
+      "pin_label_existing": "New PIN (leave empty to keep current)",
+      "pin_pattern": "PIN must be 4 digits",
+      "remove_pin": "Remove PIN"
+    },
+    "pin_modal": {
+      "title": "Enter PIN for «{{name}}»",
+      "ok_text": "Unlock",
+      "wrong_pin": "Wrong PIN"
+    }
+  },
+  "news": {
+    "toolbar": {
+      "fetch_default_tooltip": "Fetch since last read",
+      "sync_tooltip": "Since last sync",
+      "show_all": "Show all",
+      "hide_filtered": "Filtered only",
+      "mark_all_read": "Mark all read",
+      "mark_all_read_tooltip": "Mark all as read and clear list",
+      "filter": "Filter",
+      "filter_tooltip": "Filters",
+      "shown": "Shown: {{count}}",
+      "hidden": "Hidden: {{count}}",
+      "total": "Total: {{count}}",
+      "unread": "Unread: {{count}}"
+    },
+    "period": {
+      "1d": "1d",
+      "3d": "3d",
+      "5d": "5d",
+      "7d": "7d",
+      "14d": "14d",
+      "sync_tooltip": "Since last sync"
+    },
+    "detail": {
+      "refresh": "Refresh",
+      "refresh_tooltip": "Refresh [R]",
+      "links": "Links",
+      "links_tooltip": "Show links [L]",
+      "links_count": "Links ({{count}})",
+      "text": "Text",
+      "text_tooltip": "Show post text [T]",
+      "load_article": "Load article",
+      "load_article_tooltip": "Load full article text [F]",
+      "queued": "Queued",
+      "open": "Open",
+      "open_tooltip": "Open in browser [Enter]",
+      "mark_read": "Read",
+      "mark_unread": "Unread"
+    },
+    "list": {
+      "empty_tag": "No news with tag {{tag}}",
+      "empty_filtered": "No news matching filters. Click \"Show all\".",
+      "empty": "No news. Click \"Fetch\"."
+    }
+  },
+  "filters": {
+    "title": "Manage filters",
+    "description": "News matching active filters will be <strong>hidden</strong>. Tags (#) are checked first, then keywords.",
+    "type_tag": "Tag #",
+    "type_keyword": "Keyword",
+    "name_placeholder": "Filter name",
+    "value_placeholder": "Value (e.g. #news or keyword)",
+    "add": "Add",
+    "col_name": "Name",
+    "col_active": "Active",
+    "empty": "No filters added",
+    "active_tags": "Active tags:",
+    "keywords": "Keywords:",
+    "none": "none",
+    "delete_confirm_title": "Delete filter \"{{name}}\"?"
+  },
+  "downloads": {
+    "title": "Downloads",
+    "title_active": "Downloads — {{count}} active",
+    "title_active_pinned": "Downloads ({{count}})",
+    "pin_tooltip": "Pin panel to the right",
+    "unpin_tooltip": "Unpin panel",
+    "panel_tooltip": "Downloads",
+    "panel_tooltip_pinned": "Downloads (pinned)",
+    "empty": "No active downloads",
+    "status_processing": "Downloading",
+    "status_error": "Error",
+    "status_priority": "Priority",
+    "status_queued": "Queued",
+    "boost_tooltip": "Boost priority",
+    "cancel_tooltip": "Cancel",
+    "no_text": "(no text)"
+  },
+  "auth": {
+    "sign_in": "Sign in",
+    "two_fa": "Two-factor authentication",
+    "email_required": "Enter email",
+    "password_required": "Enter password",
+    "email_placeholder": "Email",
+    "password_placeholder": "Password",
+    "login_button": "Sign in",
+    "totp_prompt": "Enter the 6-digit code from your authenticator app:",
+    "back": "Back",
+    "confirm_totp": "Confirm",
+    "totp_setup": {
+      "title": "Set up two-factor authentication",
+      "scan_prompt": "Scan the QR code with Google Authenticator, Microsoft Authenticator or similar:",
+      "retry": "Retry",
+      "scanned_button": "I've scanned it, enter code →",
+      "confirm_prompt": "Enter the 6-digit code from the app to confirm:",
+      "back": "← Back",
+      "enable_button": "Confirm and enable 2FA"
+    }
+  },
+  "header": {
+    "theme_dark": "Dark theme",
+    "theme_light": "Light theme",
+    "user_menu": {
+      "manage_2fa": "Manage 2FA",
+      "enable_2fa": "Enable 2FA",
+      "disable_2fa_confirm_title": "Disable 2FA?",
+      "disable_2fa_confirm_content": "Two-factor authentication will be disabled.",
+      "disable_2fa_ok": "Disable",
+      "clear_cache": "Clear media cache",
+      "clear_cache_confirm_title": "Clear media cache?",
+      "clear_cache_confirm_content": "All cached photos and videos will be removed from the browser. They will reload on next view.",
+      "clear_cache_success": "Media cache cleared",
+      "language": "Language",
+      "logout": "Sign out"
+    }
+  }
+}
+

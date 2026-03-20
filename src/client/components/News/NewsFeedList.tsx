@@ -1,5 +1,6 @@
 import React from 'react';
 import { Spin, Empty } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsListItem } from './NewsListItem';
 
@@ -28,11 +29,12 @@ export function NewsFeedList({
   onTagClick,
   listRef,
 }: NewsFeedListProps) {
+  const { t } = useTranslation();
   const emptyDescription = hashTagFilter
-    ? `Нет новостей с тегом ${hashTagFilter}`
+    ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
-      ? 'Нет новостей, соответствующих фильтрам. Нажмите "Показать все".'
-      : 'Нет новостей. Нажмите "Выгрузить".';
+      ? t('news.list.empty_filtered')
+      : t('news.list.empty');
 
   return (
     <div className="news-feed__list" ref={listRef}>

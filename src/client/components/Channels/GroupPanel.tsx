@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Modal, Form, Tooltip, Typography, theme } from 'antd';
 import { FolderFilled, PlusOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
 import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useVerifyGroupPIN } from '../../api/groups';
 import { useChannels } from '../../api/channels';
@@ -24,6 +25,7 @@ export function GroupPanel() {
   const { selectedGroupId, setSelectedGroupId, pendingCounts } = useUIStore();
   const { unlockedGroupIds } = useAuthStore();
   const { token } = theme.useToken();
+  const { t } = useTranslation();
 
   // ── Form modal state ──────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
@@ -86,11 +88,11 @@ export function GroupPanel() {
 
   const handleDelete = (g: Group) => {
     Modal.confirm({
-      title: `Удалить группу "${g.name}"?`,
-      content: 'Каналы из группы переместятся в "Общее".',
-      okText: 'Удалить',
+      title: t('groups.delete_confirm_title', { name: g.name }),
+      content: t('groups.delete_confirm_content'),
+      okText: t('common.delete'),
       okType: 'danger',
-      cancelText: 'Отмена',
+      cancelText: t('common.cancel'),
       onOk: () =>
         deleteGroup.mutateAsync(g.id).then(() => {
           if (selectedGroupId === g.id) setSelectedGroupId(null);
@@ -118,7 +120,7 @@ export function GroupPanel() {
       setSelectedGroupId(pinTarget.id);
       setPinModalOpen(false);
     } catch {
-      setPinError('Неверный PIN');
+      setPinError(t('groups.pin_modal.wrong_pin'));
     }
   };
 
@@ -131,7 +133,7 @@ export function GroupPanel() {
   return (
     <div className="group-panel">
       {/* "Общее" — always first */}
-      <Tooltip title="Общее (без группы)" placement="right">
+      <Tooltip title={t('groups.general_tooltip')} placement="right">
         <div
           className={`group-item${selectedGroupId === null ? ' group-item--active' : ''}`}
           style={{ '--group-color': token.colorTextSecondary } as React.CSSProperties}
@@ -147,16 +149,10 @@ export function GroupPanel() {
           </div>
           <Text
             className="group-item__label"
-            style={{
-              fontSize: 10,
-              textAlign: 'center',
-              lineHeight: 1.2,
-              marginTop: 2,
-              color: token.colorTextSecondary,
-            }}
+            style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, marginTop: 2, color: token.colorTextSecondary }}
             ellipsis
           >
-            Общее
+            {t('groups.general')}
           </Text>
         </div>
       </Tooltip>
@@ -176,7 +172,7 @@ export function GroupPanel() {
       ))}
 
       {/* Add group button */}
-      <Tooltip title="Новая группа" placement="right">
+      <Tooltip title={t('groups.new_group_tooltip')} placement="right">
         <Button
           type="dashed"
           icon={<PlusOutlined />}

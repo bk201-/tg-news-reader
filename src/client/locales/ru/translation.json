@@ -1,0 +1,193 @@
+{
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "loading": "Загрузка...",
+    "none": "Не выбрано",
+    "retry": "Повторить"
+  },
+  "sidebar": {
+    "channels": "Каналы",
+    "refresh": "Обновить",
+    "refresh_tooltip": "Посчитать непрочитанные в Telegram",
+    "add": "Добавить"
+  },
+  "channels": {
+    "updated": "Обновлено: {{date}}",
+    "unavailable_tooltip": "Канал недоступен в Telegram (удалён или закрыт)",
+    "fetch_tooltip": "Загрузить новости",
+    "edit_tooltip": "Редактировать",
+    "delete_tooltip": "Удалить",
+    "delete_confirm_title": "Удалить канал \"{{name}}\"?",
+    "delete_confirm_content": "Все новости этого канала будут удалены.",
+    "form": {
+      "title_add": "Добавить канал",
+      "title_edit": "Редактировать канал",
+      "telegram_id_label": "Telegram ID / username",
+      "telegram_id_required": "Введите username канала",
+      "telegram_id_placeholder": "durov, @durov или https://t.me/durov",
+      "name_label": "Название",
+      "name_required": "Введите название",
+      "name_placeholder": "Мой любимый канал",
+      "description_label": "Описание",
+      "description_placeholder": "Необязательно",
+      "channel_type_label": "Тип канала",
+      "type_none": "Не выбрано",
+      "type_link": "Ссылка — продолжение новости",
+      "type_media": "Медиа контент (фото/видео)",
+      "group_label": "Группа",
+      "group_placeholder": "Общее (без группы)"
+    },
+    "fetch_modal": {
+      "title": "Загрузить новости",
+      "label": "Загрузить новости начиная с:",
+      "date_placeholder": "Дата (оставьте пустым для последней)",
+      "hint": "Если дата не выбрана, будет использована дата последней выгрузки.",
+      "ok_text": "Загрузить"
+    }
+  },
+  "groups": {
+    "general": "Общее",
+    "general_tooltip": "Общее (без группы)",
+    "new_group_tooltip": "Новая группа",
+    "delete_confirm_title": "Удалить группу \"{{name}}\"?",
+    "delete_confirm_content": "Каналы из группы переместятся в «Общее».",
+    "context_edit": "Редактировать",
+    "context_delete": "Удалить",
+    "form": {
+      "title_add": "Новая группа",
+      "title_edit": "Редактировать группу",
+      "name_label": "Название",
+      "name_required": "Введите название",
+      "name_placeholder": "Новости, Работа, Хобби...",
+      "color_label": "Цвет",
+      "pin_label_new": "PIN (необязательно, 4 цифры)",
+      "pin_label_existing": "Новый PIN (оставьте пустым чтобы не менять)",
+      "pin_pattern": "PIN должен быть 4 цифры",
+      "remove_pin": "Убрать PIN"
+    },
+    "pin_modal": {
+      "title": "Введите PIN для «{{name}}»",
+      "ok_text": "Открыть",
+      "wrong_pin": "Неверный PIN"
+    }
+  },
+  "news": {
+    "toolbar": {
+      "fetch_default_tooltip": "Выгрузить с последнего прочитанного",
+      "sync_tooltip": "С последней синхронизации",
+      "show_all": "Показать все",
+      "hide_filtered": "Только отфильтрованные",
+      "mark_all_read": "Прочитать все",
+      "mark_all_read_tooltip": "Отметить все прочитанными и очистить список",
+      "filter": "Фильтр",
+      "filter_tooltip": "Фильтры",
+      "shown": "Показано: {{count}}",
+      "hidden": "Скрыто: {{count}}",
+      "total": "Всего: {{count}}",
+      "unread": "Непрочит.: {{count}}"
+    },
+    "period": {
+      "1d": "1д",
+      "3d": "3д",
+      "5d": "5д",
+      "7d": "7д",
+      "14d": "14д",
+      "sync_tooltip": "С последней синхронизации"
+    },
+    "detail": {
+      "refresh": "Обновить",
+      "refresh_tooltip": "Обновить [R]",
+      "links": "Ссылки",
+      "links_tooltip": "Показать ссылки [L]",
+      "links_count": "Ссылки ({{count}})",
+      "text": "Текст",
+      "text_tooltip": "Показать текст новости [T]",
+      "load_article": "Загрузить текст",
+      "load_article_tooltip": "Загрузить полный текст статьи [F]",
+      "queued": "В очереди",
+      "open": "Открыть",
+      "open_tooltip": "Открыть в браузере [Enter]",
+      "mark_read": "Прочитано",
+      "mark_unread": "Не прочитано"
+    },
+    "list": {
+      "empty_tag": "Нет новостей с тегом {{tag}}",
+      "empty_filtered": "Нет новостей по фильтрам. Нажмите «Показать все».",
+      "empty": "Нет новостей. Нажмите «Выгрузить»."
+    }
+  },
+  "filters": {
+    "title": "Управление фильтрами",
+    "description": "Новости, совпадающие с активными фильтрами, будут <strong>скрыты</strong>. Сначала проверяются теги (#), затем ключевые слова.",
+    "type_tag": "Тег #",
+    "type_keyword": "Ключевое слово",
+    "name_placeholder": "Название фильтра",
+    "value_placeholder": "Значение (напр. #news или keyword)",
+    "add": "Добавить",
+    "col_name": "Название",
+    "col_active": "Активен",
+    "empty": "Фильтры не добавлены",
+    "active_tags": "Активные теги:",
+    "keywords": "Ключевые слова:",
+    "none": "нет",
+    "delete_confirm_title": "Удалить фильтр \"{{name}}\"?"
+  },
+  "downloads": {
+    "title": "Загрузки",
+    "title_active": "Загрузки — {{count}} активных",
+    "title_active_pinned": "Загрузки ({{count}})",
+    "pin_tooltip": "Закрепить панель справа",
+    "unpin_tooltip": "Открепить панель",
+    "panel_tooltip": "Загрузки",
+    "panel_tooltip_pinned": "Загрузки (закреплена)",
+    "empty": "Нет активных загрузок",
+    "status_processing": "Загружается",
+    "status_error": "Ошибка",
+    "status_priority": "Срочно",
+    "status_queued": "В очереди",
+    "boost_tooltip": "Поднять приоритет",
+    "cancel_tooltip": "Отменить",
+    "no_text": "(без текста)"
+  },
+  "auth": {
+    "sign_in": "Вход в систему",
+    "two_fa": "Двухфакторная аутентификация",
+    "email_required": "Введите email",
+    "password_required": "Введите пароль",
+    "email_placeholder": "Email",
+    "password_placeholder": "Пароль",
+    "login_button": "Войти",
+    "totp_prompt": "Введите 6-значный код из приложения-аутентификатора:",
+    "back": "Назад",
+    "confirm_totp": "Подтвердить",
+    "totp_setup": {
+      "title": "Настройка двухфакторной аутентификации",
+      "scan_prompt": "Отсканируйте QR-код в приложении Google Authenticator, Microsoft Authenticator или аналогичном:",
+      "retry": "Повторить",
+      "scanned_button": "Я отсканировал, ввести код →",
+      "confirm_prompt": "Введите 6-значный код из приложения для подтверждения:",
+      "back": "← Назад",
+      "enable_button": "Подтвердить и включить 2FA"
+    }
+  },
+  "header": {
+    "theme_dark": "Тёмная тема",
+    "theme_light": "Светлая тема",
+    "user_menu": {
+      "manage_2fa": "Управление 2FA",
+      "enable_2fa": "Включить 2FA",
+      "disable_2fa_confirm_title": "Отключить 2FA?",
+      "disable_2fa_confirm_content": "Двухфакторная аутентификация будет отключена.",
+      "disable_2fa_ok": "Отключить",
+      "clear_cache": "Очистить кэш медиа",
+      "clear_cache_confirm_title": "Очистить кэш медиа?",
+      "clear_cache_confirm_content": "Все закэшированные фото и видео будут удалены из браузера. При следующем просмотре они загрузятся снова.",
+      "clear_cache_success": "Кэш медиа очищен",
+      "language": "Язык",
+      "logout": "Выйти"
+    }
+  }
+}
+

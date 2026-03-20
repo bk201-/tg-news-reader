@@ -1,6 +1,7 @@
 import React from 'react';
 import { Typography, Space, Button, Tooltip, Spin, theme } from 'antd';
 import { PushpinFilled } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
 import { useDownloads, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
 import { useUIStore } from '../../store/uiStore';
@@ -14,6 +15,7 @@ export function DownloadsPinnedContent() {
   const cancelDownload = useCancelDownload();
   const prioritizeDownload = usePrioritizeDownload();
   const { toggleDownloadsPanelPin } = useUIStore();
+  const { t } = useTranslation();
 
   const activeCount = tasks.filter((t) => t.status === 'pending' || t.status === 'processing').length;
 
@@ -43,10 +45,10 @@ export function DownloadsPinnedContent() {
         <Space size={6}>
           {activeCount > 0 && <Spin size="small" />}
           <Text strong style={{ fontSize: 13 }}>
-            {activeCount > 0 ? `Загрузки (${activeCount})` : 'Загрузки'}
+            {activeCount > 0 ? t('downloads.title_active_pinned', { count: activeCount }) : t('downloads.title')}
           </Text>
         </Space>
-        <Tooltip title="Открепить панель" placement="left">
+        <Tooltip title={t('downloads.unpin_tooltip')} placement="left">
           <Button
             type="text"
             icon={<PushpinFilled style={{ color: token.colorPrimary }} />}

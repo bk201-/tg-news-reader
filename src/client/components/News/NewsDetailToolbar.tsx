@@ -9,6 +9,7 @@ import {
   ExportOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
@@ -44,6 +45,7 @@ export function NewsDetailToolbar({
   onRefresh,
   firstLink,
 }: NewsDetailToolbarProps) {
+  const { t } = useTranslation();
   const hashtags = item.hashtags || [];
   const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
 
@@ -66,41 +68,43 @@ export function NewsDetailToolbar({
 
       <Space wrap size={4}>
         {/* ── Left: rarely-used ── */}
-        <Tooltip title="Обновить [R]">
+        <Tooltip title={t('news.detail.refresh_tooltip')}>
           <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh}>
-            <span className="nd-btn-text">Обновить</span>
+            <span className="nd-btn-text">{t('news.detail.refresh')}</span>
           </Button>
         </Tooltip>
 
         {/* ── Middle: overlay toggles ── */}
         {links.length > 0 && (
-          <Tooltip title="Показать ссылки [L]">
+          <Tooltip title={t('news.detail.links_tooltip')}>
             <Button
               icon={<LinkOutlined />}
               size="small"
               type={topPanel === 'links' ? 'primary' : 'default'}
               onClick={() => onTogglePanel('links')}
             >
-              <span className="nd-btn-text">Ссылки{links.length > 1 ? ` (${links.length})` : ''}</span>
+              <span className="nd-btn-text">
+                {links.length > 1 ? t('news.detail.links_count', { count: links.length }) : t('news.detail.links')}
+              </span>
             </Button>
           </Tooltip>
         )}
         {item.text && (
-          <Tooltip title="Показать текст новости [T]">
+          <Tooltip title={t('news.detail.text_tooltip')}>
             <Button
               icon={<FileTextOutlined />}
               size="small"
               type={topPanel === 'text' ? 'primary' : 'default'}
               onClick={() => onTogglePanel('text')}
             >
-              <span className="nd-btn-text">Текст</span>
+              <span className="nd-btn-text">{t('news.detail.text')}</span>
             </Button>
           </Tooltip>
         )}
 
         {/* ── Middle: article extraction — link_continuation only ── */}
         {channelType === 'link_continuation' && !item.fullContent && nonYtLinks.length > 0 && (
-          <Tooltip title="Загрузить полный текст статьи [F]">
+          <Tooltip title={t('news.detail.load_article_tooltip')}>
             <Button
               icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
               size="small"
@@ -108,16 +112,16 @@ export function NewsDetailToolbar({
               loading={articleLoading}
               disabled={articleQueued}
             >
-              <span className="nd-btn-text">{articleQueued ? 'В очереди' : 'Загрузить текст'}</span>
+              <span className="nd-btn-text">{articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}</span>
             </Button>
           </Tooltip>
         )}
 
         {/* ── Right: primary actions ── */}
         {firstLink && (
-          <Tooltip title="Открыть в браузере [Enter]">
+          <Tooltip title={t('news.detail.open_tooltip')}>
             <Button icon={<ExportOutlined />} size="small" href={firstLink} target="_blank" rel="noreferrer">
-              <span className="nd-btn-text">Открыть</span>
+              <span className="nd-btn-text">{t('news.detail.open')}</span>
             </Button>
           </Tooltip>
         )}
@@ -128,7 +132,7 @@ export function NewsDetailToolbar({
           onClick={onMarkRead}
           loading={markReadPending}
         >
-          <span className="nd-btn-text">{isRead ? 'Не прочитано' : 'Прочитано'}</span>
+          <span className="nd-btn-text">{isRead ? t('news.detail.mark_unread') : t('news.detail.mark_read')}</span>
         </Button>
       </Space>
     </div>

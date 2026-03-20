@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App } from 'antd';
+import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App, Select } from 'antd';
 import {
   MoonOutlined,
   SunOutlined,
@@ -8,7 +8,9 @@ import {
   SafetyCertificateOutlined,
   QrcodeOutlined,
   ClearOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { clearSwCache } from '../../services/serviceWorker';
 import { DownloadsPanel } from './DownloadsPanel';
 import { TotpSetupModal } from './TotpSetupModal';
@@ -26,6 +28,7 @@ export function AppHeader() {
   const { data: channels = [] } = useChannels();
   const { token } = theme.useToken();
   const { message } = App.useApp();
+  const { t, i18n } = useTranslation();
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const [totpModalOpen, setTotpModalOpen] = useState(false);
@@ -37,26 +40,25 @@ export function AppHeader() {
 
   const handleClearMediaCache = () => {
     Modal.confirm({
-      title: 'Очистить кэш медиа?',
-      content:
-        'Все закэшированные фото и видео будут удалены из браузера. При следующем просмотре они загрузятся снова.',
-      okText: 'Очистить',
+      title: t('header.user_menu.clear_cache_confirm_title'),
+      content: t('header.user_menu.clear_cache_confirm_content'),
+      okText: t('common.delete'),
       okType: 'danger',
-      cancelText: 'Отмена',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         await clearSwCache();
-        void message.success('Кэш медиа очищен');
+        void message.success(t('header.user_menu.clear_cache_success'));
       },
     });
   };
 
   const handleDisableTOTP = () => {
     Modal.confirm({
-      title: 'Отключить 2FA?',
-      content: 'Двухфакторная аутентификация будет отключена.',
-      okText: 'Отключить',
+      title: t('header.user_menu.disable_2fa_confirm_title'),
+      content: t('header.user_menu.disable_2fa_confirm_content'),
+      okText: t('header.user_menu.disable_2fa_ok'),
       okType: 'danger',
-      cancelText: 'Отмена',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         await api.delete('/auth/totp');
         updateUser({ hasTOTP: false });
@@ -78,21 +80,42 @@ export function AppHeader() {
     {
       key: 'totp',
       icon: user?.hasTOTP ? <SafetyCertificateOutlined style={{ color: 'green' }} /> : <QrcodeOutlined />,
-      label: user?.hasTOTP ? 'Управление 2FA' : 'Включить 2FA',
+      label: user?.hasTOTP ? t('header.user_menu.manage_2fa') : t('header.user_menu.enable_2fa'),
       onClick: user?.hasTOTP ? handleDisableTOTP : () => setTotpModalOpen(true),
     },
     { type: 'divider' as const },
     {
       key: 'clear-cache',
       icon: <ClearOutlined />,
-      label: 'Очистить кэш медиа',
+      label: t('header.user_menu.clear_cache'),
       onClick: handleClearMediaCache,
+    },
+    { type: 'divider' as const },
+    {
+      key: 'language',
+      icon: <TranslationOutlined />,
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{t('header.user_menu.language')}:</span>
+          <Select
+            value={i18n.language.startsWith('ru') ? 'ru' : 'en'}
+            onChange={(lng) => void i18n.changeLanguage(lng)}
+            size="small"
+            style={{ width: 90 }}
+            options={[
+              { value: 'en', label: '🇬🇧 EN' },
+              { value: 'ru', label: '🇷🇺 RU' },
+            ]}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ),
     },
     { type: 'divider' as const },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Выйти',
+      label: t('header.user_menu.logout'),
       danger: true,
       onClick: () => void handleLogout(),
     },
@@ -118,7 +141,7 @@ export function AppHeader() {
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <DownloadsPanel />
-          <Tooltip title={isDarkTheme ? 'Светлая тема' : 'Тёмная тема'}>
+          <Tooltip title={isDarkTheme ? t('header.theme_light') : t('header.theme_dark')}>
             <Button
               type="text"
               icon={isDarkTheme ? <SunOutlined /> : <MoonOutlined />}

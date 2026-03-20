@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input } from 'antd';
 import { UnlockOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { FormInstance } from 'antd';
 import type { Group } from '@shared/types.ts';
 
@@ -45,6 +46,7 @@ export function GroupFormModal({
   onClose,
   onSave,
 }: GroupFormModalProps) {
+  const { t } = useTranslation();
   const [colorBorder, setColorBorder] = useState(selectedColor);
 
   // keep local highlight in sync when modal reopens
@@ -56,22 +58,22 @@ export function GroupFormModal({
   return (
     <Modal
       open={open}
-      title={editingGroup ? 'Редактировать группу' : 'Новая группа'}
+      title={editingGroup ? t('groups.form.title_edit') : t('groups.form.title_add')}
       onCancel={onClose}
       onOk={onSave}
-      okText="Сохранить"
-      cancelText="Отмена"
+      okText={t('common.save')}
+      cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
       afterOpenChange={(visible) => {
         if (visible) setColorBorder(selectedColor);
       }}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
-          <Input placeholder="Новости, Работа, Хобби..." autoComplete="off" />
+        <Form.Item name="name" label={t('groups.form.name_label')} rules={[{ required: true, message: t('groups.form.name_required') }]}>
+          <Input placeholder={t('groups.form.name_placeholder')} autoComplete="off" />
         </Form.Item>
 
-        <Form.Item label="Цвет">
+        <Form.Item label={t('groups.form.color_label')}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {PRESET_COLORS.map((c) => (
               <div
@@ -94,8 +96,8 @@ export function GroupFormModal({
 
         <Form.Item
           name="pin"
-          label={editingGroup?.hasPIN ? 'Новый PIN (оставьте пустым чтобы не менять)' : 'PIN (необязательно, 4 цифры)'}
-          rules={[{ pattern: /^\d{4}$/, message: 'PIN должен быть 4 цифры', warningOnly: false }]}
+          label={editingGroup?.hasPIN ? t('groups.form.pin_label_existing') : t('groups.form.pin_label_new')}
+          rules={[{ pattern: /^\d{4}$/, message: t('groups.form.pin_pattern'), warningOnly: false }]}
         >
           <Input.Password
             placeholder="1234"
@@ -111,7 +113,7 @@ export function GroupFormModal({
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
               <input type="checkbox" onChange={(e) => form.setFieldValue('removePin', e.target.checked)} />
               <UnlockOutlined />
-              Убрать PIN
+              {t('groups.form.remove_pin')}
             </label>
           </Form.Item>
         )}
