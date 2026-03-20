@@ -11,6 +11,7 @@ import {
   TranslationOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { FlagRU, FlagUS } from '../Flags';
 import { clearSwCache } from '../../services/serviceWorker';
 import { DownloadsPanel } from './DownloadsPanel';
 import { TotpSetupModal } from './TotpSetupModal';
@@ -22,61 +23,6 @@ import { api } from '../../api/client';
 const { Header } = Layout;
 const { Title, Text } = Typography;
 
-/** Russian flag: white / blue / red horizontal stripes */
-function FlagRU({ size = 20 }: { size?: number }) {
-  const h = Math.round(size * 2 / 3);
-  return (
-    <svg width={size} height={h} viewBox="0 0 3 2"
-      style={{ display: 'inline-block', verticalAlign: 'middle', borderRadius: 2, border: '1px solid rgba(0,0,0,.12)' }}>
-      <rect width="3" height="0.667" y="0" fill="#fff" />
-      <rect width="3" height="0.667" y="0.667" fill="#003da5" />
-      <rect width="3" height="0.667" y="1.333" fill="#da291c" />
-    </svg>
-  );
-}
-
-/** US flag: 13 stripes + blue canton with 50 stars */
-function FlagUS({ size = 20 }: { size?: number }) {
-  const w = size;
-  const h = Math.round(size * 10 / 19);
-  const sh = 100 / 13;
-  const cw = 76, ch = 7 * sh;
-  const sr = 1.9;
-
-  const starPath = (cx: number, cy: number) => {
-    const pts: string[] = [];
-    const inner = sr * 0.4;
-    for (let i = 0; i < 5; i++) {
-      const a1 = (i * 72 - 90) * (Math.PI / 180);
-      const a2 = (i * 72 + 36 - 90) * (Math.PI / 180);
-      pts.push(`${cx + sr * Math.cos(a1)},${cy + sr * Math.sin(a1)}`);
-      pts.push(`${cx + inner * Math.cos(a2)},${cy + inner * Math.sin(a2)}`);
-    }
-    return `M${pts.join('L')}Z`;
-  };
-
-  const stars: [number, number][] = [];
-  const hStep = cw / 12, vStep = ch / 10;
-  for (let row = 0; row < 9; row++) {
-    const cols = row % 2 === 0 ? 6 : 5;
-    const xStart = row % 2 === 0 ? hStep / 2 : hStep;
-    const y = vStep / 2 + row * vStep;
-    for (let col = 0; col < cols; col++) stars.push([xStart + col * hStep, y]);
-  }
-
-  return (
-    <svg width={w} height={h} viewBox="0 0 190 100"
-      style={{ display: 'inline-block', verticalAlign: 'middle', borderRadius: 2, border: '1px solid rgba(0,0,0,.12)' }}>
-      {Array.from({ length: 13 }, (_, i) => (
-        <rect key={i} x="0" y={i * sh} width="190" height={sh} fill={i % 2 === 0 ? '#B22234' : '#FFF'} />
-      ))}
-      <rect x="0" y="0" width={cw} height={ch} fill="#3C3B6E" />
-      {stars.map(([cx, cy], i) => (
-        <path key={i} d={starPath(cx, cy)} fill="#FFF" />
-      ))}
-    </svg>
-  );
-}
 
 export function AppHeader() {
   const { selectedChannelId, isDarkTheme, toggleTheme } = useUIStore();
