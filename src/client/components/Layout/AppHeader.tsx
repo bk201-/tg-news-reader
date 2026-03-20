@@ -103,8 +103,8 @@ export function AppHeader() {
             size="small"
             style={{ width: 90 }}
             options={[
-              { value: 'en', label: '🇬🇧 EN' },
-              { value: 'ru', label: '🇷🇺 RU' },
+              { value: 'en', label: 'EN' },
+              { value: 'ru', label: 'RU' },
             ]}
             onClick={(e) => e.stopPropagation()}
           />

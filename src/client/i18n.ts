@@ -12,9 +12,10 @@ void i18n
       en: { translation: en },
       ru: { translation: ru },
     },
-    // English is the default; Russian is the fallback for untranslated keys
-    lng: 'en',
-    fallbackLng: 'ru',
+    // No hardcoded `lng` — LanguageDetector reads from localStorage first,
+    // then navigator. Falls back to 'en' if nothing is stored/detected.
+    fallbackLng: 'en',
+    supportedLngs: ['en', 'ru'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],

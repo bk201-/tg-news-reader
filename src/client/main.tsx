@@ -10,11 +10,11 @@ import { useUIStore } from './store/uiStore';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
+import 'dayjs/locale/en';
 import './styles.css';
 import './i18n';
 import { registerMediaServiceWorker } from './services/serviceWorker';
 
-dayjs.locale('ru');
 registerMediaServiceWorker();
 
 const queryClient = new QueryClient({
@@ -24,7 +24,11 @@ const queryClient = new QueryClient({
 function ThemedApp() {
   const { isDarkTheme } = useUIStore();
   const { i18n } = useTranslation();
-  const antdLocale = i18n.language.startsWith('ru') ? ruRU : enUS;
+  const isRu = i18n.language.startsWith('ru');
+  const antdLocale = isRu ? ruRU : enUS;
+
+  // Keep dayjs locale in sync with UI language
+  dayjs.locale(isRu ? 'ru' : 'en');
 
   return (
     <ConfigProvider
@@ -51,3 +55,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
