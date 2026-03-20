@@ -615,9 +615,9 @@ body {
   align-items: center;
 }
 
-/* Media at natural size (no viewport-height cap) */
+/* Media: same max-height constraint as panel mode */
 .news-detail--inline .news-detail__media-file {
-  max-height: none;
+  max-height: calc(100vh - 300px);
   max-width: 100%;
   width: auto;
   height: auto;
