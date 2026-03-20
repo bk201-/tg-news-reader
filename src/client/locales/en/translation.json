@@ -83,6 +83,8 @@
       "mark_all_read_tooltip": "Mark all as read and clear list",
       "filter": "Filter",
       "filter_tooltip": "Filters",
+      "view_list": "List view (two panels)",
+      "view_accordion": "Accordion view",
       "shown": "Shown: {{count}}",
       "hidden": "Hidden: {{count}}",
       "total": "Total: {{count}}",

@@ -16,9 +16,10 @@ interface NewsDetailProps {
   item: NewsItem;
   channelType: ChannelType;
   onMarkedRead?: (id: number) => void;
+  variant?: 'panel' | 'inline';
 }
 
-export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps) {
+export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel' }: NewsDetailProps) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const markRead = useMarkRead();
@@ -190,7 +191,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
   const handleTogglePanel = (panel: 'links' | 'text') => setTopPanel((p) => (p === panel ? null : panel));
 
   return (
-    <div className="news-detail">
+    <div className={`news-detail${variant === 'inline' ? ' news-detail--inline' : ''}`}>
       <div className="news-detail__header">
         <NewsDetailToolbar
           item={item}
@@ -206,6 +207,7 @@ export function NewsDetail({ item, channelType, onMarkedRead }: NewsDetailProps)
           markReadPending={markRead.isPending}
           onRefresh={handleRefresh}
           firstLink={firstLink}
+          hideMetadata={variant === 'inline'}
         />
       </div>
 

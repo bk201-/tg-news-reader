@@ -28,6 +28,7 @@ interface NewsDetailToolbarProps {
   markReadPending: boolean;
   onRefresh: () => void;
   firstLink?: string;
+  hideMetadata?: boolean;
 }
 
 export function NewsDetailToolbar({
@@ -44,6 +45,7 @@ export function NewsDetailToolbar({
   markReadPending,
   onRefresh,
   firstLink,
+  hideMetadata = false,
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
   const hashtags = item.hashtags || [];
@@ -51,20 +53,22 @@ export function NewsDetailToolbar({
 
   return (
     <div className="news-detail__header-top">
-      <div>
-        <span style={{ fontSize: 12, color: 'var(--tgr-color-text-secondary, #666)' }}>
-          {dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}
-        </span>
-        {hashtags.length > 0 && (
-          <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {hashtags.map((tag) => (
-              <Tag key={tag} color="blue" style={{ marginRight: 0 }}>
-                {tag}
-              </Tag>
-            ))}
-          </div>
-        )}
-      </div>
+      {!hideMetadata && (
+        <div>
+          <span style={{ fontSize: 12, color: 'var(--tgr-color-text-secondary, #666)' }}>
+            {dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}
+          </span>
+          {hashtags.length > 0 && (
+            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {hashtags.map((tag) => (
+                <Tag key={tag} color="blue" style={{ marginRight: 0 }}>
+                  {tag}
+                </Tag>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Space wrap size={4}>
         {/* ── Left: rarely-used ── */}

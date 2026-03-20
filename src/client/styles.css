@@ -561,3 +561,72 @@ body {
   white-space: nowrap;
 }
 
+/* ===== Accordion view ===== */
+
+/* Body modifier: single column, full-width scrollable */
+.news-feed__body--accordion {
+  flex-direction: column;
+}
+
+.news-feed__accordion {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--tgr-color-bg-container, #fff);
+}
+
+/* Accordion wrapper around each news-item */
+.accordion-item {
+  border-bottom: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
+}
+
+/* Remove the news-item's own bottom border when item is expanded
+   (accordion-item provides the outer border) */
+.accordion-item .news-item {
+  border-bottom: none;
+}
+
+/* Expanded item: highlight left edge */
+.accordion-item--expanded > .news-item {
+  border-left: 3px solid var(--tgr-color-primary, #1677ff);
+  background: var(--tgr-color-primary-bg, #e6f4ff);
+}
+
+/* Body of the expanded accordion item */
+.accordion-item__body {
+  border-top: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
+  background: var(--tgr-color-bg-layout, #f5f5f5);
+}
+
+/* ── NewsDetail inline variant (inside accordion) ── */
+.news-detail--inline {
+  height: auto;
+  overflow: visible;
+  position: relative;
+}
+
+/* Sticky header becomes static in inline context */
+.news-detail--inline .news-detail__header {
+  position: static;
+}
+
+/* Content area flows naturally; parent accordion scrolls */
+.news-detail--inline .news-detail__content {
+  flex: none;
+  overflow: visible;
+  padding: 12px 20px 16px;
+  align-items: flex-start;
+}
+
+/* Media at natural size (no viewport-height cap) */
+.news-detail--inline .news-detail__media-file {
+  max-height: none;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* Text body full-width (no max-width reading column) */
+.news-detail--inline .news-detail__text-body {
+  max-width: 100%;
+  margin-top: 12px;
+}

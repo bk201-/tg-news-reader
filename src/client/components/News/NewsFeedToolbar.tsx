@@ -7,8 +7,11 @@ import {
   SyncOutlined,
   CloseCircleOutlined,
   HistoryOutlined,
+  LayoutOutlined,
+  ProfileOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import type { NewsViewMode } from '../../store/uiStore';
 
 const { Text } = Typography;
 
@@ -29,6 +32,8 @@ interface NewsFeedToolbarProps {
   hiddenCount: number;
   totalCount: number;
   unreadCount: number;
+  newsViewMode: NewsViewMode;
+  onSetViewMode: (mode: NewsViewMode) => void;
 }
 
 export function NewsFeedToolbar({
@@ -48,6 +53,8 @@ export function NewsFeedToolbar({
   hiddenCount,
   totalCount,
   unreadCount,
+  newsViewMode,
+  onSetViewMode,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
 
@@ -101,6 +108,23 @@ export function NewsFeedToolbar({
             {hashTagFilter}
           </Tag>
         )}
+        <div style={{ width: 1, height: '1.4em', background: 'var(--tgr-color-border-secondary, #e8e8e8)', margin: '0 2px', flexShrink: 0, alignSelf: 'center' }} />
+        <Tooltip title={t('news.toolbar.view_list')}>
+          <Button
+            size="small"
+            icon={<LayoutOutlined />}
+            type={newsViewMode === 'list' ? 'primary' : 'default'}
+            onClick={() => onSetViewMode('list')}
+          />
+        </Tooltip>
+        <Tooltip title={t('news.toolbar.view_accordion')}>
+          <Button
+            size="small"
+            icon={<ProfileOutlined />}
+            type={newsViewMode === 'accordion' ? 'primary' : 'default'}
+            onClick={() => onSetViewMode('accordion')}
+          />
+        </Tooltip>
       </Space>
 
       <Space size={12} style={{ fontSize: 12 }}>

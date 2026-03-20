@@ -10,6 +10,7 @@ import { NewsDetail } from './NewsDetail';
 import { FilterPanel } from '../Filters/FilterPanel';
 import { NewsFeedToolbar } from './NewsFeedToolbar';
 import { NewsFeedList } from './NewsFeedList';
+import { NewsAccordionList } from './NewsAccordionList';
 
 interface NewsFeedProps {
   channel: Channel;
@@ -26,6 +27,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     setFilterPanelOpen,
     hashTagFilter,
     setHashTagFilter,
+    newsViewMode,
+    setNewsViewMode,
   } = useUIStore();
 
   const { data: newsData, isLoading } = useNews(channel.id, !showAll);
@@ -192,8 +195,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     if (!selectedNewsId || !listRef.current) return;
     listRef.current
       .querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [selectedNewsId]);
+      ?.scrollIntoView({ behavior: 'smooth', block: newsViewMode === 'accordion' ? 'start' : 'center' });
+  }, [selectedNewsId, newsViewMode]);
 
   return (
     <div className="news-feed">
@@ -214,36 +217,57 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         hiddenCount={hiddenByFilters}
         totalCount={totalCount}
         unreadCount={unreadCount}
+        newsViewMode={newsViewMode}
+        onSetViewMode={setNewsViewMode}
       />
 
-      <div className="news-feed__body">
-        <NewsFeedList
-          isLoading={isLoading}
-          items={displayItems}
-          filteredIds={filteredIds}
-          showAll={showAll}
-          selectedNewsId={selectedNewsId}
-          hashTagFilter={hashTagFilter}
-          activeFilterCount={activeFilterCount}
-          onSelect={setSelectedNewsId}
-          onTagClick={handleTagClick}
-          listRef={listRef}
-        />
-
-        <div className="news-feed__detail">
-          {selectedItem ? (
-            <NewsDetail
-              key={selectedItem.id}
-              item={selectedItem}
-              channelType={channel.channelType}
-              onMarkedRead={handleMarkedRead}
+      <div className={`news-feed__body${newsViewMode === 'accordion' ? ' news-feed__body--accordion' : ''}`}>
+        {newsViewMode === 'accordion' ? (
+          <NewsAccordionList
+            isLoading={isLoading}
+            items={displayItems}
+            filteredIds={filteredIds}
+            showAll={showAll}
+            selectedNewsId={selectedNewsId}
+            hashTagFilter={hashTagFilter}
+            activeFilterCount={activeFilterCount}
+            channelType={channel.channelType}
+            onSelect={setSelectedNewsId}
+            onTagClick={handleTagClick}
+            onMarkedRead={handleMarkedRead}
+            listRef={listRef}
+          />
+        ) : (
+          <>
+            <NewsFeedList
+              isLoading={isLoading}
+              items={displayItems}
+              filteredIds={filteredIds}
+              showAll={showAll}
+              selectedNewsId={selectedNewsId}
+              hashTagFilter={hashTagFilter}
+              activeFilterCount={activeFilterCount}
+              onSelect={setSelectedNewsId}
+              onTagClick={handleTagClick}
+              listRef={listRef}
             />
-          ) : (
-            <div className="news-feed__detail-empty">
-              <Empty description="Выберите новость из списка" />
+
+            <div className="news-feed__detail">
+              {selectedItem ? (
+                <NewsDetail
+                  key={selectedItem.id}
+                  item={selectedItem}
+                  channelType={channel.channelType}
+                  onMarkedRead={handleMarkedRead}
+                />
+              ) : (
+                <div className="news-feed__detail-empty">
+                  <Empty description="Выберите новость из списка" />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       <FilterPanel channelId={channel.id} />

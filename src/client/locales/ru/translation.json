@@ -83,6 +83,8 @@
       "mark_all_read_tooltip": "Отметить все прочитанными и очистить список",
       "filter": "Фильтр",
       "filter_tooltip": "Фильтры",
+      "view_list": "Вид: список (две панели)",
+      "view_accordion": "Вид: аккордеон",
       "shown": "Показано: {{count}}",
       "hidden": "Скрыто: {{count}}",
       "total": "Всего: {{count}}",

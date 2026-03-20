@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+export type NewsViewMode = 'list' | 'accordion';
+
 interface UIStore {
   selectedChannelId: number | null;
   setSelectedChannelId: (id: number | null) => void;
@@ -19,6 +21,9 @@ interface UIStore {
   // Downloads panel — when pinned, renders as inline sidebar next to news feed
   downloadsPanelPinned: boolean;
   toggleDownloadsPanelPin: () => void;
+  // News view mode: 2-pane list or accordion
+  newsViewMode: NewsViewMode;
+  setNewsViewMode: (mode: NewsViewMode) => void;
   // Pending counts from Telegram (messages not yet fetched, per channel)
   pendingCounts: Record<number, number>;
   setPendingCounts: (counts: Record<number, number>) => void;
@@ -52,6 +57,11 @@ export const useUIStore = create<UIStore>()((set) => ({
       localStorage.setItem('downloadsPanelPinned', String(next));
       return { downloadsPanelPinned: next };
     }),
+  newsViewMode: (localStorage.getItem('newsViewMode') as NewsViewMode) || 'list',
+  setNewsViewMode: (mode) => {
+    localStorage.setItem('newsViewMode', mode);
+    set({ newsViewMode: mode });
+  },
   pendingCounts: {},
   setPendingCounts: (counts) => set({ pendingCounts: counts }),
   clearPendingCount: (channelId) =>

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Spin, Empty } from 'antd';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem } from '@shared/types.ts';
-import { NewsListItem } from './NewsListItem';
+import type { NewsItem, ChannelType } from '@shared/types.ts';
+import { NewsAccordionItem } from './NewsAccordionItem';
 
-interface NewsFeedListProps {
+interface NewsAccordionListProps {
   isLoading: boolean;
   items: NewsItem[];
   filteredIds: Set<number>;
@@ -12,12 +12,14 @@ interface NewsFeedListProps {
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
-  onSelect: (id: number) => void;
+  channelType: ChannelType;
+  onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
+  onMarkedRead: (id: number) => void;
   listRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function NewsFeedList({
+export function NewsAccordionList({
   isLoading,
   items,
   filteredIds,
@@ -25,11 +27,14 @@ export function NewsFeedList({
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
+  channelType,
   onSelect,
   onTagClick,
+  onMarkedRead,
   listRef,
-}: NewsFeedListProps) {
+}: NewsAccordionListProps) {
   const { t } = useTranslation();
+
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
@@ -37,7 +42,7 @@ export function NewsFeedList({
       : t('news.list.empty');
 
   return (
-    <div className="news-feed__list" ref={listRef}>
+    <div className="news-feed__accordion" ref={listRef}>
       {isLoading && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
           <Spin size="large" />
@@ -45,16 +50,19 @@ export function NewsFeedList({
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} style={{ marginTop: 48 }} />}
       {items.map((item) => (
-        <NewsListItem
+        <NewsAccordionItem
           key={item.id}
           item={item}
           isSelected={selectedNewsId === item.id}
           isFiltered={filteredIds.has(item.id)}
           showAll={showAll}
-          onClick={() => onSelect(item.id)}
+          channelType={channelType}
+          onSelect={onSelect}
           onTagClick={onTagClick}
+          onMarkedRead={onMarkedRead}
         />
       ))}
     </div>
   );
 }
+
