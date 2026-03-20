@@ -49,6 +49,10 @@ src/
                       # Layout/:   AppLayout (shell + URL sync), AppHeader (header + user menu + lang switcher),
                       #            TotpSetupModal (2FA flow), DownloadsPanel (badge + Drawer + SSE),
                       #            DownloadsPinnedContent (inline sidebar), DownloadTaskList (shared task list)
+                      # News/:     NewsFeed (coordinator), NewsFeedToolbar, NewsFeedList, NewsAccordionList,
+                      #            NewsAccordionItem, NewsListItem, NewsDetail (state+hotkeys),
+                      #            NewsDetailToolbar, NewsDetailBody (media+text+modal), NewsDetailMedia,
+                      #            NewsDetailTopPanel; hooks: useHashTagSync, useMobileBreakpoint, useNewsHotkeys
     api/              # React Query hooks + helpers: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts,
                       # mediaProgress.ts, mediaUrl.ts; central fetch client: client.ts
     services/
@@ -280,3 +284,39 @@ function MyComponent() {
 - For `Modal.confirm` use `t()` for `title`, `content`, `okText`, `cancelText`
 - Interpolation: `t('channels.updated', { date })` → `"updated": "Updated: {{date}}"`
 - **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`
+
+## News View Architecture
+
+Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorage`):
+
+| Mode | Layout | Default |
+|---|---|---|
+| `'list'` | 2-pane: `NewsFeedList` (380px) + `NewsDetail` panel | Desktop |
+| `'accordion'` | Single column: `NewsAccordionList` → `NewsAccordionItem` | Mobile (< 768px) |
+
+**Responsive override**: `useMobileBreakpoint(768)` in `NewsFeed` → `effectiveViewMode = isMobile ? 'accordion' : newsViewMode`. View-toggle buttons are hidden on mobile.
+
+**Shared components** — both modes reuse: `NewsListItem` (collapsed accordion row), `NewsDetail` (expanded accordion body), all `NewsDetail*` sub-components.
+
+**`NewsDetail` variant pattern**:
+```tsx
+// panel (default): sticky header, fixed height, date+tags in toolbar left
+<NewsDetail item={item} channelType={...} variant="panel" />
+
+// inline (accordion expanded): static header, auto-height, title+date+tags in toolbar left,
+// left area is clickable to collapse the accordion item
+<NewsDetail item={item} channelType={...} variant="inline" onHeaderClick={() => onSelect(null)} />
+```
+
+**Component decomposition** (`src/client/components/News/`):
+- `NewsDetail` — state coordinator (queries, album index, top panel, hotkeys, handlers)
+- `NewsDetailBody` — pure display: `NewsDetailMedia` + text body + link-select Modal
+- `NewsDetailToolbar` — header row; `variant='inline'` shows full title + clickable meta area
+- `useHashTagSync(channelId)` — URL hash ↔ `hashTagFilter` sync
+- `useMobileBreakpoint(n)` — resize-reactive boolean
+- `useNewsHotkeys(items, selectedId, setId, onSpace)` — ↑↓Space keyboard nav
+
+**`uiStore` fields added for news view**:
+- `newsViewMode: 'list' | 'accordion'` — user preference, persisted
+- `NewsViewMode` type exported from `uiStore.ts`
+
