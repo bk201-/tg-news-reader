@@ -259,6 +259,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  justify-content: flex-end;
 }
 
 .news-item__thumb {

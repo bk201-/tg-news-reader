@@ -75,7 +75,7 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
         )}
       </div>
       <div className="news-item__meta">
-        <Text type="secondary" style={{ fontSize: 11 }}>
+        <Text type="secondary" style={{ fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>
           {dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm')}
         </Text>
         <div className="news-item__tags">
@@ -96,7 +96,17 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
             >
               <Tag
                 color="blue"
-                style={{ fontSize: 10, margin: '0 2px', cursor: onTagClick ? 'pointer' : 'default' }}
+                style={{
+                  fontSize: 10,
+                  margin: '0 2px',
+                  cursor: onTagClick ? 'pointer' : 'default',
+                  maxWidth: 140,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-block',
+                  verticalAlign: 'middle',
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {tag}
