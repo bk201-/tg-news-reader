@@ -39,7 +39,7 @@ export function GroupPinModal({
         </span>
       }
       onCancel={onClose}
-      onOk={onConfirm}
+      onOk={() => onConfirm()}
       okText={t('groups.pin_modal.ok_text')}
       cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
