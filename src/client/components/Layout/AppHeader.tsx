@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App, Select } from 'antd';
+import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App } from 'antd';
 import {
   MoonOutlined,
   SunOutlined,
@@ -95,19 +95,22 @@ export function AppHeader() {
       key: 'language',
       icon: <TranslationOutlined />,
       label: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>{t('header.user_menu.language')}:</span>
-          <Select
-            value={i18n.language.startsWith('ru') ? 'ru' : 'en'}
-            onChange={(lng) => void i18n.changeLanguage(lng)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+          <span style={{ marginRight: 4 }}>{t('header.user_menu.language')}:</span>
+          <Button
             size="small"
-            style={{ width: 90 }}
-            options={[
-              { value: 'en', label: 'EN' },
-              { value: 'ru', label: 'RU' },
-            ]}
-            onClick={(e) => e.stopPropagation()}
-          />
+            type={!i18n.language.startsWith('ru') ? 'primary' : 'default'}
+            onClick={(e) => { e.stopPropagation(); void i18n.changeLanguage('en'); }}
+          >
+            🇬🇧 EN
+          </Button>
+          <Button
+            size="small"
+            type={i18n.language.startsWith('ru') ? 'primary' : 'default'}
+            onClick={(e) => { e.stopPropagation(); void i18n.changeLanguage('ru'); }}
+          >
+            🇷🇺 RU
+          </Button>
         </div>
       ),
     },
