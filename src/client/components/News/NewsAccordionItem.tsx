@@ -24,32 +24,34 @@ export function NewsAccordionItem({
   onTagClick,
   onMarkedRead,
 }: NewsAccordionItemProps) {
-  // NewsListItem handles the filter/showAll visibility itself, but we need to
-  // guard here so the expanded body is also not rendered for filtered-out items.
   if (!isFiltered && !showAll) return null;
 
+  const dimmed = !isFiltered && showAll;
+
   return (
-    <div className={`accordion-item${isSelected ? ' accordion-item--expanded' : ''}`}>
-      <NewsListItem
-        item={item}
-        isSelected={isSelected}
-        isFiltered={isFiltered}
-        showAll={showAll}
-        onClick={() => onSelect(isSelected ? null : item.id)}
-        onTagClick={onTagClick}
-      />
-      {isSelected && (
-        <div className="accordion-item__body">
-          <NewsDetail
-            key={item.id}
-            item={item}
-            channelType={channelType}
-            onMarkedRead={onMarkedRead}
-            variant="inline"
-          />
-        </div>
+    <div
+      data-news-id={item.id}
+      className={`accordion-item${isSelected ? ' accordion-item--expanded' : ''}${dimmed ? ' accordion-item--dimmed' : ''}`}
+    >
+      {isSelected ? (
+        <NewsDetail
+          key={item.id}
+          item={item}
+          channelType={channelType}
+          onMarkedRead={onMarkedRead}
+          variant="inline"
+          onHeaderClick={() => onSelect(null)}
+        />
+      ) : (
+        <NewsListItem
+          item={item}
+          isSelected={false}
+          isFiltered={isFiltered}
+          showAll={showAll}
+          onClick={() => onSelect(item.id)}
+          onTagClick={onTagClick}
+        />
       )}
     </div>
   );
 }
-

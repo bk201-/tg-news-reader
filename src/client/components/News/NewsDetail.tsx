@@ -5,7 +5,7 @@ import type { NewsItem, ChannelType } from '../../../shared/types';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
 import { useNewsDownloadTask } from '../../api/downloads';
 import { useQueryClient } from '@tanstack/react-query';
-import { isYouTubeUrl } from './newsUtils';
+import { isYouTubeUrl, getNewsTitle } from './newsUtils';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailMedia } from './NewsDetailMedia';
@@ -17,9 +17,10 @@ interface NewsDetailProps {
   channelType: ChannelType;
   onMarkedRead?: (id: number) => void;
   variant?: 'panel' | 'inline';
+  onHeaderClick?: () => void;
 }
 
-export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel' }: NewsDetailProps) {
+export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel', onHeaderClick }: NewsDetailProps) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const markRead = useMarkRead();
@@ -207,7 +208,9 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel' 
           markReadPending={markRead.isPending}
           onRefresh={handleRefresh}
           firstLink={firstLink}
-          hideMetadata={variant === 'inline'}
+          variant={variant}
+          title={variant === 'inline' ? getNewsTitle(item) : undefined}
+          onHeaderClick={onHeaderClick}
         />
       </div>
 

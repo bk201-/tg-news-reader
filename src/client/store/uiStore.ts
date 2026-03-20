@@ -57,7 +57,7 @@ export const useUIStore = create<UIStore>()((set) => ({
       localStorage.setItem('downloadsPanelPinned', String(next));
       return { downloadsPanelPinned: next };
     }),
-  newsViewMode: (localStorage.getItem('newsViewMode') as NewsViewMode) || 'list',
+  newsViewMode: (localStorage.getItem('newsViewMode') as NewsViewMode) || (window.innerWidth < 768 ? 'accordion' : 'list'),
   setNewsViewMode: (mode) => {
     localStorage.setItem('newsViewMode', mode);
     set({ newsViewMode: mode });

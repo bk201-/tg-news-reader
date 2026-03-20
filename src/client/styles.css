@@ -574,27 +574,24 @@ body {
   background: var(--tgr-color-bg-container, #fff);
 }
 
-/* Accordion wrapper around each news-item */
+/* Accordion wrapper around each item */
 .accordion-item {
   border-bottom: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
 }
 
-/* Remove the news-item's own bottom border when item is expanded
-   (accordion-item provides the outer border) */
+/* Collapsed item: remove the news-item's own bottom border (accordion provides it) */
 .accordion-item .news-item {
   border-bottom: none;
 }
 
-/* Expanded item: highlight left edge */
-.accordion-item--expanded > .news-item {
+/* Expanded item: left blue border on the outer wrapper */
+.accordion-item--expanded {
   border-left: 3px solid var(--tgr-color-primary, #1677ff);
-  background: var(--tgr-color-primary-bg, #e6f4ff);
 }
 
-/* Body of the expanded accordion item */
-.accordion-item__body {
-  border-top: 1px solid var(--tgr-color-border-secondary, #f0f0f0);
-  background: var(--tgr-color-bg-layout, #f5f5f5);
+/* Dimmed items (filtered-out when showAll) */
+.accordion-item--dimmed {
+  opacity: 0.45;
 }
 
 /* ── NewsDetail inline variant (inside accordion) ── */
@@ -604,17 +601,18 @@ body {
   position: relative;
 }
 
-/* Sticky header becomes static in inline context */
+/* Header is static (not sticky) in inline context */
 .news-detail--inline .news-detail__header {
   position: static;
+  background: var(--tgr-color-bg-container, #fff);
 }
 
-/* Content area flows naturally; parent accordion scrolls */
+/* Content area: same padding as panel mode, centered content */
 .news-detail--inline .news-detail__content {
   flex: none;
   overflow: visible;
-  padding: 12px 20px 16px;
-  align-items: flex-start;
+  padding: 16px 24px 24px;
+  align-items: center;
 }
 
 /* Media at natural size (no viewport-height cap) */
@@ -625,8 +623,30 @@ body {
   height: auto;
 }
 
-/* Text body full-width (no max-width reading column) */
+/* Text body: same max-width reading column as panel mode */
 .news-detail--inline .news-detail__text-body {
-  max-width: 100%;
-  margin-top: 12px;
+  max-width: 680px;
+  margin-top: 20px;
+}
+
+/* ── Inline toolbar: title + meta (left section) ── */
+.news-detail__toolbar-meta {
+  flex: 1;
+  min-width: min(380px, 100%);
+  cursor: pointer;
+  user-select: none;
+  padding-right: 12px;
+}
+
+.news-detail__toolbar-meta:hover {
+  opacity: 0.8;
+}
+
+.news-detail__toolbar-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+  margin-bottom: 4px;
+  color: var(--tgr-color-text, #222);
 }

@@ -1,3 +1,12 @@
+import type { NewsItem } from '@shared/types.ts';
+
+/** Full title from first line of text, no truncation (for accordion header). */
+export function getNewsTitle(item: NewsItem): string {
+  const text = item.text || '';
+  const firstLine = text.split('\n')[0]?.trim() || '';
+  return firstLine || `Сообщение #${item.telegramMsgId}`;
+}
+
 /** Extract a short readable label from a URL (domain without www). */
 export function getLinkLabel(url: string, index: number): string {
   try {

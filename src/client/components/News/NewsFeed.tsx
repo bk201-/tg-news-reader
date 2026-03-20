@@ -31,6 +31,14 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     setNewsViewMode,
   } = useUIStore();
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const effectiveViewMode = isMobile ? 'accordion' : newsViewMode;
+
   const { data: newsData, isLoading } = useNews(channel.id, !showAll);
   const newsItems = newsData?.items ?? [];
   const serverFilteredOut = newsData?.filteredOut ?? 0;
@@ -195,8 +203,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     if (!selectedNewsId || !listRef.current) return;
     listRef.current
       .querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: newsViewMode === 'accordion' ? 'start' : 'center' });
-  }, [selectedNewsId, newsViewMode]);
+      ?.scrollIntoView({ behavior: 'smooth', block: effectiveViewMode === 'accordion' ? 'start' : 'center' });
+  }, [selectedNewsId, effectiveViewMode]);
 
   return (
     <div className="news-feed">
@@ -219,10 +227,11 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         unreadCount={unreadCount}
         newsViewMode={newsViewMode}
         onSetViewMode={setNewsViewMode}
+        isMobile={isMobile}
       />
 
-      <div className={`news-feed__body${newsViewMode === 'accordion' ? ' news-feed__body--accordion' : ''}`}>
-        {newsViewMode === 'accordion' ? (
+      <div className={`news-feed__body${effectiveViewMode === 'accordion' ? ' news-feed__body--accordion' : ''}`}>
+        {effectiveViewMode === 'accordion' ? (
           <NewsAccordionList
             isLoading={isLoading}
             items={displayItems}

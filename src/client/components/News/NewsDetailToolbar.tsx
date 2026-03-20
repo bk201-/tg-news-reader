@@ -28,7 +28,12 @@ interface NewsDetailToolbarProps {
   markReadPending: boolean;
   onRefresh: () => void;
   firstLink?: string;
-  hideMetadata?: boolean;
+  /** 'panel' = classic date+tags header; 'inline' = accordion with title+date+tags */
+  variant?: 'panel' | 'inline';
+  /** Title text shown in inline variant */
+  title?: string;
+  /** Clicking the left (title/meta) area collapses the accordion item */
+  onHeaderClick?: () => void;
 }
 
 export function NewsDetailToolbar({
@@ -45,40 +50,60 @@ export function NewsDetailToolbar({
   markReadPending,
   onRefresh,
   firstLink,
-  hideMetadata = false,
+  variant = 'panel',
+  title,
+  onHeaderClick,
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
   const hashtags = item.hashtags || [];
   const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
+  const isInline = variant === 'inline';
+
+  const metaContent = (
+    <>
+      <span style={{ fontSize: 12, color: 'var(--tgr-color-text-secondary, #666)' }}>
+        {dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}
+      </span>
+      {hashtags.length > 0 && (
+        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {hashtags.map((tag) => (
+            <Tag key={tag} color="blue" style={{ marginRight: 0 }}>
+              {tag}
+            </Tag>
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="news-detail__header-top">
-      {!hideMetadata && (
-        <div>
-          <span style={{ fontSize: 12, color: 'var(--tgr-color-text-secondary, #666)' }}>
-            {dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}
-          </span>
-          {hashtags.length > 0 && (
-            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {hashtags.map((tag) => (
-                <Tag key={tag} color="blue" style={{ marginRight: 0 }}>
-                  {tag}
-                </Tag>
-              ))}
-            </div>
-          )}
+      {isInline ? (
+        <div
+          className="news-detail__toolbar-meta"
+          onClick={onHeaderClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onHeaderClick?.()}
+        >
+          {title && <div className="news-detail__toolbar-title">{title}</div>}
+          {metaContent}
         </div>
+      ) : (
+        <div>{metaContent}</div>
       )}
 
-      <Space wrap size={4}>
-        {/* ── Left: rarely-used ── */}
+      <Space
+        wrap
+        size={4}
+        onClick={isInline ? (e: React.MouseEvent) => e.stopPropagation() : undefined}
+      >
         <Tooltip title={t('news.detail.refresh_tooltip')}>
           <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh}>
             <span className="nd-btn-text">{t('news.detail.refresh')}</span>
           </Button>
         </Tooltip>
 
-        {/* ── Middle: overlay toggles ── */}
         {links.length > 0 && (
           <Tooltip title={t('news.detail.links_tooltip')}>
             <Button
@@ -106,7 +131,6 @@ export function NewsDetailToolbar({
           </Tooltip>
         )}
 
-        {/* ── Middle: article extraction — link_continuation only ── */}
         {channelType === 'link_continuation' && !item.fullContent && nonYtLinks.length > 0 && (
           <Tooltip title={t('news.detail.load_article_tooltip')}>
             <Button
@@ -123,7 +147,6 @@ export function NewsDetailToolbar({
           </Tooltip>
         )}
 
-        {/* ── Right: primary actions ── */}
         {firstLink && (
           <Tooltip title={t('news.detail.open_tooltip')}>
             <Button icon={<ExportOutlined />} size="small" href={firstLink} target="_blank" rel="noreferrer">
