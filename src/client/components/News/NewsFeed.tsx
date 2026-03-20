@@ -22,15 +22,8 @@ interface NewsFeedProps {
 export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
 
-  const {
-    selectedNewsId,
-    setSelectedNewsId,
-    showAll,
-    setShowAll,
-    setFilterPanelOpen,
-    newsViewMode,
-    setNewsViewMode,
-  } = useUIStore();
+  const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
+    useUIStore();
 
   const isMobile = useMobileBreakpoint(768);
   const effectiveViewMode = isMobile ? 'accordion' : newsViewMode;
@@ -98,7 +91,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
 
   // ── Fetch period ──────────────────────────────────────────────────────
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
-  useEffect(() => { setFetchPeriod(''); }, [channel.id]);
+  useEffect(() => {
+    setFetchPeriod('');
+  }, [channel.id]);
 
   const handleFetchDefault = useCallback(() => {
     setFetchPeriod('');
@@ -211,7 +206,12 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             />
             <div className="news-feed__detail">
               {selectedItem ? (
-                <NewsDetail key={selectedItem.id} item={selectedItem} channelType={channel.channelType} onMarkedRead={handleMarkedRead} />
+                <NewsDetail
+                  key={selectedItem.id}
+                  item={selectedItem}
+                  channelType={channel.channelType}
+                  onMarkedRead={handleMarkedRead}
+                />
               ) : (
                 <div className="news-feed__detail-empty">
                   <Empty description="Выберите новость из списка" />

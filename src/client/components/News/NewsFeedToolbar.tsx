@@ -112,7 +112,16 @@ export function NewsFeedToolbar({
         )}
         {!isMobile && (
           <>
-            <div style={{ width: 1, height: '1.4em', background: 'var(--tgr-color-border-secondary, #e8e8e8)', margin: '0 2px', flexShrink: 0, alignSelf: 'center' }} />
+            <div
+              style={{
+                width: 1,
+                height: '1.4em',
+                background: 'var(--tgr-color-border-secondary, #e8e8e8)',
+                margin: '0 2px',
+                flexShrink: 0,
+                alignSelf: 'center',
+              }}
+            />
             <Tooltip title={t('news.toolbar.view_list')}>
               <Button
                 size="small"

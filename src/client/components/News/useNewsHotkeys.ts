@@ -41,4 +41,3 @@ export function useNewsHotkeys(
     return () => window.removeEventListener('keydown', onKey);
   }, [displayItems, selectedNewsId, setSelectedNewsId, onSpaceKey]);
 }
-

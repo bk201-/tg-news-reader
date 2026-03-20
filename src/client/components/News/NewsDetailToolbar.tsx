@@ -93,11 +93,7 @@ export function NewsDetailToolbar({
         <div>{metaContent}</div>
       )}
 
-      <Space
-        wrap
-        size={4}
-        onClick={isInline ? (e: React.MouseEvent) => e.stopPropagation() : undefined}
-      >
+      <Space wrap size={4} onClick={isInline ? (e: React.MouseEvent) => e.stopPropagation() : undefined}>
         <Tooltip title={t('news.detail.refresh_tooltip')}>
           <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh}>
             <span className="nd-btn-text">{t('news.detail.refresh')}</span>

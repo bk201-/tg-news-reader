@@ -39,4 +39,3 @@ export function useHashTagSync(channelId: number) {
 
   return { hashTagFilter, setHashTagFilter };
 }
-
