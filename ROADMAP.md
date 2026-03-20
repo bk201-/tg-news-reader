@@ -25,14 +25,14 @@
 | ✅ | 🟡 7 | robots.txt + rate limiting + security headers | — | ⭐ |
 | ✅ | 🟡 8 | Аутентификация (пароль + TOTP 2FA + JWT) | — | ⭐⭐⭐⭐ |
 | ⬜ | 🟡 9 | Деплой в Azure (Container Apps + Turso) | Auth | ⭐⭐⭐ |
-| ⬜ | 🟢 10 | Service Worker кэш медиа | — | ⭐⭐⭐ |
+| ✅ | 🟢 10 | Service Worker кэш медиа | — | ⭐⭐⭐ |
 | ⬜ | 🟢 11 | Режим просмотра "аккордион" | Группы | ⭐⭐⭐⭐ |
 | ⬜ | 🟢 12 | Менеджер загрузок в папку | SW кэш | ⭐⭐⭐ |
 | ⬜ | 🟢 13 | Локализация (i18n: ru / en) | — | ⭐⭐⭐ |
 | ⬜ | 🟢 14 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
 | ⬜ | ⚪ 15 | Клиентская скачка gramjs | Деплой | ⭐⭐⭐⭐⭐ |
 | ✅ | ⚪ 16 | Адаптивные кнопки (текст→иконки) | Сплиттер | ⭐⭐⭐ |
-| ⬜ | 🟡 17 | Логи (структурированные + ротация) | — | ⭐⭐ |
+| ✅ | 🟡 17 | Логи (структурированные + ротация) | — | ⭐⭐ |
 | ⬜ | 🟡 18 | Fail detection после деплоя | Деплой | ⭐⭐ |
 | ⬜ | 🟢 19 | Оптимизация UI под мобилки | — | ⭐⭐⭐ |
 
@@ -801,3 +801,5 @@ xs/sm:
 - [x] Настроить git user.name/email (`git config --global user.name "..."`)
 - [x] Баг двойного счётчика непрочитанных: `count-unread` использовал `getSinceDate`/`lastReadAt`, что приводило к суммированию уже загруженных непрочитанных и `pendingCounts` — исправлено на `lastFetchedAt`
 - [x] `GroupPanel` разбит на `GroupItem` + `GroupFormModal` + `GroupPinModal` (по аналогии с Channel-компонентами); бейдж группы теперь учитывает `pendingCounts`
+- [x] Service Worker кэш медиа (`public/sw.js`): Cache-First стратегия для `/api/media/*`; стрипает `?token=` из ключа кэша; 2000 записей / 30 дней TTL; кнопка очистки в меню пользователя (`AppHeader`); регистрируется только в prod
+- [x] Структурированные логи через pino (`src/server/logger.ts`): pino-pretty в dev, JSON в prod; access-log middleware (IP/метод/статус/ms); логирование auth-попыток (IP + reason, без email/пароля); rate-limit хиты; download задачи; ошибки Telegram; uncaughtException/unhandledRejection

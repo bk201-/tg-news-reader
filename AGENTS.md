@@ -41,6 +41,7 @@ src/
     routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
                       # downloadManager.ts, downloadProgress.ts, mediaProgress.ts
+    logger.ts         # Single pino instance — import { logger } from '../logger.js'
   client/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
                       # Channels/: ChannelSidebar, ChannelItem, ChannelFormModal, ChannelFetchModal,
@@ -50,6 +51,8 @@ src/
                       #            DownloadsPinnedContent (inline sidebar), DownloadTaskList (shared task list)
     api/              # React Query hooks + helpers: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts,
                       # mediaProgress.ts, mediaUrl.ts; central fetch client: client.ts
+    services/
+      serviceWorker.ts  # SW registration (prod-only) + messaging helpers (getSwStats, clearSwCache)
     store/
       uiStore.ts      # Zustand UI store (selectedChannelId, selectedGroupId, selectedNewsId, theme, etc.)
       authStore.ts    # Zustand auth store (accessToken, user, unlockedGroupIds, isCheckingAuth)
@@ -214,3 +217,36 @@ Use `mediaUrl(localMediaPath)` from `src/client/api/mediaUrl.ts` to generate aut
 - Served via `GET /api/media/:channel/:filename`
 - Downloads managed by `downloadManager.ts` — background tasks use size limits (photos ≤ `MAX_PHOTO_SIZE_MB` MB, videos ≤ `MAX_VIDEO_SIZE_MB` MB, image-docs ≤ `MAX_IMG_DOC_SIZE_MB` MB; all env-configurable, defaults 5/75/5); user-initiated (`priority ≥ 10`) bypass limits
 - Progress visible in `DownloadsPanel` (header badge + Drawer) via SSE
+
+## Logging
+
+All server-side logging goes through `src/server/logger.ts` — a single **pino** instance:
+
+```ts
+import { logger } from '../logger.js'; // adjust relative path
+
+logger.info({ module: 'channels', channelId, inserted }, 'fetch done');
+logger.warn({ module: 'telegram', channelId, err }, 'channel unavailable');
+logger.error({ module: 'download', workerId, err }, 'worker crashed');
+```
+
+- **Dev**: pino-pretty (colourised, `HH:MM:ss`, no pid/hostname)
+- **Prod**: JSON to stdout → consumed by Azure Log Analytics automatically
+- **Level**: `LOG_LEVEL` env var (default: `debug` in dev, `info` in prod)
+- Always include `module` field (`'http'`, `'auth'`, `'channels'`, `'download'`, `'telegram'`, etc.)
+- **Never log**: tokens, passwords, email addresses, `TG_SESSION` — only IDs and status codes
+- `index.ts` registers `process.on('uncaughtException')` and `process.on('unhandledRejection')` handlers
+- `rateLimit.ts` logs rate-limit hits with IP + path at `warn` level
+- `routes/auth.ts` logs login failures with IP + `reason` field (no credentials in log)
+
+## Service Worker (Media Cache)
+
+`public/sw.js` — vanilla JS Service Worker, **Cache-First** strategy for `/api/media/*`:
+
+- Strips `?token=` from cache key so JWT rotation doesn't bust the cache
+- Max 2000 entries, 30-day TTL (configurable via `postMessage`)
+- `src/client/services/serviceWorker.ts` — typed registration helper; **only registers in `PROD`** (`import.meta.env.DEV` check) to avoid interfering with Vite HMR
+- Registered in `main.tsx` via `registerMediaServiceWorker()`
+- **"Очистить кэш медиа"** button in `AppHeader` user menu calls `clearSwCache()` with confirm dialog
+- Message API: `GET_STATS` → `SwStats`, `CLEAR_CACHE`, `SET_LIMITS { maxEntries, maxAgeDays }`
+
