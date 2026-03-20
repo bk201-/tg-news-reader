@@ -28,7 +28,7 @@
 | ✅ | 🟢 10 | Service Worker кэш медиа | — | ⭐⭐⭐ |
 | ⬜ | 🟢 11 | Режим просмотра "аккордион" | Группы | ⭐⭐⭐⭐ |
 | ⬜ | 🟢 12 | Менеджер загрузок в папку | SW кэш | ⭐⭐⭐ |
-| ⬜ | 🟢 13 | Локализация (i18n: ru / en) | — | ⭐⭐⭐ |
+| ✅ | 🟢 13 | Локализация (i18n: ru / en) | — | ⭐⭐⭐ |
 | ⬜ | 🟢 14 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
 | ⬜ | ⚪ 15 | Клиентская скачка gramjs | Деплой | ⭐⭐⭐⭐⭐ |
 | ✅ | ⚪ 16 | Адаптивные кнопки (текст→иконки) | Сплиттер | ⭐⭐⭐ |
@@ -803,3 +803,4 @@ xs/sm:
 - [x] `GroupPanel` разбит на `GroupItem` + `GroupFormModal` + `GroupPinModal` (по аналогии с Channel-компонентами); бейдж группы теперь учитывает `pendingCounts`
 - [x] Service Worker кэш медиа (`public/sw.js`): Cache-First стратегия для `/api/media/*`; стрипает `?token=` из ключа кэша; 2000 записей / 30 дней TTL; кнопка очистки в меню пользователя (`AppHeader`); регистрируется только в prod
 - [x] Структурированные логи через pino (`src/server/logger.ts`): pino-pretty в dev, JSON в prod; access-log middleware (IP/метод/статус/ms); логирование auth-попыток (IP + reason, без email/пароля); rate-limit хиты; download задачи; ошибки Telegram; uncaughtException/unhandledRejection
+- [x] Локализация (i18n): react-i18next + i18next-browser-languagedetector; **EN по умолчанию, RU как fallback**; переключатель языка в меню пользователя (🌐); файлы переводов в `src/client/locales/{en,ru}/translation.json`; Ant Design locale динамически переключается через `ConfigProvider`

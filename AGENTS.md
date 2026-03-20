@@ -46,7 +46,7 @@ src/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
                       # Channels/: ChannelSidebar, ChannelItem, ChannelFormModal, ChannelFetchModal,
                       #            GroupPanel (coordinator), GroupItem, GroupFormModal, GroupPinModal
-                      # Layout/:   AppLayout (shell + URL sync), AppHeader (header + user menu),
+                      # Layout/:   AppLayout (shell + URL sync), AppHeader (header + user menu + lang switcher),
                       #            TotpSetupModal (2FA flow), DownloadsPanel (badge + Drawer + SSE),
                       #            DownloadsPinnedContent (inline sidebar), DownloadTaskList (shared task list)
     api/              # React Query hooks + helpers: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts,
@@ -56,6 +56,10 @@ src/
     store/
       uiStore.ts      # Zustand UI store (selectedChannelId, selectedGroupId, selectedNewsId, theme, etc.)
       authStore.ts    # Zustand auth store (accessToken, user, unlockedGroupIds, isCheckingAuth)
+    i18n.ts           # i18next init: EN default, RU fallback, persisted in localStorage
+    locales/
+      en/translation.json   # English strings (primary)
+      ru/translation.json   # Russian strings (fallback)
     styles.css        # All CSS (BEM-like, CSS custom props for theming)
   shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter, DownloadTask)
 ```
@@ -247,6 +251,32 @@ logger.error({ module: 'download', workerId, err }, 'worker crashed');
 - Max 2000 entries, 30-day TTL (configurable via `postMessage`)
 - `src/client/services/serviceWorker.ts` — typed registration helper; **only registers in `PROD`** (`import.meta.env.DEV` check) to avoid interfering with Vite HMR
 - Registered in `main.tsx` via `registerMediaServiceWorker()`
-- **"Очистить кэш медиа"** button in `AppHeader` user menu calls `clearSwCache()` with confirm dialog
+- **"Clear media cache"** button in `AppHeader` user menu calls `clearSwCache()` with confirm dialog
 - Message API: `GET_STATS` → `SwStats`, `CLEAR_CACHE`, `SET_LIMITS { maxEntries, maxAgeDays }`
 
+## Localization (i18n)
+
+**Stack**: `react-i18next` + `i18next` + `i18next-browser-languagedetector`
+
+- **Default language: English (`en`)**, Russian (`ru`) as fallback
+- Language choice persisted in `localStorage` key `i18nextLng`
+- Config: `src/client/i18n.ts` — imported as side effect in `main.tsx` (`import './i18n'`)
+- Translation files: `src/client/locales/en/translation.json` (primary) and `ru/translation.json` (fallback)
+- Ant Design locale switches reactively in `main.tsx`: `i18n.language.startsWith('ru') ? ruRU : enUS`
+- Language switcher in `AppHeader` user menu — `TranslationOutlined` + `Select`
+
+**Pattern — every component with UI strings must use `useTranslation`:**
+```tsx
+import { useTranslation } from 'react-i18next';
+function MyComponent() {
+  const { t } = useTranslation();
+  return <Button>{t('mySection.myKey')}</Button>;
+}
+```
+
+**Rules:**
+- Always add new keys to **both** `en/translation.json` AND `ru/translation.json`
+- Keys are namespaced by section: `sidebar.*`, `channels.*`, `groups.*`, `news.*`, `filters.*`, `downloads.*`, `auth.*`, `header.*`, `common.*`
+- For `Modal.confirm` use `t()` for `title`, `content`, `okText`, `cancelText`
+- Interpolation: `t('channels.updated', { date })` → `"updated": "Updated: {{date}}"`
+- **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`
