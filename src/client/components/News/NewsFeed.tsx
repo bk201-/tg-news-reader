@@ -11,6 +11,9 @@ import { FilterPanel } from '../Filters/FilterPanel';
 import { NewsFeedToolbar } from './NewsFeedToolbar';
 import { NewsFeedList } from './NewsFeedList';
 import { NewsAccordionList } from './NewsAccordionList';
+import { useHashTagSync } from './useHashTagSync';
+import { useMobileBreakpoint } from './useMobileBreakpoint';
+import { useNewsHotkeys } from './useNewsHotkeys';
 
 interface NewsFeedProps {
   channel: Channel;
@@ -25,19 +28,14 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     showAll,
     setShowAll,
     setFilterPanelOpen,
-    hashTagFilter,
-    setHashTagFilter,
     newsViewMode,
     setNewsViewMode,
   } = useUIStore();
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useMobileBreakpoint(768);
   const effectiveViewMode = isMobile ? 'accordion' : newsViewMode;
+
+  const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
 
   const { data: newsData, isLoading } = useNews(channel.id, !showAll);
   const newsItems = newsData?.items ?? [];
@@ -49,33 +47,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const createFilter = useCreateFilter(channel.id);
 
   const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {}, []);
-
-  // ── URL hash sync ─────────────────────────────────────────────────────
-  useEffect(() => {
-    setHashTagFilter(null);
-  }, [channel.id, setHashTagFilter]);
-
-  useEffect(() => {
-    if (hashTagFilter) {
-      history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${window.location.search}#tag=${encodeURIComponent(hashTagFilter)}`,
-      );
-    } else {
-      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    }
-  }, [hashTagFilter]);
-
-  useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash;
-      if (!hash || hash === '#') setHashTagFilter(null);
-      else if (hash.startsWith('#tag=')) setHashTagFilter(decodeURIComponent(hash.slice(5)));
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, [setHashTagFilter]);
 
   // ── Derived values ────────────────────────────────────────────────────
   const selectedItem = useMemo(
@@ -127,9 +98,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
 
   // ── Fetch period ──────────────────────────────────────────────────────
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
-  useEffect(() => {
-    setFetchPeriod('');
-  }, [channel.id]);
+  useEffect(() => { setFetchPeriod(''); }, [channel.id]);
 
   const handleFetchDefault = useCallback(() => {
     setFetchPeriod('');
@@ -152,40 +121,20 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [channel.id, fetchChannel, onFetchSuccess],
   );
 
-  // ── Hotkeys: ↑/↓ navigate, Space = mark read + advance ───────────────
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement).isContentEditable) return;
-
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (displayItems.length === 0) return;
-        if (!selectedNewsId) {
-          setSelectedNewsId(displayItems[0].id);
-          return;
-        }
-        const idx = displayItems.findIndex((n) => n.id === selectedNewsId);
-        if (e.key === 'ArrowDown' && idx < displayItems.length - 1) setSelectedNewsId(displayItems[idx + 1].id);
-        if (e.key === 'ArrowUp' && idx > 0) setSelectedNewsId(displayItems[idx - 1].id);
-        return;
+  // ── Keyboard navigation (↑/↓/Space) ──────────────────────────────────
+  const handleSpaceKey = useCallback(
+    (item: (typeof displayItems)[number]) => {
+      if (item.isRead === 0) {
+        markRead.mutate({ id: item.id, isRead: 1 }, { onSuccess: () => handleMarkedRead(item.id) });
+      } else {
+        const idx = displayItems.findIndex((n) => n.id === item.id);
+        const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
+        if (next) setSelectedNewsId(next.id);
       }
-      if (e.key === ' ' && selectedNewsId) {
-        e.preventDefault();
-        const item = displayItems.find((n) => n.id === selectedNewsId);
-        if (!item) return;
-        if (item.isRead === 0) {
-          markRead.mutate({ id: item.id, isRead: 1 }, { onSuccess: () => handleMarkedRead(item.id) });
-        } else {
-          const idx = displayItems.findIndex((n) => n.id === selectedNewsId);
-          const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
-          if (next) setSelectedNewsId(next.id);
-        }
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [displayItems, selectedNewsId, setSelectedNewsId, markRead, handleMarkedRead]);
+    },
+    [displayItems, markRead, handleMarkedRead, setSelectedNewsId],
+  );
+  useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
 
   // ── Auto-mark read when selected post gets filtered out ───────────────
   useEffect(() => {
@@ -260,15 +209,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
               onTagClick={handleTagClick}
               listRef={listRef}
             />
-
             <div className="news-feed__detail">
               {selectedItem ? (
-                <NewsDetail
-                  key={selectedItem.id}
-                  item={selectedItem}
-                  channelType={channel.channelType}
-                  onMarkedRead={handleMarkedRead}
-                />
+                <NewsDetail key={selectedItem.id} item={selectedItem} channelType={channel.channelType} onMarkedRead={handleMarkedRead} />
               ) : (
                 <div className="news-feed__detail-empty">
                   <Empty description="Выберите новость из списка" />
