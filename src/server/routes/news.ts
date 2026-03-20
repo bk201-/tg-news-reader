@@ -6,6 +6,7 @@ import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
 import { readChannelHistory, fetchMessageById, downloadMessageMedia } from '../services/telegram.js';
+import { logger } from '../logger.js';
 
 const router = new Hono();
 
@@ -188,7 +189,7 @@ router.patch('/:id/read', async (c) => {
         try {
           await readChannelHistory(channel.telegramId, updated.telegramMsgId);
         } catch (err) {
-          console.warn('Failed to sync read state to Telegram:', err);
+          logger.warn({ module: 'news', newsId: updated.id, err }, 'failed to sync read state to Telegram');
         }
         // Update lastReadAt only if this message is newer than what we have
         if (!channel.lastReadAt || updated.postedAt > channel.lastReadAt) {

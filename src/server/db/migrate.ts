@@ -1,4 +1,5 @@
 ﻿import { client } from './index.js';
+import { logger } from '../logger.js';
 await client.execute('PRAGMA foreign_keys = ON');
 await client.executeMultiple(`
   CREATE TABLE IF NOT EXISTS groups (
@@ -102,4 +103,4 @@ await client.execute(
   `UPDATE filters SET channel_id = (SELECT id FROM channels ORDER BY id LIMIT 1)
    WHERE channel_id IS NULL AND EXISTS (SELECT 1 FROM channels)`,
 );
-console.log('✅ Database migrated successfully');
+logger.info('✅ Database migrated successfully');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal } from 'antd';
+import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App } from 'antd';
 import {
   MoonOutlined,
   SunOutlined,
@@ -7,7 +7,9 @@ import {
   LogoutOutlined,
   SafetyCertificateOutlined,
   QrcodeOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
+import { clearSwCache } from '../../services/serviceWorker';
 import { DownloadsPanel } from './DownloadsPanel';
 import { TotpSetupModal } from './TotpSetupModal';
 import { useUIStore } from '../../store/uiStore';
@@ -23,6 +25,7 @@ export function AppHeader() {
   const { user, clearAuth, updateUser } = useAuthStore();
   const { data: channels = [] } = useChannels();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const [totpModalOpen, setTotpModalOpen] = useState(false);
@@ -30,6 +33,21 @@ export function AppHeader() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     clearAuth();
+  };
+
+  const handleClearMediaCache = () => {
+    Modal.confirm({
+      title: 'Очистить кэш медиа?',
+      content:
+        'Все закэшированные фото и видео будут удалены из браузера. При следующем просмотре они загрузятся снова.',
+      okText: 'Очистить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        await clearSwCache();
+        void message.success('Кэш медиа очищен');
+      },
+    });
   };
 
   const handleDisableTOTP = () => {
@@ -62,6 +80,13 @@ export function AppHeader() {
       icon: user?.hasTOTP ? <SafetyCertificateOutlined style={{ color: 'green' }} /> : <QrcodeOutlined />,
       label: user?.hasTOTP ? 'Управление 2FA' : 'Включить 2FA',
       onClick: user?.hasTOTP ? handleDisableTOTP : () => setTotpModalOpen(true),
+    },
+    { type: 'divider' as const },
+    {
+      key: 'clear-cache',
+      icon: <ClearOutlined />,
+      label: 'Очистить кэш медиа',
+      onClick: handleClearMediaCache,
     },
     { type: 'divider' as const },
     {

@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import { randomUUID } from 'crypto';
 import { authMiddleware } from '../middleware/auth.js';
 import { JWT_SECRET, JWT_ACCESS_EXPIRES_SEC, REFRESH_EXPIRES_DAYS } from '../config.js';
+import { logger } from '../logger.js';
 
 const router = new Hono();
 const isDev = process.env.NODE_ENV !== 'production';
@@ -45,12 +46,19 @@ export { issueAccessToken };
 // POST /api/auth/login
 router.post('/login', async (c) => {
   const body = await c.req.json<{ email: string; password: string; totpCode?: string }>();
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? 'unknown';
 
   const [user] = await db.select().from(users).where(eq(users.email, body.email.toLowerCase().trim()));
-  if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+  if (!user) {
+    logger.warn({ module: 'auth', ip, event: 'login_failed', reason: 'user_not_found' }, 'login failed');
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
 
   const passwordOk = await bcrypt.compare(body.password, user.passwordHash);
-  if (!passwordOk) return c.json({ error: 'Invalid credentials' }, 401);
+  if (!passwordOk) {
+    logger.warn({ module: 'auth', ip, event: 'login_failed', reason: 'wrong_password' }, 'login failed');
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
 
   // Check TOTP if enabled
   if (user.totpSecret) {
@@ -59,7 +67,10 @@ router.post('/login', async (c) => {
     }
     const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(user.totpSecret) });
     const delta = totp.validate({ token: body.totpCode.replace(/\s/g, ''), window: 1 });
-    if (delta === null) return c.json({ error: 'Invalid TOTP code' }, 401);
+    if (delta === null) {
+      logger.warn({ module: 'auth', ip, event: 'login_failed', reason: 'wrong_totp' }, 'login failed');
+      return c.json({ error: 'Invalid TOTP code' }, 401);
+    }
   }
 
   // Create session
@@ -78,6 +89,8 @@ router.post('/login', async (c) => {
   });
 
   const accessToken = await issueAccessToken(user.id, user.role, sessionId);
+
+  logger.info({ module: 'auth', ip, event: 'login_ok', userId: user.id, sessionId }, 'login successful');
   setCookie(c, 'refresh_token', `${sessionId}:${refreshToken}`, refreshCookieOptions());
 
   return c.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });

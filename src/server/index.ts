@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
 import channelsRouter from './routes/channels.js';
 import newsRouter from './routes/news.js';
@@ -17,15 +16,40 @@ import { corsMiddleware } from './middleware/cors.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { startWorkerPool } from './services/downloadManager.js';
 import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
+import { logger } from './logger.js';
 
 // Run DB migration on startup
 import './db/migrate.js';
+
+// ─── Process-level error handlers ────────────────────────────────────────────
+
+process.on('uncaughtException', (err) => {
+  logger.error({ module: 'process', err }, 'uncaughtException — shutting down');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ module: 'process', reason }, 'unhandledRejection');
+});
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 const app = new Hono();
 
-app.use('*', logger());
+// ─── Access log (API only — static files are too noisy) ───────────────────────
+app.use('/api/*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? 'unknown';
+  logger.info(
+    { module: 'http', method: c.req.method, path: c.req.path, status: c.res.status, ms, ip },
+    `${c.req.method} ${c.req.path} ${c.res.status} ${ms}ms`,
+  );
+});
+
 app.use('*', secureHeaders());
 
 // Tell all crawlers and bots to stay away
@@ -76,9 +100,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const port = parseInt(process.env.SERVER_PORT || '3173', 10);
-console.log(`🚀 Server running on http://localhost:${port}`);
 
 // Start download manager workers
 startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
 
 serve({ fetch: app.fetch, port });
+logger.info({ module: 'server', port }, `Server running on http://localhost:${port}`);

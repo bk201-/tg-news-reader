@@ -10,6 +10,7 @@ import { mediaProgressEmitter, type MediaProgressEvent } from '../services/media
 import { getChannelStrategy, type PostProcessArgs } from '../services/channelStrategies.js';
 import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
 import type { ChannelType } from '../../shared/types.js';
+import { logger } from '../logger.js';
 
 const router = new Hono();
 
@@ -324,6 +325,11 @@ router.post('/:id/fetch', async (c) => {
 
     // Fire post-processing in background — just queues tasks, returns immediately
     void strategy.postProcess(args);
+
+    logger.info(
+      { module: 'channels', channelId, inserted, total: messages.length, mediaProcessing },
+      `fetch done: ${inserted}/${messages.length} inserted`,
+    );
 
     return c.json({ inserted, total: messages.length, mediaProcessing });
   } catch (err: unknown) {

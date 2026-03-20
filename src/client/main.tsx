@@ -9,8 +9,10 @@ import { useUIStore } from './store/uiStore';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import './styles.css';
+import { registerMediaServiceWorker } from './services/serviceWorker';
 
 dayjs.locale('ru');
+registerMediaServiceWorker();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },

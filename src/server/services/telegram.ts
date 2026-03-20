@@ -3,6 +3,7 @@ import { StringSession } from 'telegram/sessions/index.js';
 import { Api } from 'telegram';
 import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { logger } from '../logger.js';
 
 let client: TelegramClient | null = null;
 
@@ -392,7 +393,7 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       rawMedia: msg.media ?? undefined,
     };
   } catch (err) {
-    console.error('Error fetching message by ID:', err);
+    logger.warn({ module: 'telegram', err }, 'error fetching message by ID');
     return null;
   }
 }

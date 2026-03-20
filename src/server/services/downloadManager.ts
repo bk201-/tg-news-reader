@@ -6,6 +6,7 @@ import { extractContentFromUrl, buildFullContent } from './readability.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 import { DOWNLOAD_TASK_CLEANUP_DELAY_MS } from '../config.js';
 import type { DownloadType, DownloadTask } from '../../shared/types.js';
+import { logger } from '../logger.js';
 
 const WAKEUP_EVENT = 'wakeup';
 
@@ -266,8 +267,8 @@ export function startWorkerPool(concurrency = 10): void {
 
   for (let i = 0; i < concurrency; i++) {
     void runWorker().catch((err) => {
-      console.error(`[DownloadManager] Worker ${i} crashed:`, err);
+      logger.error({ module: 'download', workerId: i, err }, 'worker crashed');
     });
   }
-  console.log(`[DownloadManager] Started ${concurrency} workers`);
+  logger.info({ module: 'download', concurrency }, `worker pool started (${concurrency} workers)`);
 }
