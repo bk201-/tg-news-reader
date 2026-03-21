@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App } from 'antd';
+import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App, Grid } from 'antd';
 import {
   MoonOutlined,
   SunOutlined,
@@ -9,6 +9,7 @@ import {
   QrcodeOutlined,
   ClearOutlined,
   TranslationOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { FlagRU, FlagUS } from '../Flags';
@@ -24,12 +25,15 @@ const { Header } = Layout;
 const { Title, Text } = Typography;
 
 export function AppHeader() {
-  const { selectedChannelId, isDarkTheme, toggleTheme } = useUIStore();
+  const { selectedChannelId, isDarkTheme, toggleTheme, setSidebarDrawerOpen } = useUIStore();
   const { user, clearAuth, updateUser } = useAuthStore();
   const { data: channels = [] } = useChannels();
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const { t, i18n } = useTranslation();
+  const screens = Grid.useBreakpoint();
+  // screens.xxl = true when ≥ 1600px → full desktop, no hamburger needed
+  const sidebarInDrawer = !screens.xxl;
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const [totpModalOpen, setTotpModalOpen] = useState(false);
@@ -140,16 +144,41 @@ export function AppHeader() {
           display: 'flex',
           alignItems: 'center',
           background: token.colorPrimary,
-          padding: '0 24px',
-          gap: 12,
+          padding: sidebarInDrawer ? '0 12px' : '0 24px',
+          gap: sidebarInDrawer ? 8 : 12,
         }}
       >
-        <span style={{ fontSize: 24 }}>📰</span>
-        <Title level={4} style={{ margin: 0, color: '#fff' }}>
-          TG News Reader
-        </Title>
+        {sidebarInDrawer && (
+          <Tooltip title={t('header.open_sidebar')}>
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={() => setSidebarDrawerOpen(true)}
+              style={{ color: '#fff', flexShrink: 0 }}
+            />
+          </Tooltip>
+        )}
+        <span style={{ fontSize: 24, flexShrink: 0 }}>📰</span>
+        {!sidebarInDrawer && (
+          <Title level={4} style={{ margin: 0, color: '#fff', whiteSpace: 'nowrap' }}>
+            TG News Reader
+          </Title>
+        )}
         {selectedChannel && (
-          <Text style={{ color: 'rgba(255,255,255,0.75)', marginLeft: 12 }}>— {selectedChannel.name}</Text>
+          <Text
+            style={{
+              color: 'rgba(255,255,255,0.85)',
+              marginLeft: sidebarInDrawer ? 0 : 12,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+              flex: sidebarInDrawer ? 1 : undefined,
+              fontWeight: sidebarInDrawer ? 600 : 400,
+            }}
+          >
+            {sidebarInDrawer ? selectedChannel.name : `— ${selectedChannel.name}`}
+          </Text>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <DownloadsPanel />

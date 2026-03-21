@@ -177,6 +177,7 @@
   "header": {
     "theme_dark": "Dark theme",
     "theme_light": "Light theme",
+    "open_sidebar": "Open channels",
     "user_menu": {
       "manage_2fa": "Manage 2FA",
       "enable_2fa": "Enable 2FA",

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { App, Empty } from 'antd';
+import { App, Empty, Grid } from 'antd';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
@@ -12,7 +12,6 @@ import { NewsFeedToolbar } from './NewsFeedToolbar';
 import { NewsFeedList } from './NewsFeedList';
 import { NewsAccordionList } from './NewsAccordionList';
 import { useHashTagSync } from './useHashTagSync';
-import { useMobileBreakpoint } from './useMobileBreakpoint';
 import { useNewsHotkeys } from './useNewsHotkeys';
 
 interface NewsFeedProps {
@@ -25,8 +24,10 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
     useUIStore();
 
-  const isMobile = useMobileBreakpoint(768);
-  const effectiveViewMode = isMobile ? 'accordion' : newsViewMode;
+  const screens = Grid.useBreakpoint();
+  // screens.xl = true when ≥ 1200px → list view available; below → force accordion
+  const forceAccordion = !screens.xl;
+  const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
 
   const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
 
@@ -171,7 +172,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         unreadCount={unreadCount}
         newsViewMode={newsViewMode}
         onSetViewMode={setNewsViewMode}
-        isMobile={isMobile}
+        isMobile={forceAccordion}
       />
 
       <div className={`news-feed__body${effectiveViewMode === 'accordion' ? ' news-feed__body--accordion' : ''}`}>

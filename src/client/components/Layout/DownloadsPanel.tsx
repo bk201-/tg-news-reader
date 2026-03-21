@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Badge, Button, Drawer, Space, Tooltip, Spin } from 'antd';
+import { Badge, Button, Drawer, Space, Tooltip, Spin, Grid } from 'antd';
 import { CloudDownloadOutlined, PushpinOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
@@ -15,6 +15,10 @@ export function DownloadsPanel() {
   const prioritizeDownload = usePrioritizeDownload();
   const { downloadsPanelPinned, toggleDownloadsPanelPin } = useUIStore();
   const { t } = useTranslation();
+  const screens = Grid.useBreakpoint();
+
+  // Pin only available on full desktop (≥ 1600px / xxl)
+  const effectivePinned = !!screens.xxl && downloadsPanelPinned;
 
   // SSE always active — mounted once for the whole app lifetime
   useDownloadsSSE();
@@ -27,24 +31,26 @@ export function DownloadsPanel() {
         {activeCount > 0 && <Spin size="small" />}
         <span>{activeCount > 0 ? t('downloads.title_active', { count: activeCount }) : t('downloads.title')}</span>
       </Space>
-      <Tooltip title={t('downloads.pin_tooltip')} placement="left">
-        <Button
-          size="small"
-          type="text"
-          icon={<PushpinOutlined />}
-          onClick={() => {
-            toggleDownloadsPanelPin();
-            setOpen(false);
-          }}
-        />
-      </Tooltip>
+      {!!screens.xxl && (
+        <Tooltip title={t('downloads.pin_tooltip')} placement="left">
+          <Button
+            size="small"
+            type="text"
+            icon={<PushpinOutlined />}
+            onClick={() => {
+              toggleDownloadsPanelPin();
+              setOpen(false);
+            }}
+          />
+        </Tooltip>
+      )}
     </div>
   );
 
   return (
     <>
       <Tooltip
-        title={downloadsPanelPinned ? t('downloads.panel_tooltip_pinned') : t('downloads.panel_tooltip')}
+        title={effectivePinned ? t('downloads.panel_tooltip_pinned') : t('downloads.panel_tooltip')}
         placement="bottomLeft"
       >
         <Badge count={activeCount} size="small" offset={[-4, 4]}>
@@ -52,15 +58,15 @@ export function DownloadsPanel() {
             type="text"
             icon={<CloudDownloadOutlined />}
             onClick={() => {
-              if (!downloadsPanelPinned) setOpen(true);
+              if (!effectivePinned) setOpen(true);
             }}
-            style={{ color: '#fff', opacity: downloadsPanelPinned ? 0.75 : 1 }}
+            style={{ color: '#fff', opacity: effectivePinned ? 0.75 : 1 }}
           />
         </Badge>
       </Tooltip>
 
-      {!downloadsPanelPinned && (
-        <Drawer title={drawerTitle} placement="right" width={420} open={open} onClose={() => setOpen(false)}>
+      {!effectivePinned && (
+        <Drawer title={drawerTitle} placement="right" size="default" open={open} onClose={() => setOpen(false)}>
           <TaskList tasks={tasks} cancelDownload={cancelDownload} prioritizeDownload={prioritizeDownload} />
         </Drawer>
       )}

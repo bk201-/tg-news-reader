@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { BP_XL } from '../hooks/breakpoints';
 
 export type NewsViewMode = 'list' | 'accordion';
 
@@ -21,6 +22,9 @@ interface UIStore {
   // Downloads panel — when pinned, renders as inline sidebar next to news feed
   downloadsPanelPinned: boolean;
   toggleDownloadsPanelPin: () => void;
+  // Mobile sidebar drawer
+  sidebarDrawerOpen: boolean;
+  setSidebarDrawerOpen: (v: boolean) => void;
   // News view mode: 2-pane list or accordion
   newsViewMode: NewsViewMode;
   setNewsViewMode: (mode: NewsViewMode) => void;
@@ -32,7 +36,8 @@ interface UIStore {
 
 export const useUIStore = create<UIStore>()((set) => ({
   selectedChannelId: null,
-  setSelectedChannelId: (id) => set({ selectedChannelId: id, selectedNewsId: null, hashTagFilter: null }),
+  setSelectedChannelId: (id) =>
+    set({ selectedChannelId: id, selectedNewsId: null, hashTagFilter: null, sidebarDrawerOpen: false }),
   selectedNewsId: null,
   setSelectedNewsId: (id) => set({ selectedNewsId: id }),
   selectedGroupId: null,
@@ -57,8 +62,10 @@ export const useUIStore = create<UIStore>()((set) => ({
       localStorage.setItem('downloadsPanelPinned', String(next));
       return { downloadsPanelPinned: next };
     }),
+  sidebarDrawerOpen: false,
+  setSidebarDrawerOpen: (v) => set({ sidebarDrawerOpen: v }),
   newsViewMode:
-    (localStorage.getItem('newsViewMode') as NewsViewMode) || (window.innerWidth < 768 ? 'accordion' : 'list'),
+    (localStorage.getItem('newsViewMode') as NewsViewMode) || (window.innerWidth < BP_XL ? 'accordion' : 'list'),
   setNewsViewMode: (mode) => {
     localStorage.setItem('newsViewMode', mode);
     set({ newsViewMode: mode });
