@@ -41,6 +41,7 @@ const useStyles = createStyles(({ css, token }) => ({
     height: calc(100vh - 64px);
     overflow: hidden;
     display: flex;
+    flex-direction: column;
     background: ${token.colorBgLayout};
   `,
   splitter: css`
