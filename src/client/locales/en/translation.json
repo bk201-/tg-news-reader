@@ -113,6 +113,7 @@
       "queued": "Queued",
       "open": "Open",
       "open_tooltip": "Open in browser [Enter]",
+      "open_tg_tooltip": "Open in Telegram [Enter]",
       "mark_read": "Read",
       "mark_unread": "Unread",
       "prev": "Previous",

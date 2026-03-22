@@ -151,6 +151,7 @@ router.get('/', async (c) => {
     fullContent: r.fullContent || undefined,
     localMediaPath: r.localMediaPath || undefined,
     localMediaPaths: r.localMediaPaths ? (JSON.parse(r.localMediaPaths) as string[]) : undefined,
+    albumMsgIds: r.albumMsgIds ? (JSON.parse(r.albumMsgIds) as number[]) : undefined,
     mediaSize: r.mediaSize || undefined,
   }));
 
@@ -244,6 +245,7 @@ router.post('/:id/download-media', async (c) => {
       fullContent: updated.fullContent || undefined,
       localMediaPath: updated.localMediaPath || undefined,
       localMediaPaths: updated.localMediaPaths ? (JSON.parse(updated.localMediaPaths) as string[]) : undefined,
+      albumMsgIds: updated.albumMsgIds ? (JSON.parse(updated.albumMsgIds) as number[]) : undefined,
       mediaSize: updated.mediaSize || undefined,
     } satisfies NewsItem);
   }
@@ -264,6 +266,7 @@ router.post('/:id/download-media', async (c) => {
     fullContent: updated.fullContent || undefined,
     localMediaPath: updated.localMediaPath || undefined,
     localMediaPaths: updated.localMediaPaths ? (JSON.parse(updated.localMediaPaths) as string[]) : undefined,
+    albumMsgIds: updated.albumMsgIds ? (JSON.parse(updated.albumMsgIds) as number[]) : undefined,
     mediaSize: updated.mediaSize || undefined,
   } satisfies NewsItem);
 });

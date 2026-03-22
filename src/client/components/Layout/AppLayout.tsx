@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Layout, Typography, Splitter, Drawer, Grid } from 'antd';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
+import { Layout, Typography, Splitter, Drawer } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
@@ -9,6 +9,7 @@ import { DownloadsPinnedContent } from './DownloadsPinnedContent';
 import { AppHeader } from './AppHeader';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
+import { useMatchMedia, BP_XXL } from '../../hooks/breakpoints';
 
 const { Text } = Typography;
 
@@ -77,10 +78,13 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
-  const screens = Grid.useBreakpoint();
 
-  // screens.xxl = true when ≥ 1600px → inline sidebar; below → sidebar in Drawer
-  const sidebarInDrawer = !screens.xxl;
+  // Targeted: only fires when crossing the 1600 px threshold, not on every AntD breakpoint.
+  const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);
+
+  // Read localStorage once on mount — Splitter treats defaultSize as a one-time value.
+  // useState lazy initializer avoids re-reading on every render and is safe to use in JSX.
+  const [defaultSidebarWidth] = useState(() => parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10));
 
   // Restore channel from URL once channels are loaded
   useEffect(() => {
@@ -100,22 +104,30 @@ export function AppLayout() {
     }
   }, [selectedChannelId]);
 
-  const sidebarContent = (
-    <div className={styles.sidebarWrap}>
-      <GroupPanel />
-      <div className={styles.sidebarInner}>
-        <ChannelSidebar />
+  // Memoized: GroupPanel / ChannelSidebar receive no props from AppLayout,
+  // so this JSX only needs to change when the theme changes (styles).
+  const sidebarContent = useMemo(
+    () => (
+      <div className={styles.sidebarWrap}>
+        <GroupPanel />
+        <div className={styles.sidebarInner}>
+          <ChannelSidebar />
+        </div>
       </div>
-    </div>
+    ),
+    [styles],
   );
 
-  const emptyState = (
-    <div className={styles.emptyState}>
-      <span className={styles.emptyEmoji}>📡</span>
-      <Text type="secondary" className={styles.emptyText}>
-        {t('sidebar.select_channel')}
-      </Text>
-    </div>
+  const emptyState = useMemo(
+    () => (
+      <div className={styles.emptyState}>
+        <span className={styles.emptyEmoji}>📡</span>
+        <Text type="secondary" className={styles.emptyText}>
+          {t('sidebar.select_channel')}
+        </Text>
+      </div>
+    ),
+    [styles, t],
   );
 
   // Single return: NewsFeed is always at the same tree position (Splitter.Panel[1] → contentMain),
@@ -135,7 +147,12 @@ export function AppLayout() {
         title={null}
         closable={false}
       >
-        {sidebarContent}
+        {/* Only render when in-drawer mode: prevents double-mount when the user
+            resizes from mobile→desktop after opening the drawer at least once.
+            Ant Design keeps Drawer children alive after close (destroyOnClose=false
+            by default), so without this guard GroupPanel+ChannelSidebar would be
+            mounted in both the Drawer and the Splitter panel simultaneously. */}
+        {sidebarInDrawer && sidebarContent}
       </Drawer>
 
       <Splitter
@@ -147,7 +164,7 @@ export function AppLayout() {
       >
         {/* Sidebar panel: visible + resizable on desktop, collapsed to 0 on mobile */}
         <Splitter.Panel
-          defaultSize={parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10)}
+          defaultSize={defaultSidebarWidth}
           min={sidebarInDrawer ? 0 : 200}
           max={sidebarInDrawer ? 0 : 500}
           size={sidebarInDrawer ? 0 : undefined}

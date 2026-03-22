@@ -67,6 +67,8 @@ src/
       ru/translation.json   # Russian strings (fallback)
     styles.css        # Global reset only (10 lines) — all component styles live in createStyles
   shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter, DownloadTask)
+                      # NewsItem.albumMsgIds?: number[] — full album size from Telegram (set at fetch time,
+                      # persists even before images are downloaded; used to guard Space key in albums)
 ```
 
 ## DB Migration Pattern
@@ -383,7 +385,7 @@ function MyComponent() {
 - Keys are namespaced by section: `sidebar.*`, `channels.*`, `groups.*`, `news.*`, `filters.*`, `downloads.*`, `auth.*`, `header.*`, `common.*`
 - For `Modal.confirm` use `t()` for `title`, `content`, `okText`, `cancelText`
 - Interpolation: `t('channels.updated', { date })` → `"updated": "Updated: {{date}}"`
-ся- **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`. This includes button labels, tooltips, aria-labels, Modal strings, and `message.success()` toasts.
+- **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`. This includes button labels, tooltips, aria-labels, Modal strings, and `message.success()` toasts.
 
 ## News View Architecture
 
@@ -410,10 +412,12 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 
 **Known keyboard caveat**: `NewsDetail`'s `keydown` handler excludes `input / textarea / button / a` but NOT `video`. `useNewsHotkeys` intercepts `ArrowUp`/`ArrowDown` globally and calls `e.preventDefault()` — this blocks native video volume-control keys when the `<video>` element has focus. Arrow Left/Right (seek) are not blocked. If editing hotkey logic, add `tag === 'video'` to the exclusion check.
 
+**Hotkey listener phases**: `NewsDetail` registers its `keydown` listener with `{ capture: true }` so it always fires **before** `useNewsHotkeys` (which uses the default bubble phase). This is essential for `stopImmediatePropagation()` to work in the album Space-advance case — without capture, the parent's listener may be registered first and process the event before the child can stop it.
+
 **Component decomposition** (`src/client/components/News/`):
-- `NewsDetail` — state coordinator (queries, album index, top panel, hotkeys, handlers)
+- `NewsDetail` — state coordinator (queries, album index, top panel, hotkeys, handlers); requires `channelTelegramId: string` prop
 - `NewsDetailBody` — pure display: `NewsDetailMedia` + text body + link-select Modal
-- `NewsDetailToolbar` — header row; `variant='inline'` shows full title + clickable meta area
+- `NewsDetailToolbar` — header row; `variant='inline'` shows full title + clickable meta area; always renders the Open button using `openUrl` (= `firstLink ?? https://t.me/{channelTelegramId}/{msgId}`) + `isExternalLink` boolean for tooltip switch
 - `useHashTagSync(channelId)` — URL hash ↔ `hashTagFilter` sync
 - `useMobileBreakpoint(n)` — resize-reactive boolean
 - `useNewsHotkeys(items, selectedId, setId, onSpace)` — ↑↓Space keyboard nav

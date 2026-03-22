@@ -31,6 +31,7 @@ interface NewsAccordionListProps {
   hashTagFilter: string | null;
   activeFilterCount: number;
   channelType: ChannelType;
+  channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   onMarkedRead: (id: number) => void;
@@ -46,6 +47,7 @@ export function NewsAccordionList({
   hashTagFilter,
   activeFilterCount,
   channelType,
+  channelTelegramId,
   onSelect,
   onTagClick,
   onMarkedRead,
@@ -76,6 +78,7 @@ export function NewsAccordionList({
           isFiltered={filteredIds.has(item.id)}
           showAll={showAll}
           channelType={channelType}
+          channelTelegramId={channelTelegramId}
           onSelect={onSelect}
           onTagClick={onTagClick}
           onMarkedRead={onMarkedRead}

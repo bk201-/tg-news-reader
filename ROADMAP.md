@@ -41,6 +41,7 @@
 | ⬜ | 🟡 | Деплой в Azure (Container Apps + Turso) | Auth | ⭐⭐⭐ |
 | ⬜ | 🟡 | Fail detection после деплоя | Деплой | ⭐⭐ |
 | ⬜ | 🟢 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
+| ⬜ | 🟢 | Accessibility: фокус по Tab, ARIA-роли, a11y-аудит | — | ⭐⭐⭐ |
 
 ### ⬜ Отложено (низкий приоритет)
 
@@ -766,4 +767,57 @@ export async function sendAlert(msg: string) {
 - [x] Локализация (i18n): react-i18next + i18next-browser-languagedetector; **EN по умолчанию, RU как fallback**; переключатель языка в меню пользователя (🌐); файлы переводов в `src/client/locales/{en,ru}/translation.json`; Ant Design locale динамически переключается через `ConfigProvider`; SVG-флаги (FlagRU/FlagUS) вместо emoji
 - [x] Менеджер загрузок медиа (сервер): `downloads` таблица + фоновые воркеры (`startWorkerPool`); `enqueueTask(newsId, type, url?, priority)`; SSE-стрим прогресса (`GET /api/downloads/stream`); `DownloadsPanel` с закреплённым сайдбаром (`downloadsPanelPinned` в `uiStore`); приоритет 10 = пользовательский (без лимита размера), 0 = фоновый
 - [x] Аккордион-режим просмотра новостей: `newsViewMode: 'list' | 'accordion'` в `uiStore` (persisted); `NewsAccordionList` + `NewsAccordionItem`; `useMobileBreakpoint` → `effectiveViewMode`; на мобильных всегда аккордион
-- [x] Адаптивный layout: `Grid.useBreakpoint()` из AntD вместо кастомного хука; `src/client/hooks/breakpoints.ts` с константами BP_SM/MD/LG/XL/XXL; `<Splitter>` только на xxl (≥1600px); сайдбар в `<Drawer>` ниже xxl; `sidebarDrawerOpen` в `uiStore`; `DownloadsPanel` pinned только на xxl
+- [x] Адаптивный layout: `useMatchMedia` из `src/client/hooks/breakpoints.ts` (только нужный брейкпоинт, без лишних ре-рендеров); константы BP_SM/MD/LG/XL/XXL; `<Splitter>` только на xxl (≥1600px); сайдбар в `<Drawer>` ниже xxl; `sidebarDrawerOpen` в `uiStore`; `DownloadsPanel` pinned только на xxl
+
+---
+
+## 16. Accessibility (a11y) ⬜
+
+### Цель
+
+Сделать приложение пригодным для клавиатурной навигации и скрин-ридеров. Это личное приложение, но правильная структура ARIA и фокус-менеджмент ускоряют работу даже без скрин-ридера.
+
+### Что нужно сделать
+
+#### 16.1 Фокус и Tab-навигация
+
+- [ ] **Логичный порядок Tab** во всём приложении: `AppHeader` → `GroupPanel` → `ChannelSidebar` → `NewsFeed`
+- [ ] **Фокус при открытии Drawer** (мобильный сайдбар): переводить фокус внутрь `<Drawer>` при открытии, возвращать обратно при закрытии (`autoFocus` / `afterOpenChange`)
+- [ ] **Фокус при выборе новости** (list-режим): при нажатии Enter/клике на элемент в `NewsFeedList` — перевести фокус в `NewsDetail`
+- [ ] **Ловушка фокуса в модалках** (`Modal`, `Drawer`) — Ant Design делает это сам, убедиться что не переопределяется
+- [ ] **`NewsDetailToolbar`**: все кнопки уже в DOM, Tab должен их обходить без пробелов — проверить
+- [ ] **Карусель альбома** (`NewsDetailMedia`): кнопки Prev/Next и изображение — добавить `tabIndex`, `aria-label` уже есть
+- [ ] **Skip-link**: `<a href="#main-content">Перейти к контенту</a>` скрытый до фокуса (`:focus-visible`)
+
+#### 16.2 ARIA-роли и атрибуты
+
+- [ ] **`ChannelSidebar`** (`ChannelItem`): `role="listbox"` / `role="option"`, `aria-selected={isSelected}`
+- [ ] **`GroupPanel`** (`GroupItem`): `role="listbox"` / `role="option"`, `aria-selected`
+- [ ] **`NewsFeedList`**: `role="listbox"`, каждый `NewsListItem` — `role="option"`, `aria-selected`
+- [ ] **`NewsAccordionList`**: `role="list"`, каждый `NewsAccordionItem` — `role="listitem"`, `aria-expanded={isSelected}`
+- [ ] **`NewsDetailToolbar`**: `aria-label` у кнопок без текста (иконки в collapsed-режиме); кнопка "Mark read/unread" — `aria-pressed={isRead}`
+- [ ] **`DownloadsPanel`**: `role="status"` / `aria-live="polite"` для счётчика задач
+- [ ] **Изображения**: `<img alt>` в `NewsDetailMedia` уже заполнен через `t('news.detail.photo_alt')` — проверить остальные `<img>` (без alt)
+
+#### 16.3 Focus-visible стили
+
+- [ ] Убедиться что AntD `ConfigProvider` не сбрасывает `:focus-visible` outline (проверить в light и dark темах)
+- [ ] В `createStyles`: для интерактивных элементов добавить явный `&:focus-visible { outline: 2px solid ${token.colorPrimary}; }` там, где AntD его убирает
+
+#### 16.4 Клавиатурный эквивалент для кликов
+
+- [ ] `NewsListItem` (клик → выбор): уже есть `onClick` на `div` — добавить `onKeyDown` для Enter/Space
+- [ ] `ChannelItem` / `GroupItem`: проверить, есть ли `onKeyDown` для Enter (добавить где нет)
+- [ ] Кликабельная шапка в `NewsDetail` inline-варианте (`toolbarMeta`) — уже есть `onKeyDown` ✅
+
+#### 16.5 Аудит
+
+- [ ] Прогнать **Lighthouse → Accessibility** в Chrome DevTools
+- [ ] Прогнать **axe DevTools** (расширение) на главной странице
+- [ ] Целевой балл Lighthouse: ≥ 90
+
+### Технические заметки
+
+- AntD 6 поставляет `role`, `aria-label` для своих компонентов (`Button`, `Modal`, `Drawer`, `Input`) — не дублировать, только дополнять
+- `createStyles` + `token` для всех focus-стилей, никаких hardcoded цветов
+- `useTranslation` для всех `aria-label` — добавлять ключи в `common.aria.*`

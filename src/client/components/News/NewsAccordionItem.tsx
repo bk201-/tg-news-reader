@@ -26,6 +26,7 @@ interface NewsAccordionItemProps {
   isFiltered: boolean;
   showAll: boolean;
   channelType: ChannelType;
+  channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   onMarkedRead: (id: number) => void;
@@ -37,6 +38,7 @@ export function NewsAccordionItem({
   isFiltered,
   showAll,
   channelType,
+  channelTelegramId,
   onSelect,
   onTagClick,
   onMarkedRead,
@@ -57,6 +59,7 @@ export function NewsAccordionItem({
           key={item.id}
           item={item}
           channelType={channelType}
+          channelTelegramId={channelTelegramId}
           onMarkedRead={onMarkedRead}
           variant="inline"
           onHeaderClick={() => onSelect(null)}

@@ -41,12 +41,21 @@ const useStyles = createStyles(({ css, token }) => ({
 interface NewsDetailProps {
   item: NewsItem;
   channelType: ChannelType;
+  /** Telegram channel username — used to build a fallback t.me deep-link when the post has no links */
+  channelTelegramId: string;
   onMarkedRead?: (id: number) => void;
   variant?: 'panel' | 'inline';
   onHeaderClick?: () => void;
 }
 
-export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel', onHeaderClick }: NewsDetailProps) {
+export function NewsDetail({
+  item,
+  channelType,
+  channelTelegramId,
+  onMarkedRead,
+  variant = 'panel',
+  onHeaderClick,
+}: NewsDetailProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
@@ -67,9 +76,17 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
   const links = item.links || [];
   const isRead = item.isRead === 1;
   const firstLink = links[0];
+  // openUrl: prefer the post's first link; fall back to the channel's Telegram message permalink
+  const openUrl = firstLink ?? `https://t.me/${channelTelegramId}/${item.telegramMsgId}`;
+  const isExternalLink = !!firstLink;
   const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
-  const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
+  // albumLength: how many images are already downloaded (can be less than expected)
   const albumLength = item.localMediaPaths?.length ?? 0;
+  // albumExpectedLength: total images in the album per Telegram (known even before download completes)
+  const albumExpectedLength = item.albumMsgIds?.length ?? albumLength;
+  // isAlbum controls the carousel UI — only active when ≥2 images are actually downloaded.
+  // albumExpectedLength is used separately for Space-key blocking (see hotkey handler below).
+  const isAlbum = albumLength > 1;
   const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
   const articleLoading = extractContent.isPending || articleTask?.status === 'processing';
   const articleQueued = articleTask?.status === 'pending';
@@ -77,6 +94,11 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
   const mediaQueued = mediaTask?.status === 'pending';
 
   // ── Hotkeys ──────────────────────────────────────────────────────────
+  // Registered in the CAPTURE phase so this handler always fires before
+  // useNewsHotkeys (which listens in the default bubble phase). Without capture,
+  // both listeners sit on `window` and fire in registration order — useNewsHotkeys
+  // (from the parent NewsFeed) may be registered first, meaning stopImmediatePropagation()
+  // called here would be too late to stop it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -128,10 +150,8 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
           break;
         }
         case 'Enter':
-          if (firstLink) {
-            e.preventDefault();
-            window.open(firstLink, '_blank', 'noopener,noreferrer');
-          }
+          e.preventDefault();
+          window.open(openUrl, '_blank', 'noopener,noreferrer');
           break;
         case 'Escape':
           if (topPanel) {
@@ -154,16 +174,20 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
           }
           break;
         case ' ':
-          if (isAlbum && albumIndex < albumLength - 1) {
+          // Block Space → mark-as-read while there are more album images to view.
+          // Gated on albumExpectedLength (not isAlbum) so it works even when only
+          // 0–1 images are downloaded but the album is known to have more.
+          if (albumExpectedLength > 1 && albumIndex < albumExpectedLength - 1) {
             e.preventDefault();
             e.stopImmediatePropagation();
-            setAlbumIndex((i) => i + 1);
+            // Navigate only within already-downloaded images
+            if (albumIndex < albumLength - 1) setAlbumIndex((i) => i + 1);
           }
           break;
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [
     links,
     item.text,
@@ -171,7 +195,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
     item.channelId,
     item.id,
     channelType,
-    firstLink,
+    openUrl,
     topPanel,
     articleQueued,
     qc,
@@ -180,6 +204,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
     isAlbum,
     albumIndex,
     albumLength,
+    albumExpectedLength,
   ]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
@@ -224,7 +249,8 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
           onMarkRead={handleMarkRead}
           markReadPending={markRead.isPending}
           onRefresh={handleRefresh}
-          firstLink={firstLink}
+          openUrl={openUrl}
+          isExternalLink={isExternalLink}
           variant={variant}
           title={variant === 'inline' ? getNewsTitle(item) : undefined}
           onHeaderClick={onHeaderClick}
@@ -244,6 +270,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
         isVideo={isVideo}
         albumIndex={albumIndex}
         albumLength={albumLength}
+        albumExpectedLength={albumExpectedLength}
         onAlbumNav={(delta) => setAlbumIndex((i) => Math.max(0, Math.min(albumLength - 1, i + delta)))}
         mediaLoading={mediaLoading}
         mediaQueued={mediaQueued}

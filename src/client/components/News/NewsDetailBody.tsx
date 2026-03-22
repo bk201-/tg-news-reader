@@ -75,6 +75,7 @@ interface NewsDetailBodyProps {
   isVideo: boolean;
   albumIndex: number;
   albumLength: number;
+  albumExpectedLength: number;
   onAlbumNav: (delta: -1 | 1) => void;
   mediaLoading: boolean;
   mediaQueued: boolean;
@@ -103,6 +104,7 @@ export function NewsDetailBody({
   isVideo,
   albumIndex,
   albumLength,
+  albumExpectedLength,
   onAlbumNav,
   mediaLoading,
   mediaQueued,
@@ -133,6 +135,8 @@ export function NewsDetailBody({
           isAlbum={isAlbum}
           isVideo={isVideo}
           albumIndex={albumIndex}
+          albumLength={albumLength}
+          albumExpectedLength={albumExpectedLength}
           onAlbumNav={onAlbumNav}
           mediaLoading={mediaLoading}
           mediaQueued={mediaQueued}

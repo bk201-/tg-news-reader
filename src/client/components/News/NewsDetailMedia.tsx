@@ -117,6 +117,8 @@ interface NewsDetailMediaProps {
   isAlbum: boolean;
   isVideo: boolean;
   albumIndex: number;
+  albumLength: number; // downloaded images count (navigation limit)
+  albumExpectedLength: number; // expected total from albumMsgIds (counter + Space-hint)
   onAlbumNav: (delta: -1 | 1) => void;
   mediaLoading: boolean;
   mediaQueued: boolean;
@@ -131,6 +133,8 @@ export function NewsDetailMedia({
   isAlbum,
   isVideo,
   albumIndex,
+  albumLength,
+  albumExpectedLength,
   onAlbumNav,
   mediaLoading,
   mediaQueued,
@@ -143,7 +147,6 @@ export function NewsDetailMedia({
 
   if (isAlbum) {
     const paths = item.localMediaPaths!;
-    const albumLength = paths.length;
     return (
       <div className={cx(styles.media, styles.mediaAlbum)}>
         <div className={styles.carousel}>
@@ -157,7 +160,7 @@ export function NewsDetailMedia({
           </button>
           <img
             src={mediaUrl(paths[albumIndex])}
-            alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumLength })}
+            alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
             className={styles.mediaFile}
           />
           <button
@@ -170,10 +173,13 @@ export function NewsDetailMedia({
           </button>
         </div>
         <div className={styles.counter}>
+          {/* Show expected total so the user sees e.g. "2 / 10" even when only 2 are downloaded */}
           <span>
-            {albumIndex + 1} / {albumLength}
+            {albumIndex + 1} / {albumExpectedLength}
           </span>
-          {albumIndex === albumLength - 1 && <span className={styles.counterHint}>{t('news.detail.space_hint')}</span>}
+          {albumIndex === albumExpectedLength - 1 && (
+            <span className={styles.counterHint}>{t('news.detail.space_hint')}</span>
+          )}
         </div>
       </div>
     );

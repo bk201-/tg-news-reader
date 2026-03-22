@@ -56,6 +56,7 @@ export interface NewsItem {
   fullContent?: string;
   localMediaPath?: string;
   localMediaPaths?: string[]; // album: all downloaded paths (JSON-decoded)
+  albumMsgIds?: number[]; // album: full list of Telegram msg IDs — length = expected total, even before download
   mediaSize?: number;
 }
 

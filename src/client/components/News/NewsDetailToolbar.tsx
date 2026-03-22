@@ -76,7 +76,10 @@ interface NewsDetailToolbarProps {
   onMarkRead: () => void;
   markReadPending: boolean;
   onRefresh: () => void;
-  firstLink?: string;
+  /** URL to open when the Open button is clicked (firstLink if available, otherwise Telegram deep-link) */
+  openUrl: string;
+  /** true when openUrl is an external link from the post (false = Telegram fallback) */
+  isExternalLink: boolean;
   /** 'panel' = classic date+tags header; 'inline' = accordion with title+date+tags */
   variant?: 'panel' | 'inline';
   /** Title text shown in inline variant */
@@ -98,7 +101,8 @@ export function NewsDetailToolbar({
   onMarkRead,
   markReadPending,
   onRefresh,
-  firstLink,
+  openUrl,
+  isExternalLink,
   variant = 'panel',
   title,
   onHeaderClick,
@@ -191,13 +195,11 @@ export function NewsDetailToolbar({
           </Tooltip>
         )}
 
-        {firstLink && (
-          <Tooltip title={t('news.detail.open_tooltip')}>
-            <Button icon={<ExportOutlined />} size="small" href={firstLink} target="_blank" rel="noreferrer">
-              <span className={styles.ndBtnText}>{t('news.detail.open')}</span>
-            </Button>
-          </Tooltip>
-        )}
+        <Tooltip title={isExternalLink ? t('news.detail.open_tooltip') : t('news.detail.open_tg_tooltip')}>
+          <Button icon={<ExportOutlined />} size="small" href={openUrl} target="_blank" rel="noreferrer">
+            <span className={styles.ndBtnText}>{t('news.detail.open')}</span>
+          </Button>
+        </Tooltip>
         <Button
           icon={<CheckOutlined />}
           size="small"

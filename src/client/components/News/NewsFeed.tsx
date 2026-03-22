@@ -240,6 +240,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             hashTagFilter={hashTagFilter}
             activeFilterCount={activeFilterCount}
             channelType={channel.channelType}
+            channelTelegramId={channel.telegramId}
             onSelect={setSelectedNewsId}
             onTagClick={handleTagClick}
             onMarkedRead={handleMarkedRead}
@@ -265,6 +266,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
                   key={selectedItem.id}
                   item={selectedItem}
                   channelType={channel.channelType}
+                  channelTelegramId={channel.telegramId}
                   onMarkedRead={handleMarkedRead}
                 />
               ) : (
