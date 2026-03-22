@@ -27,6 +27,7 @@
     "@mozilla/readability": "^0.6.0",
     "@tanstack/react-query": "^5.80.0",
     "antd": "^6.3.0",
+    "antd-style": "^4.1.0",
     "axios": "^1.9.0",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.13",

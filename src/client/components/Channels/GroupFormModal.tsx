@@ -1,9 +1,38 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input } from 'antd';
 import { UnlockOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { FormInstance } from 'antd';
 import type { Group } from '@shared/types.ts';
+
+const useStyles = createStyles(({ css }) => ({
+  form: css`
+    margin-top: 16px;
+  `,
+  colorPicker: css`
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  `,
+  colorDot: css`
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  `,
+  pinInput: css`
+    letter-spacing: 0.3em;
+  `,
+  removePinLabel: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    cursor: pointer;
+  `,
+}));
 
 export const PRESET_COLORS = [
   '#1677ff', // blue (default)
@@ -47,6 +76,7 @@ export function GroupFormModal({
   onSave,
 }: GroupFormModalProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   const [colorBorder, setColorBorder] = useState(selectedColor);
 
   // keep local highlight in sync when modal reopens
@@ -68,7 +98,7 @@ export function GroupFormModal({
         if (visible) setColorBorder(selectedColor);
       }}
     >
-      <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+      <Form form={form} layout="vertical" className={styles.form}>
         <Form.Item
           name="name"
           label={t('groups.form.name_label')}
@@ -78,20 +108,16 @@ export function GroupFormModal({
         </Form.Item>
 
         <Form.Item label={t('groups.form.color_label')}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className={styles.colorPicker}>
             {PRESET_COLORS.map((c) => (
               <div
                 key={c}
+                className={styles.colorDot}
                 onClick={() => handleColorClick(c)}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
                   background: c,
-                  cursor: 'pointer',
                   border: colorBorder === c ? `3px solid rgba(0,0,0,0.35)` : '3px solid transparent',
                   boxShadow: colorBorder === c ? `0 0 0 2px ${c}` : 'none',
-                  transition: 'all 0.15s',
                 }}
               />
             ))}
@@ -108,13 +134,13 @@ export function GroupFormModal({
             maxLength={4}
             autoComplete="new-password"
             inputMode="numeric"
-            style={{ letterSpacing: '0.3em' }}
+            className={styles.pinInput}
           />
         </Form.Item>
 
         {editingGroup?.hasPIN && (
           <Form.Item name="removePin" valuePropName="checked">
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+            <label className={styles.removePinLabel}>
               <input type="checkbox" onChange={(e) => form.setFieldValue('removePin', e.target.checked)} />
               <UnlockOutlined />
               {t('groups.form.remove_pin')}

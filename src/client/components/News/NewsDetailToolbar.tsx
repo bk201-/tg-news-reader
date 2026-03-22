@@ -9,10 +9,59 @@ import {
   ExportOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
+
+const useStyles = createStyles(({ css, token }) => ({
+  headerTop: css`
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+  `,
+  toolbarMeta: css`
+    flex: 1;
+    min-width: min(380px, 100%);
+    cursor: pointer;
+    user-select: none;
+    padding-right: 12px;
+    &:hover {
+      opacity: 0.8;
+    }
+  `,
+  toolbarTitle: css`
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: break-word;
+    margin-bottom: 4px;
+    color: ${token.colorText};
+  `,
+  dateLine: css`
+    font-size: 12px;
+    color: ${token.colorTextSecondary};
+  `,
+  tags: css`
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  `,
+  tag: css`
+    margin-right: 0;
+  `,
+  /* Hides button text labels when the detail header gets narrow (container set on header in NewsDetail) */
+  ndBtnText: css`
+    @container (max-width: 540px) {
+      display: none;
+    }
+  `,
+}));
 
 interface NewsDetailToolbarProps {
   item: NewsItem;
@@ -55,19 +104,18 @@ export function NewsDetailToolbar({
   onHeaderClick,
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   const hashtags = item.hashtags || [];
   const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
   const isInline = variant === 'inline';
 
   const metaContent = (
     <>
-      <span style={{ fontSize: 12, color: 'var(--tgr-color-text-secondary, #666)' }}>
-        {dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}
-      </span>
+      <span className={styles.dateLine}>{dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}</span>
       {hashtags.length > 0 && (
-        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div className={styles.tags}>
           {hashtags.map((tag) => (
-            <Tag key={tag} color="blue" style={{ marginRight: 0 }}>
+            <Tag key={tag} color="blue" className={styles.tag}>
               {tag}
             </Tag>
           ))}
@@ -77,16 +125,16 @@ export function NewsDetailToolbar({
   );
 
   return (
-    <div className="news-detail__header-top">
+    <div className={styles.headerTop}>
       {isInline ? (
         <div
-          className="news-detail__toolbar-meta"
+          className={styles.toolbarMeta}
           onClick={onHeaderClick}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onHeaderClick?.()}
         >
-          {title && <div className="news-detail__toolbar-title">{title}</div>}
+          {title && <div className={styles.toolbarTitle}>{title}</div>}
           {metaContent}
         </div>
       ) : (
@@ -96,7 +144,7 @@ export function NewsDetailToolbar({
       <Space wrap size={4} onClick={isInline ? (e: React.MouseEvent) => e.stopPropagation() : undefined}>
         <Tooltip title={t('news.detail.refresh_tooltip')}>
           <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh}>
-            <span className="nd-btn-text">{t('news.detail.refresh')}</span>
+            <span className={styles.ndBtnText}>{t('news.detail.refresh')}</span>
           </Button>
         </Tooltip>
 
@@ -108,7 +156,7 @@ export function NewsDetailToolbar({
               type={topPanel === 'links' ? 'primary' : 'default'}
               onClick={() => onTogglePanel('links')}
             >
-              <span className="nd-btn-text">
+              <span className={styles.ndBtnText}>
                 {links.length > 1 ? t('news.detail.links_count', { count: links.length }) : t('news.detail.links')}
               </span>
             </Button>
@@ -122,7 +170,7 @@ export function NewsDetailToolbar({
               type={topPanel === 'text' ? 'primary' : 'default'}
               onClick={() => onTogglePanel('text')}
             >
-              <span className="nd-btn-text">{t('news.detail.text')}</span>
+              <span className={styles.ndBtnText}>{t('news.detail.text')}</span>
             </Button>
           </Tooltip>
         )}
@@ -136,7 +184,7 @@ export function NewsDetailToolbar({
               loading={articleLoading}
               disabled={articleQueued}
             >
-              <span className="nd-btn-text">
+              <span className={styles.ndBtnText}>
                 {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
               </span>
             </Button>
@@ -146,7 +194,7 @@ export function NewsDetailToolbar({
         {firstLink && (
           <Tooltip title={t('news.detail.open_tooltip')}>
             <Button icon={<ExportOutlined />} size="small" href={firstLink} target="_blank" rel="noreferrer">
-              <span className="nd-btn-text">{t('news.detail.open')}</span>
+              <span className={styles.ndBtnText}>{t('news.detail.open')}</span>
             </Button>
           </Tooltip>
         )}
@@ -157,7 +205,7 @@ export function NewsDetailToolbar({
           onClick={onMarkRead}
           loading={markReadPending}
         >
-          <span className="nd-btn-text">{isRead ? t('news.detail.mark_unread') : t('news.detail.mark_read')}</span>
+          <span className={styles.ndBtnText}>{isRead ? t('news.detail.mark_unread') : t('news.detail.mark_read')}</span>
         </Button>
       </Space>
     </div>

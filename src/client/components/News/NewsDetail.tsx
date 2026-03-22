@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { App } from 'antd';
+import { createStyles } from 'antd-style';
+import { useTranslation } from 'react-i18next';
 import type { NewsItem, ChannelType } from '../../../shared/types';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
 import { useNewsDownloadTask } from '../../api/downloads';
@@ -8,6 +10,33 @@ import { isYouTubeUrl, getNewsTitle } from './newsUtils';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailBody } from './NewsDetailBody';
+
+const useStyles = createStyles(({ css, token }) => ({
+  detail: css`
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  `,
+  detailInline: css`
+    height: auto;
+    overflow: visible;
+  `,
+  header: css`
+    flex-shrink: 0;
+    background: ${token.colorBgLayout};
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    container-type: inline-size;
+  `,
+  headerInline: css`
+    position: static;
+    background: ${token.colorBgContainer};
+  `,
+}));
 
 interface NewsDetailProps {
   item: NewsItem;
@@ -19,6 +48,8 @@ interface NewsDetailProps {
 
 export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel', onHeaderClick }: NewsDetailProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+  const { styles, cx } = useStyles();
   const qc = useQueryClient();
   const markRead = useMarkRead();
   const extractContent = useExtractContent();
@@ -87,7 +118,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
             if (nonYt.length === 1)
               extractContent.mutate(
                 { newsId: item.id, url: nonYt[0] },
-                { onSuccess: () => void message.success('Статья поставлена в очередь загрузки') },
+                { onSuccess: () => void message.success(t('news.detail.article_queued_toast')) },
               );
             else {
               setSelectedUrl(nonYt[0]);
@@ -165,7 +196,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
   const handleExtract = (url: string) =>
     extractContent.mutate(
       { newsId: item.id, url },
-      { onSuccess: () => void message.success('Статья поставлена в очередь загрузки') },
+      { onSuccess: () => void message.success(t('news.detail.article_queued_toast')) },
     );
   const handleExtractClick = () => {
     const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
@@ -178,8 +209,8 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
   };
 
   return (
-    <div className={`news-detail${variant === 'inline' ? ' news-detail--inline' : ''}`}>
-      <div className="news-detail__header">
+    <div className={cx(styles.detail, variant === 'inline' && styles.detailInline)}>
+      <div className={cx(styles.header, variant === 'inline' && styles.headerInline)}>
         <NewsDetailToolbar
           item={item}
           channelType={channelType}
@@ -220,7 +251,7 @@ export function NewsDetail({ item, channelType, onMarkedRead, variant = 'panel',
         mediaTaskError={mediaTask?.error ?? undefined}
         onDownload={() =>
           downloadMedia.mutate(item.id, {
-            onSuccess: () => void message.success('Медиа поставлено в очередь загрузки'),
+            onSuccess: () => void message.success(t('news.detail.media_queued_toast')),
           })
         }
         articleLoading={articleLoading}

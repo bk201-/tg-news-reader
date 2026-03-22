@@ -1,20 +1,82 @@
 import React, { useEffect, useRef } from 'react';
-import { Layout, Typography, theme, Splitter, Drawer, Grid } from 'antd';
+import { Layout, Typography, Splitter, Drawer, Grid } from 'antd';
+import { createStyles } from 'antd-style';
+import { useTranslation } from 'react-i18next';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
 import { GroupPanel } from '../Channels/GroupPanel';
 import { NewsFeed } from '../News/NewsFeed';
 import { DownloadsPinnedContent } from './DownloadsPinnedContent';
 import { AppHeader } from './AppHeader';
 import { useUIStore } from '../../store/uiStore';
-
 import { useChannels } from '../../api/channels';
+
+const { Text } = Typography;
+
+const useStyles = createStyles(({ css, token }) => ({
+  sidebarWrap: css`
+    display: flex;
+    height: 100%;
+  `,
+  sidebarInner: css`
+    flex: 1;
+    min-width: 0;
+    border-left: 1px solid ${token.colorBorderSecondary};
+    overflow: hidden;
+  `,
+  emptyState: css`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    flex-direction: column;
+    gap: 16px;
+  `,
+  emptyEmoji: css`
+    font-size: 64px;
+  `,
+  emptyText: css`
+    font-size: 16px;
+  `,
+  mobileContent: css`
+    height: calc(100vh - 64px);
+    overflow: hidden;
+    display: flex;
+    background: ${token.colorBgLayout};
+  `,
+  splitter: css`
+    height: calc(100vh - 64px);
+  `,
+  sidebarPanel: css`
+    background: ${token.colorBgContainer};
+    border-right: 1px solid ${token.colorBorderSecondary};
+    overflow: hidden;
+  `,
+  contentPanel: css`
+    background: ${token.colorBgLayout};
+    overflow: hidden;
+  `,
+  contentFlex: css`
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+  `,
+  contentMain: css`
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  `,
+  layout: css`
+    min-height: 100vh;
+  `,
+}));
 
 export function AppLayout() {
   const { selectedChannelId, setSelectedChannelId, downloadsPanelPinned, sidebarDrawerOpen, setSidebarDrawerOpen } =
     useUIStore();
   const { data: channels = [] } = useChannels();
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
-  const { token } = theme.useToken();
+  const { t } = useTranslation();
+  const { styles } = useStyles();
   const initialized = useRef(false);
   const screens = Grid.useBreakpoint();
 
@@ -41,35 +103,26 @@ export function AppLayout() {
   }, [selectedChannelId]);
 
   const sidebarContent = (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div className={styles.sidebarWrap}>
       <GroupPanel />
-      <div style={{ flex: 1, minWidth: 0, borderLeft: `1px solid ${token.colorBorderSecondary}`, overflow: 'hidden' }}>
+      <div className={styles.sidebarInner}>
         <ChannelSidebar />
       </div>
     </div>
   );
 
   const emptyState = (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        flexDirection: 'column',
-        gap: 16,
-      }}
-    >
-      <span style={{ fontSize: 64 }}>📡</span>
-      <Text type="secondary" style={{ fontSize: 16 }}>
-        Выберите канал из списка слева
+    <div className={styles.emptyState}>
+      <span className={styles.emptyEmoji}>📡</span>
+      <Text type="secondary" className={styles.emptyText}>
+        {t('sidebar.select_channel')}
       </Text>
     </div>
   );
 
   if (sidebarInDrawer) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout className={styles.layout}>
         <AppHeader />
         <Drawer
           open={sidebarDrawerOpen}
@@ -82,14 +135,7 @@ export function AppLayout() {
         >
           {sidebarContent}
         </Drawer>
-        <Layout.Content
-          style={{
-            height: 'calc(100vh - 64px)',
-            overflow: 'hidden',
-            display: 'flex',
-            background: token.colorBgLayout,
-          }}
-        >
+        <Layout.Content className={styles.mobileContent}>
           {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
         </Layout.Content>
       </Layout>
@@ -97,29 +143,25 @@ export function AppLayout() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className={styles.layout}>
       <AppHeader />
 
       <Splitter
-        style={{ height: 'calc(100vh - 64px)' }}
+        className={styles.splitter}
         onResizeEnd={(sizes) => localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])))}
       >
         <Splitter.Panel
           defaultSize={parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10)}
           min={200}
           max={500}
-          style={{
-            background: token.colorBgContainer,
-            borderRight: `1px solid ${token.colorBorderSecondary}`,
-            overflow: 'hidden',
-          }}
+          className={styles.sidebarPanel}
         >
           {sidebarContent}
         </Splitter.Panel>
 
-        <Splitter.Panel style={{ background: token.colorBgLayout, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <Splitter.Panel className={styles.contentPanel}>
+          <div className={styles.contentFlex}>
+            <div className={styles.contentMain}>
               {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
             </div>
             {downloadsPanelPinned && <DownloadsPinnedContent />}

@@ -1,8 +1,28 @@
 import React from 'react';
 import { Spin, Empty } from 'antd';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsListItem } from './NewsListItem';
+
+const useStyles = createStyles(({ css, token }) => ({
+  list: css`
+    width: 380px;
+    min-width: 280px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    background: ${token.colorBgContainer};
+    border-right: 1px solid ${token.colorBorderSecondary};
+  `,
+  loadingWrap: css`
+    display: flex;
+    justify-content: center;
+    padding: 32px;
+  `,
+  empty: css`
+    margin-top: 48px;
+  `,
+}));
 
 interface NewsFeedListProps {
   isLoading: boolean;
@@ -30,6 +50,7 @@ export function NewsFeedList({
   listRef,
 }: NewsFeedListProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
@@ -37,13 +58,13 @@ export function NewsFeedList({
       : t('news.list.empty');
 
   return (
-    <div className="news-feed__list" ref={listRef}>
+    <div className={styles.list} ref={listRef}>
       {isLoading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+        <div className={styles.loadingWrap}>
           <Spin size="large" />
         </div>
       )}
-      {!isLoading && items.length === 0 && <Empty description={emptyDescription} style={{ marginTop: 48 }} />}
+      {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {items.map((item) => (
         <NewsListItem
           key={item.id}

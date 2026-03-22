@@ -1,18 +1,46 @@
 import React, { useState } from 'react';
-import { Button, Modal, Form, Tooltip, Typography, theme } from 'antd';
+import { Button, Modal, Form, Tooltip, Typography } from 'antd';
 import { FolderFilled, PlusOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
 import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useVerifyGroupPIN } from '../../api/groups';
 import { useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
-import { GroupItem } from './GroupItem';
+import { GroupItem, useGroupItemStyles } from './GroupItem';
 import { GroupFormModal, PRESET_COLORS } from './GroupFormModal';
 import type { GroupFormValues } from './GroupFormModal';
 import { GroupPinModal } from './GroupPinModal';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css, token }) => ({
+  panel: css`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 72px;
+    flex-shrink: 0;
+    padding: 8px 0;
+    overflow-y: auto;
+    gap: 4px;
+  `,
+  addBtn: css`
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    margin-top: 4px;
+    flex-shrink: 0;
+  `,
+  generalIcon: css`
+    font-size: 22px;
+    color: ${token.colorTextSecondary};
+  `,
+  generalLabel: css`
+    color: ${token.colorTextSecondary};
+  `,
+}));
 
 export function GroupPanel() {
   const { data: groups = [] } = useGroups();
@@ -24,8 +52,9 @@ export function GroupPanel() {
 
   const { selectedGroupId, setSelectedGroupId, pendingCounts } = useUIStore();
   const { unlockedGroupIds } = useAuthStore();
-  const { token } = theme.useToken();
   const { t } = useTranslation();
+  const { styles, cx } = useStyles();
+  const { styles: itemStyles } = useGroupItemStyles();
 
   // ── Form modal state ──────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
@@ -131,33 +160,18 @@ export function GroupPanel() {
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div className="group-panel">
+    <div className={styles.panel}>
       {/* "Общее" — always first */}
       <Tooltip title={t('groups.general_tooltip')} placement="right">
         <div
-          className={`group-item${selectedGroupId === null ? ' group-item--active' : ''}`}
-          style={{ '--group-color': token.colorTextSecondary } as React.CSSProperties}
+          className={cx(itemStyles.item, selectedGroupId === null && itemStyles.itemActive)}
           onClick={() => setSelectedGroupId(null)}
         >
-          <div className="group-item__icon-wrap">
-            <FolderFilled style={{ fontSize: 22, color: token.colorTextSecondary }} />
-            {generalCount > 0 && (
-              <span className="group-item__badge" style={{ background: token.colorPrimary }}>
-                {generalCount > 99 ? '99+' : generalCount}
-              </span>
-            )}
+          <div className={itemStyles.iconWrap}>
+            <FolderFilled className={styles.generalIcon} />
+            {generalCount > 0 && <span className={itemStyles.badge}>{generalCount > 99 ? '99+' : generalCount}</span>}
           </div>
-          <Text
-            className="group-item__label"
-            style={{
-              fontSize: 10,
-              textAlign: 'center',
-              lineHeight: 1.2,
-              marginTop: 2,
-              color: token.colorTextSecondary,
-            }}
-            ellipsis
-          >
+          <Text className={cx(itemStyles.label, styles.generalLabel)} ellipsis>
             {t('groups.general')}
           </Text>
         </div>
@@ -179,13 +193,7 @@ export function GroupPanel() {
 
       {/* Add group button */}
       <Tooltip title={t('groups.new_group_tooltip')} placement="right">
-        <Button
-          type="dashed"
-          icon={<PlusOutlined />}
-          className="group-panel__add-btn"
-          onClick={openCreate}
-          size="small"
-        />
+        <Button type="dashed" icon={<PlusOutlined />} className={styles.addBtn} onClick={openCreate} size="small" />
       </Tooltip>
 
       <GroupFormModal

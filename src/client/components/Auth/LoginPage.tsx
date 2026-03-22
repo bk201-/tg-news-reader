@@ -1,11 +1,48 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Typography, Card, Alert, Space } from 'antd';
 import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import type { AuthUser } from '../../store/authStore';
 
 const { Title, Text } = Typography;
+
+const useStyles = createStyles(({ css }) => ({
+  page: css`
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  `,
+  card: css`
+    width: 100%;
+    max-width: 400px;
+  `,
+  spaceVertical: css`
+    width: 100%;
+  `,
+  cardHeader: css`
+    text-align: center;
+  `,
+  emoji: css`
+    font-size: 40px;
+  `,
+  title: css`
+    margin: 8px 0 4px;
+  `,
+  passwordField: css`
+    margin-bottom: 24px;
+  `,
+  submitField: css`
+    margin-bottom: 0;
+  `,
+  totpActions: css`
+    width: 100%;
+    justify-content: space-between;
+  `,
+}));
 
 interface LoginFormValues {
   email: string;
@@ -14,6 +51,7 @@ interface LoginFormValues {
 
 export function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const { styles } = useStyles();
   const [step, setStep] = useState<'credentials' | 'totp'>('credentials');
   const [totpCode, setTotpCode] = useState('');
   const [pending, setPending] = useState<{ email: string; password: string } | null>(null);
@@ -67,26 +105,18 @@ export function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <Card style={{ width: '100%', maxWidth: 400 }} variant="outlined">
-        <Space direction="vertical" style={{ width: '100%' }} size={24}>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: 40 }}>📰</span>
-            <Title level={3} style={{ margin: '8px 0 4px' }}>
+    <div className={styles.page}>
+      <Card className={styles.card} variant="outlined">
+        <Space vertical className={styles.spaceVertical} size={24}>
+          <div className={styles.cardHeader}>
+            <span className={styles.emoji}>📰</span>
+            <Title level={3} className={styles.title}>
               TG News Reader
             </Title>
             <Text type="secondary">{step === 'credentials' ? t('auth.sign_in') : t('auth.two_fa')}</Text>
           </div>
 
-          {error && <Alert type="error" message={error} showIcon />}
+          {error && <Alert type="error" title={error} showIcon />}
 
           {step === 'credentials' ? (
             <Form form={form} layout="vertical" onFinish={handleCredentials} autoComplete="off">
@@ -101,7 +131,7 @@ export function LoginPage() {
               <Form.Item
                 name="password"
                 rules={[{ required: true, message: t('auth.password_required') }]}
-                style={{ marginBottom: 24 }}
+                className={styles.passwordField}
               >
                 <Input.Password
                   prefix={<LockOutlined />}
@@ -110,17 +140,17 @@ export function LoginPage() {
                   size="large"
                 />
               </Form.Item>
-              <Form.Item style={{ marginBottom: 0 }}>
+              <Form.Item className={styles.submitField}>
                 <Button type="primary" htmlType="submit" block size="large" loading={loading}>
                   {t('auth.login_button')}
                 </Button>
               </Form.Item>
             </Form>
           ) : (
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
+            <Space vertical className={styles.spaceVertical} size={16}>
               <Text>{t('auth.totp_prompt')}</Text>
               <Input.OTP length={6} value={totpCode} onChange={setTotpCode} size="large" />
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space className={styles.totpActions}>
                 <Button
                   onClick={() => {
                     setStep('credentials');

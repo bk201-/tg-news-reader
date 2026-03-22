@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
 import { Modal, Input, Button, Alert, Flex, Spin, Typography } from 'antd';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css }) => ({
+  qrContainer: css`
+    text-align: center;
+  `,
+  qrImg: css`
+    width: 200px;
+    height: 200px;
+  `,
+  loadingContainer: css`
+    text-align: center;
+    padding: 40px;
+  `,
+}));
 
 interface TotpSetupModalProps {
   open: boolean;
@@ -14,6 +29,7 @@ interface TotpSetupModalProps {
 export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
   const { updateUser } = useAuthStore();
   const { t } = useTranslation();
+  const { styles } = useStyles();
 
   const [step, setStep] = useState<'scan' | 'confirm'>('scan');
   const [qr, setQr] = useState<string | null>(null);
@@ -82,11 +98,11 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
               }
             />
           ) : qr ? (
-            <div style={{ textAlign: 'center' }}>
-              <img src={qr} alt="TOTP QR Code" style={{ width: 200, height: 200 }} />
+            <div className={styles.qrContainer}>
+              <img src={qr} alt="TOTP QR Code" className={styles.qrImg} />
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: 40 }}>
+            <div className={styles.loadingContainer}>
               <Spin />
             </div>
           )}

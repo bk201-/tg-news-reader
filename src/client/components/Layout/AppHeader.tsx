@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, theme, Button, Tooltip, Dropdown, Modal, App, Grid } from 'antd';
+import { Layout, Typography, Button, Tooltip, Dropdown, Modal, App, Grid } from 'antd';
 import {
   MoonOutlined,
   SunOutlined,
@@ -11,6 +11,7 @@ import {
   TranslationOutlined,
   MenuOutlined,
 } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { FlagRU, FlagUS } from '../Flags';
 import { clearSwCache } from '../../services/serviceWorker';
@@ -24,16 +25,74 @@ import { api } from '../../api/client';
 const { Header } = Layout;
 const { Title, Text } = Typography;
 
+const useStyles = createStyles(({ css, token }, sidebarInDrawer: boolean) => ({
+  header: css`
+    display: flex;
+    align-items: center;
+    background: ${token.colorPrimary};
+    padding: ${sidebarInDrawer ? '0 12px' : '0 24px'};
+    gap: ${sidebarInDrawer ? '8px' : '12px'};
+  `,
+  iconBtn: css`
+    color: ${token.colorTextLightSolid};
+    flex-shrink: 0;
+  `,
+  emoji: css`
+    font-size: 24px;
+    flex-shrink: 0;
+  `,
+  title: css`
+    margin: 0;
+    color: ${token.colorTextLightSolid};
+    white-space: nowrap;
+  `,
+  channelName: css`
+    color: rgba(255, 255, 255, 0.85);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    margin-left: ${sidebarInDrawer ? '0' : '12px'};
+    flex: ${sidebarInDrawer ? '1' : 'unset'};
+    font-weight: ${sidebarInDrawer ? '600' : '400'};
+  `,
+  actions: css`
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `,
+  emailText: css`
+    font-size: 12px;
+  `,
+  totpActiveIcon: css`
+    color: ${token.colorSuccess};
+  `,
+  langSwitcher: css`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  `,
+  langLabel: css`
+    margin-right: 4px;
+  `,
+  langBtn: css`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  `,
+}));
+
 export function AppHeader() {
   const { selectedChannelId, isDarkTheme, toggleTheme, setSidebarDrawerOpen } = useUIStore();
   const { user, clearAuth, updateUser } = useAuthStore();
   const { data: channels = [] } = useChannels();
-  const { token } = theme.useToken();
   const { message } = App.useApp();
   const { t, i18n } = useTranslation();
   const screens = Grid.useBreakpoint();
   // screens.xxl = true when ≥ 1600px → full desktop, no hamburger needed
   const sidebarInDrawer = !screens.xxl;
+  const { styles } = useStyles(sidebarInDrawer);
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const [totpModalOpen, setTotpModalOpen] = useState(false);
@@ -75,7 +134,7 @@ export function AppHeader() {
     {
       key: 'email',
       label: (
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Text type="secondary" className={styles.emailText}>
           {user?.email}
         </Text>
       ),
@@ -84,7 +143,7 @@ export function AppHeader() {
     { type: 'divider' as const },
     {
       key: 'totp',
-      icon: user?.hasTOTP ? <SafetyCertificateOutlined style={{ color: 'green' }} /> : <QrcodeOutlined />,
+      icon: user?.hasTOTP ? <SafetyCertificateOutlined className={styles.totpActiveIcon} /> : <QrcodeOutlined />,
       label: user?.hasTOTP ? t('header.user_menu.manage_2fa') : t('header.user_menu.enable_2fa'),
       onClick: user?.hasTOTP ? handleDisableTOTP : () => setTotpModalOpen(true),
     },
@@ -100,8 +159,8 @@ export function AppHeader() {
       key: 'language',
       icon: <TranslationOutlined />,
       label: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
-          <span style={{ marginRight: 4 }}>{t('header.user_menu.language')}:</span>
+        <div className={styles.langSwitcher} onClick={(e) => e.stopPropagation()}>
+          <span className={styles.langLabel}>{t('header.user_menu.language')}:</span>
           <Button
             size="small"
             type={!i18n.language.startsWith('ru') ? 'primary' : 'default'}
@@ -109,7 +168,7 @@ export function AppHeader() {
               e.stopPropagation();
               void i18n.changeLanguage('en');
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            className={styles.langBtn}
           >
             <FlagUS size={18} /> EN
           </Button>
@@ -120,7 +179,7 @@ export function AppHeader() {
               e.stopPropagation();
               void i18n.changeLanguage('ru');
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            className={styles.langBtn}
           >
             <FlagRU size={18} /> RU
           </Button>
@@ -139,59 +198,40 @@ export function AppHeader() {
 
   return (
     <>
-      <Header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: token.colorPrimary,
-          padding: sidebarInDrawer ? '0 12px' : '0 24px',
-          gap: sidebarInDrawer ? 8 : 12,
-        }}
-      >
+      <Header className={styles.header}>
         {sidebarInDrawer && (
           <Tooltip title={t('header.open_sidebar')}>
             <Button
               type="text"
               icon={<MenuOutlined />}
               onClick={() => setSidebarDrawerOpen(true)}
-              style={{ color: '#fff', flexShrink: 0 }}
+              className={styles.iconBtn}
             />
           </Tooltip>
         )}
-        <span style={{ fontSize: 24, flexShrink: 0 }}>📰</span>
+        <span className={styles.emoji}>📰</span>
         {!sidebarInDrawer && (
-          <Title level={4} style={{ margin: 0, color: '#fff', whiteSpace: 'nowrap' }}>
+          <Title level={4} className={styles.title}>
             TG News Reader
           </Title>
         )}
         {selectedChannel && (
-          <Text
-            style={{
-              color: 'rgba(255,255,255,0.85)',
-              marginLeft: sidebarInDrawer ? 0 : 12,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-              flex: sidebarInDrawer ? 1 : undefined,
-              fontWeight: sidebarInDrawer ? 600 : 400,
-            }}
-          >
+          <Text className={styles.channelName}>
             {sidebarInDrawer ? selectedChannel.name : `— ${selectedChannel.name}`}
           </Text>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className={styles.actions}>
           <DownloadsPanel />
           <Tooltip title={isDarkTheme ? t('header.theme_light') : t('header.theme_dark')}>
             <Button
               type="text"
               icon={isDarkTheme ? <SunOutlined /> : <MoonOutlined />}
               onClick={toggleTheme}
-              style={{ color: '#fff' }}
+              className={styles.iconBtn}
             />
           </Tooltip>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-            <Button type="text" icon={<UserOutlined />} style={{ color: '#fff' }} />
+            <Button type="text" icon={<UserOutlined />} className={styles.iconBtn} />
           </Dropdown>
         </div>
       </Header>

@@ -30,22 +30,23 @@
 | ✅ | 10 | Service Worker кэш медиа | ⭐⭐⭐ |
 | ✅ | 11 | Логи (структурированные + ротация) | ⭐⭐ |
 | ✅ | 12 | Локализация (i18n: en / ru) | ⭐⭐⭐ |
+| ✅ | 13 | Менеджер загрузок медиа (сервер, фоновые задачи, SSE) | ⭐⭐⭐ |
+| ✅ | 14 | Режим просмотра «аккордион» | ⭐⭐⭐⭐ |
+| ✅ | 15 | Адаптивный layout (AntD breakpoints, Drawer-сайдбар) | ⭐⭐⭐ |
 
 ### ⬜ В работе / Следующие
 
 | Статус | Приоритет | Задача | Зависимости | Сложность |
 |--------|-----------|--------|-------------|-----------|
 | ⬜ | 🟡 | Деплой в Azure (Container Apps + Turso) | Auth | ⭐⭐⭐ |
-| ⬜ | 🟢 | Режим просмотра "аккордион" | Группы | ⭐⭐⭐⭐ |
-| ⬜ | 🟢 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
 | ⬜ | 🟡 | Fail detection после деплоя | Деплой | ⭐⭐ |
-| ⬜ | 🟢 | Оптимизация UI под мобилки | — | ⭐⭐⭐ |
+| ⬜ | 🟢 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
 
 ### ⬜ Отложено (низкий приоритет)
 
 | Статус | Задача | Зависимости | Сложность |
 |--------|--------|-------------|-----------|
-| ⬜ | Менеджер загрузок в папку | SW кэш | ⭐⭐⭐ |
+| ⬜ | Менеджер загрузок в папку (File System Access API) | SW кэш | ⭐⭐⭐ |
 | ⬜ | Клиентская скачка gramjs | Деплой | ⭐⭐⭐⭐⭐ |
 
 ---
@@ -144,57 +145,54 @@ CREATE TABLE groups (
 
 ---
 
-## 3. Переработка панели каналов
+## 3. Аккордион-режим просмотра новостей ✅
 
-### Вариант A: Аккордион (рекомендуется на первом этапе)
+**Задача**: список новостей во всю ширину, каждая новость — раскрывающийся аккордион.
 
-```
-▼ Новости (3 непрочитанных)      [папка 🟦]
-    📡 Bloomberg (2)
-    📡 РБК (1)
-▶ Работа (🔒)                    [папка 🟩]
-▶ Без группы
-```
+**Реализовано**:
+- `newsViewMode: 'list' | 'accordion'` в `uiStore` (persisted в `localStorage`)
+- Переключатель в `NewsFeedToolbar` (скрыт на мобильных)
+- `NewsFeedList` (list mode) и `NewsAccordionList` + `NewsAccordionItem` (accordion mode)
+- `effectiveViewMode` в `NewsFeed` — на мобильных (`< 1200px`) принудительно аккордион
+- `NewsDetail` поддерживает `variant='panel'` (list mode) и `variant='inline'` (accordion)
+- При нажатии "Прочитано" — новость схлопывается, фокус переходит на следующую
 
-- Ant Design `<Collapse>` / `<Tree>` 
-- Простая реализация, знакомый UX
+**Сложность**: ⭐⭐⭐⭐ Высокая. Реализовано.
 
-### Вариант B: Иконки папок + drill-down
+---
 
-```
-[🟦 Новости]  [🟩 Работа]  [🟥 Трейдинг]
-      ↓ клик
-[📡 Bloomberg] [📡 РБК] [← назад]
-```
+## 3b. Адаптивный layout ✅
 
-- Более компактно, но нужна навигация "назад"
-- Хорошо смотрится на маленьких сайдбарах
+**Задача**: приложение нормально работает на любом экране — от телефона до большого монитора.
 
-**Решение**: начинаем с Аккордионом (проще), потом можно переключить.
+**Реализовано**:
+- `src/client/hooks/breakpoints.ts` — константы BP_SM/MD/LG/XL/XXL (совпадают с Ant Design)
+- `Grid.useBreakpoint()` из AntD повсюду вместо кастомного хука
+- `<Splitter>` (resizable sidebar) только на `xxl` (≥ 1600px)
+- На `< xxl` (`xl`, `lg`, `md`, `sm`, `xs`): sidebar (GroupPanel + ChannelSidebar) в `<Drawer>`
+- `AppHeader`: hamburger-кнопка для открытия Drawer, компактный layout
+- `NewsFeed`: accordion-mode принудительно ниже `xl` (< 1200px)
+- `DownloadsPanel`: pinned-режим только на `xxl`
+- `sidebarDrawerOpen` в `uiStore`; `setSelectedChannelId` автоматически закрывает Drawer
 
-### Альтернативный режим просмотра новостей (аккордион-новости)
+**Сложность**: ⭐⭐⭐ Средняя. Реализовано.
 
-**Задача**: список новостей во всю ширину, каждая новость — раскрытый аккордион (как GitHub diff).
+---
 
-```
-▼ Bloomberg | 17 марта, 12:30
-  [медиа] Текст новости целиком...
-  [Прочитано ✓]  [Ссылки]
+## 3c. Менеджер загрузок медиа (сервер) ✅
 
-▼ РБК | 17 марта, 11:15  
-  Текст...
-  [Прочитано ✓]
-```
+**Задача**: фоновая скачка медиафайлов с Telegram на диск сервера с отображением прогресса.
 
-При нажатии "Прочитано" — новость схлопывается, фокус на следующей.
+**Реализовано**:
+- `downloads` таблица: `id, news_id, type ('media'|'article'), url, priority, status, error, created_at, processed_at` + `UNIQUE(news_id, type)`
+- `enqueueTask(newsId, type, url?, priority=0)` — INSERT with `onConflictDoUpdate`, resets failed → pending
+- `startWorkerPool(n)` — N воркеров (`DOWNLOAD_WORKER_CONCURRENCY`, default 10); crash recovery на старте
+- Приоритеты: 0 = фоновый (лимиты размера), 10 = пользовательский (лимиты пропускаются)
+- Автоочистка done-задач через `DOWNLOAD_TASK_CLEANUP_DELAY_SEC` секунд (default 30)
+- `GET /api/downloads/stream` — SSE-стрим; `init` + `task_update` события
+- `DownloadsPanel` в `AppHeader`: бейдж активных задач + Drawer; `DownloadsPinnedContent` — inline-сайдбар (только xxl); `DownloadTaskList` — общий список задач
 
-**Это большое изменение UI**. Предлагаю сделать переключатель режимов:
-- `compact` — текущий (список слева + детали справа)
-- `expanded` — аккордион на всю ширину
-
-Хранить в `uiStore` + `localStorage`.
-
-**Сложность**: ⭐⭐⭐⭐ Высокая. Делаем **после** групп.
+**Сложность**: ⭐⭐⭐ Средняя. Реализовано.
 
 ---
 
@@ -343,6 +341,7 @@ CREATE TABLE sessions (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   refresh_token_hash TEXT NOT NULL,  -- bcrypt(token, 10)
   expires_at INTEGER NOT NULL,   -- unixepoch
+  unlocked_group_ids TEXT NOT NULL DEFAULT '[]',  -- JSON array of group IDs unlocked by PIN
   user_agent TEXT,
   ip TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -724,71 +723,20 @@ export async function sendAlert(msg: string) {
 
 ---
 
-## 19. Оптимизация UI под мобилки
+## 19. Оптимизация UI под мобилки ✅
 
-**Задача**: приложение должно нормально работать на смартфоне — не только не ломаться, но и быть удобным.
+**Задача**: приложение должно нормально работать на смартфоне.
 
-### Текущие проблемы
+**Реализовано** — см. раздел 3b (Адаптивный layout). Ключевые решения:
+- `Grid.useBreakpoint()` вместо `resize`-листенеров
+- Sidebar в Drawer ниже `xxl`
+- Accordion-режим принудительно ниже `xl`
+- DownloadsPanel: pinned только на xxl
+- `sidebarDrawerOpen` в uiStore
 
-- Трёхколоночный layout (GroupPanel + ChannelSidebar + NewsFeed) не влезает на 390px экран
-- `NewsDetail` открывается рядом со списком, а не поверх него
-- Кнопки тулбара слишком мелкие для тап-таргетов
-- Сплиттер (`<Splitter>`) на тачскрине неудобен
-
-### Стратегия: mobile-first breakpoints
-
-**Breakpoints** (CSS custom properties):
-```
-xs: < 640px   — мобильный телефон (portrait)
-sm: < 1024px  — планшет / телефон landscape
-md: ≥ 1024px  — десктоп (текущий layout)
-```
-
-### Изменения по компонентам
-
-#### AppLayout (`md`+: текущий) → мобильный режим
-
-```
-xs/sm:
-┌─────────────────────┐
-│  [☰ Меню]  Заголовок│  ← header с hamburger
-├─────────────────────┤
-│  Список новостей    │  ← полная ширина
-│  (или детали)       │
-└─────────────────────┘
-```
-
-- `GroupPanel` + `ChannelSidebar` → `<Drawer>` (выезжает слева по hamburger)
-- `NewsDetail` → отдельный экран (навигация назад `<` в header)
-- Использовать `useBreakpoint()` из Ant Design или CSS media queries
-
-#### Навигация
-
-- На `xs`: список → деталь — **полноэкранная замена** (не side-by-side)
-- `setSelectedNewsId` уже в `uiStore` — достаточно добавить мобильный view-state
-
-#### Тач-таргеты
-
-- Минимальная высота кнопок: 44px (Apple HIG) — `size="large"` в Ant Design
-- Теги хэштегов — увеличить `padding`
-- Checkbox "Прочитано" — увеличить зону клика
-
-#### Сплиттер
-
-На `xs/sm` — убрать `<Splitter>`, sidebar фиксированной ширины или Drawer.
-
-#### Downloads Panel
-
-На мобильном — только иконка с бейджем в header, без pinned-режима.
-
-### Реализация
-
-1. Добавить CSS breakpoint-переменные в `styles.css`
-2. `AppLayout.tsx` — определять `isMobile` через `window.innerWidth < 1024` + `resize listener` (или Ant Design `Grid.useBreakpoint()`)
-3. Компоненты sidebar завернуть в `<Drawer>` на мобильном
-4. `NewsFeed` — на мобильном показывать список ИЛИ детали (не одновременно)
-
-**Сложность**: ⭐⭐⭐ Средняя. Основная сложность — переключение layout без дублирования компонентов.
+**Открытые вопросы**:
+- Тач-таргеты (44px HIG): тулбарные кнопки в целом ок, но хэштег-теги и checkbox можно увеличить
+- Safari iOS: проверить `<Splitter>` на тачскрине (на xxl он включается только если ≥ 1600px)
 
 ---
 
@@ -815,4 +763,7 @@ xs/sm:
 - [x] `GroupPanel` разбит на `GroupItem` + `GroupFormModal` + `GroupPinModal` (по аналогии с Channel-компонентами); бейдж группы теперь учитывает `pendingCounts`
 - [x] Service Worker кэш медиа (`public/sw.js`): Cache-First стратегия для `/api/media/*`; стрипает `?token=` из ключа кэша; 2000 записей / 30 дней TTL; кнопка очистки в меню пользователя (`AppHeader`); регистрируется только в prod
 - [x] Структурированные логи через pino (`src/server/logger.ts`): pino-pretty в dev, JSON в prod; access-log middleware (IP/метод/статус/ms); логирование auth-попыток (IP + reason, без email/пароля); rate-limit хиты; download задачи; ошибки Telegram; uncaughtException/unhandledRejection
-- [x] Локализация (i18n): react-i18next + i18next-browser-languagedetector; **EN по умолчанию, RU как fallback**; переключатель языка в меню пользователя (🌐); файлы переводов в `src/client/locales/{en,ru}/translation.json`; Ant Design locale динамически переключается через `ConfigProvider`
+- [x] Локализация (i18n): react-i18next + i18next-browser-languagedetector; **EN по умолчанию, RU как fallback**; переключатель языка в меню пользователя (🌐); файлы переводов в `src/client/locales/{en,ru}/translation.json`; Ant Design locale динамически переключается через `ConfigProvider`; SVG-флаги (FlagRU/FlagUS) вместо emoji
+- [x] Менеджер загрузок медиа (сервер): `downloads` таблица + фоновые воркеры (`startWorkerPool`); `enqueueTask(newsId, type, url?, priority)`; SSE-стрим прогресса (`GET /api/downloads/stream`); `DownloadsPanel` с закреплённым сайдбаром (`downloadsPanelPinned` в `uiStore`); приоритет 10 = пользовательский (без лимита размера), 0 = фоновый
+- [x] Аккордион-режим просмотра новостей: `newsViewMode: 'list' | 'accordion'` в `uiStore` (persisted); `NewsAccordionList` + `NewsAccordionItem`; `useMobileBreakpoint` → `effectiveViewMode`; на мобильных всегда аккордион
+- [x] Адаптивный layout: `Grid.useBreakpoint()` из AntD вместо кастомного хука; `src/client/hooks/breakpoints.ts` с константами BP_SM/MD/LG/XL/XXL; `<Splitter>` только на xxl (≥1600px); сайдбар в `<Drawer>` ниже xxl; `sidebarDrawerOpen` в `uiStore`; `DownloadsPanel` pinned только на xxl

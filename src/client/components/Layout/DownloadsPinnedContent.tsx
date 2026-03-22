@@ -1,6 +1,7 @@
 import React from 'react';
-import { Typography, Space, Button, Tooltip, Spin, theme } from 'antd';
+import { Typography, Space, Button, Tooltip, Spin } from 'antd';
 import { PushpinFilled } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
 import { useDownloads, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
@@ -8,9 +9,41 @@ import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
 
+const useStyles = createStyles(({ css, token }) => ({
+  container: css`
+    width: 300px;
+    flex-shrink: 0;
+    border-left: 1px solid ${token.colorBorderSecondary};
+    background: ${token.colorBgContainer};
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  `,
+  header: css`
+    padding: 12px 14px;
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  `,
+  headerTitle: css`
+    font-size: 13px;
+  `,
+  pinIcon: css`
+    color: ${token.colorPrimary};
+  `,
+  body: css`
+    flex: 1;
+    overflow: auto;
+    padding: 0 4px;
+  `,
+}));
+
 /** Inline sidebar rendered next to the news feed when the downloads panel is pinned. */
 export function DownloadsPinnedContent() {
-  const { token } = theme.useToken();
+  const { styles } = useStyles();
   const { data: tasks = [] } = useDownloads();
   const cancelDownload = useCancelDownload();
   const prioritizeDownload = usePrioritizeDownload();
@@ -20,43 +53,19 @@ export function DownloadsPinnedContent() {
   const activeCount = tasks.filter((t) => t.status === 'pending' || t.status === 'processing').length;
 
   return (
-    <div
-      style={{
-        width: 300,
-        flexShrink: 0,
-        borderLeft: `1px solid ${token.colorBorderSecondary}`,
-        background: token.colorBgContainer,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          padding: '12px 14px',
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
+    <div className={styles.container}>
+      <div className={styles.header}>
         <Space size={6}>
           {activeCount > 0 && <Spin size="small" />}
-          <Text strong style={{ fontSize: 13 }}>
+          <Text strong className={styles.headerTitle}>
             {activeCount > 0 ? t('downloads.title_active_pinned', { count: activeCount }) : t('downloads.title')}
           </Text>
         </Space>
         <Tooltip title={t('downloads.unpin_tooltip')} placement="left">
-          <Button
-            type="text"
-            icon={<PushpinFilled style={{ color: token.colorPrimary }} />}
-            onClick={toggleDownloadsPanelPin}
-          />
+          <Button type="text" icon={<PushpinFilled className={styles.pinIcon} />} onClick={toggleDownloadsPanelPin} />
         </Tooltip>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
+      <div className={styles.body}>
         <TaskList tasks={tasks} cancelDownload={cancelDownload} prioritizeDownload={prioritizeDownload} />
       </div>
     </div>

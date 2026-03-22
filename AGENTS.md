@@ -64,7 +64,7 @@ src/
     locales/
       en/translation.json   # English strings (primary)
       ru/translation.json   # Russian strings (fallback)
-    styles.css        # All CSS (BEM-like, CSS custom props for theming)
+    styles.css        # Global reset only (10 lines) — all component styles live in createStyles
   shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter, DownloadTask)
 ```
 
@@ -189,9 +189,108 @@ All fetch calls go through `api` from `src/client/api/client.ts`, which attaches
 
 ## CSS Conventions
 
-- CSS variables: `--tgr-color-*` (mapped from Ant Design tokens via inline styles)
-- BEM-like classes: `.channel-item`, `.channel-item--active`, `.channel-item__info`
-- CSS Container Queries used for responsive sidebar buttons (`.channel-sidebar__header`)
+**All component styles use `createStyles` from `antd-style` — no global CSS classes.**  
+`styles.css` contains only a global reset (`* { box-sizing: border-box }` + `body` defaults).
+
+### Standard pattern
+
+```tsx
+import { createStyles } from 'antd-style';
+
+const useStyles = createStyles(({ css, token }) => ({
+  item: css`
+    background: ${token.colorBgContainer};
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    &:hover { background: ${token.colorFillTertiary}; }
+  `,
+  itemActive: css`
+    background: ${token.colorPrimaryBg};
+  `,
+}));
+
+function MyComponent() {
+  const { styles, cx } = useStyles();
+  return <div className={cx(styles.item, isActive && styles.itemActive)} />;
+}
+```
+
+- Use `token.*` for all theme-aware values (colors, borders, etc.) — **never** hardcode hex colors
+- Use `cx(styles.a, condition && styles.b)` for conditional class merging
+- Use `theme.useToken()` from `antd` to access tokens in component logic (e.g. inline styles)
+
+ ### No inline `style={{}}` — use `createStyles` instead
+
+**All styles must live in `createStyles`, including layout and structural styles.** The only permitted exceptions for `style={{}}` are truly runtime-dynamic values that can't be expressed as static CSS:
+
+```tsx
+// ✅ OK — value is a runtime variable (group color from DB)
+<FolderFilled style={{ color: group.color }} />
+
+// ✅ OK — conditional cursor based on prop
+<Tag style={{ cursor: onTagClick ? 'pointer' : 'default' }} />
+
+// ❌ Wrong — hardcoded color, must use token
+<WarningOutlined style={{ color: '#ff4d4f' }} />   // → token.colorError in createStyles
+
+// ❌ Wrong — structural layout, must use createStyles
+<div style={{ display: 'flex', gap: 8 }} />
+
+// ❌ Wrong — CSS variable fallback, must use token in createStyles
+<span style={{ color: 'var(--some-var, #666)' }} />  // → token.colorTextSecondary
+```
+
+Token equivalents for common hardcoded values:
+- `#fff` on colored backgrounds → `token.colorTextLightSolid`
+- `'green'` for success icons → `token.colorSuccess`
+- `'#ff4d4f'` for error/warning → `token.colorError`
+- `'#888'` / `'#666'` secondary text → `token.colorTextSecondary`
+- `'#f5f5f5'` background fills → `token.colorFillAlter`
+
+### Dynamic param styles (used in AppHeader, GroupItem)
+
+When styles depend on a boolean flag or runtime value that changes the layout, pass it as a second argument:
+
+```tsx
+// AppHeader: sidebarInDrawer changes padding/gap/color
+const useStyles = createStyles(({ css, token }, sidebarInDrawer: boolean) => ({
+  header: css`
+    background: ${token.colorPrimary};
+    padding: ${sidebarInDrawer ? '0 12px' : '0 24px'};
+  `,
+}));
+const { styles } = useStyles(sidebarInDrawer);  // antd-style caches per unique param
+
+// GroupItem: group color drives radial-gradient background
+const useGroupItemStyles = createStyles(({ css, token }, color?: string) => {
+  const c = color ?? token.colorPrimary;
+  return { item: css`background: color-mix(in srgb, ${c} 15%, transparent);` };
+});
+const { styles } = useGroupItemStyles(group.color);
+```
+
+### Cross-component child targeting
+
+To remove a border from a child component inside a wrapper (e.g. accordion), use the structural selector — **not** a class name, since `createStyles` generates hashed class names:
+
+```tsx
+item: css`
+  border-bottom: 1px solid ${token.colorBorderSecondary};
+  & > div:first-child { border-bottom: none; }  /* removes child's own border */
+`,
+```
+
+### Container Queries
+
+Declare `container-type: inline-size` on the parent in its `createStyles`, then use `@container` in child component styles:
+
+```tsx
+// parent
+header: css`container-type: inline-size;`
+
+// child (separate createStyles)
+btnText: css`@container (max-width: 540px) { display: none; }`
+```
+
 - Ant Design dark/light theme toggled via `ConfigProvider` in `main.tsx`
 
 ## Security — NEVER Read or Print
@@ -222,7 +321,7 @@ Use `mediaUrl(localMediaPath)` from `src/client/api/mediaUrl.ts` to generate aut
 ## Media Files
 
 - Downloaded to `data/{telegramId}/{filename}` on server disk
-- Served via `GET /api/media/:channel/:filename`
+- Served via `GET /api/media/:channel/:filename` — supports **HTTP Range requests** (`206 Partial Content`) so browsers can seek videos; always returns `Accept-Ranges: bytes`
 - Downloads managed by `downloadManager.ts` — background tasks use size limits (photos ≤ `MAX_PHOTO_SIZE_MB` MB, videos ≤ `MAX_VIDEO_SIZE_MB` MB, image-docs ≤ `MAX_IMG_DOC_SIZE_MB` MB; all env-configurable, defaults 5/75/5); user-initiated (`priority ≥ 10`) bypass limits
 - Progress visible in `DownloadsPanel` (header badge + Drawer) via SSE
 
@@ -283,7 +382,7 @@ function MyComponent() {
 - Keys are namespaced by section: `sidebar.*`, `channels.*`, `groups.*`, `news.*`, `filters.*`, `downloads.*`, `auth.*`, `header.*`, `common.*`
 - For `Modal.confirm` use `t()` for `title`, `content`, `okText`, `cancelText`
 - Interpolation: `t('channels.updated', { date })` → `"updated": "Updated: {{date}}"`
-- **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`
+ся- **Never hardcode Russian or English UI strings directly in JSX** — always use `t()`. This includes button labels, tooltips, aria-labels, Modal strings, and `message.success()` toasts.
 
 ## News View Architecture
 
@@ -307,6 +406,8 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 // left area is clickable to collapse the accordion item
 <NewsDetail item={item} channelType={...} variant="inline" onHeaderClick={() => onSelect(null)} />
 ```
+
+**Known keyboard caveat**: `NewsDetail`'s `keydown` handler excludes `input / textarea / button / a` but NOT `video`. `useNewsHotkeys` intercepts `ArrowUp`/`ArrowDown` globally and calls `e.preventDefault()` — this blocks native video volume-control keys when the `<video>` element has focus. Arrow Left/Right (seek) are not blocked. If editing hotkey logic, add `tag === 'video'` to the exclusion check.
 
 **Component decomposition** (`src/client/components/News/`):
 - `NewsDetail` — state coordinator (queries, album index, top panel, hotkeys, handlers)

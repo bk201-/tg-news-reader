@@ -8,10 +8,40 @@ import {
   FileTextOutlined,
   PictureOutlined,
 } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { DownloadTask } from '@shared/types.ts';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css }) => ({
+  empty: css`
+    padding: 32px 0;
+    text-align: center;
+  `,
+  emptyIcon: css`
+    font-size: 32px;
+    opacity: 0.3;
+  `,
+  emptyText: css`
+    margin-top: 8px;
+  `,
+  typeIcon: css`
+    font-size: 18px;
+    opacity: 0.6;
+  `,
+  taskTitle: css`
+    font-size: 12px;
+  `,
+  taskUrl: css`
+    font-size: 11px;
+  `,
+  taskError: css`
+    font-size: 11px;
+    display: block;
+    margin-top: 2px;
+  `,
+}));
 
 function TaskStatus({ task }: { task: DownloadTask }) {
   const { t } = useTranslation();
@@ -34,11 +64,12 @@ export interface TaskListProps {
 
 export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskListProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   if (tasks.length === 0) {
     return (
-      <div style={{ padding: '32px 0', textAlign: 'center' }}>
-        <CloudDownloadOutlined style={{ fontSize: 32, opacity: 0.3 }} />
-        <div style={{ marginTop: 8 }}>
+      <div className={styles.empty}>
+        <CloudDownloadOutlined className={styles.emptyIcon} />
+        <div className={styles.emptyText}>
           <Text type="secondary">{t('downloads.empty')}</Text>
         </div>
       </div>
@@ -69,14 +100,14 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
               task.status === 'processing' ? (
                 <Spin size="small" />
               ) : task.type === 'media' ? (
-                <PictureOutlined style={{ fontSize: 18, opacity: 0.6 }} />
+                <PictureOutlined className={styles.typeIcon} />
               ) : (
-                <FileTextOutlined style={{ fontSize: 18, opacity: 0.6 }} />
+                <FileTextOutlined className={styles.typeIcon} />
               )
             }
             title={
               <Space size={4} wrap>
-                <Text strong style={{ fontSize: 12 }}>
+                <Text strong className={styles.taskTitle}>
                   {task.channelName ?? '—'}
                 </Text>
                 <TaskStatus task={task} />
@@ -84,11 +115,11 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
             }
             description={
               <>
-                <Text style={{ fontSize: 11 }} type="secondary" ellipsis>
+                <Text className={styles.taskUrl} type="secondary" ellipsis>
                   {task.newsText?.substring(0, 80) || t('downloads.no_text')}
                 </Text>
                 {task.status === 'failed' && task.error && (
-                  <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                  <Text type="danger" className={styles.taskError}>
                     {task.error}
                   </Text>
                 )}

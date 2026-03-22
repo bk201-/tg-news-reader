@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Space, Typography, Tooltip, Form } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
@@ -21,6 +22,38 @@ import { ChannelFetchModal } from './ChannelFetchModal';
 
 const { Text } = Typography;
 
+const useStyles = createStyles(({ css, token }) => ({
+  sidebar: css`
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  `,
+  header: css`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    container-type: inline-size;
+  `,
+  btnText: css`
+    @container (max-width: 300px) {
+      display: none;
+    }
+  `,
+  list: css`
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  `,
+  loading: css`
+    padding: 16px;
+  `,
+  sidebarTitle: css`
+    font-size: 14px;
+  `,
+}));
+
 export function ChannelSidebar() {
   const { data: allChannels = [], isLoading } = useChannels();
   const { data: groups = [] } = useGroups();
@@ -33,6 +66,7 @@ export function ChannelSidebar() {
   const { t } = useTranslation();
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
+  const { styles } = useStyles();
 
   const channels = allChannels.filter((ch) =>
     selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId,
@@ -126,25 +160,25 @@ export function ChannelSidebar() {
   };
 
   return (
-    <div className="channel-sidebar">
-      <div className="channel-sidebar__header">
-        <Text strong style={{ fontSize: 14 }} className="sidebar-title">
+    <div className={styles.sidebar}>
+      <div className={styles.header}>
+        <Text strong className={styles.sidebarTitle}>
           {t('sidebar.channels')}
         </Text>
         <Space size={4}>
           <Tooltip title={t('sidebar.refresh_tooltip')}>
             <Button icon={<ReloadOutlined />} onClick={() => countUnread.mutate()} loading={countUnread.isPending}>
-              <span className="btn-text">{t('sidebar.refresh')}</span>
+              <span className={styles.btnText}>{t('sidebar.refresh')}</span>
             </Button>
           </Tooltip>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            <span className="btn-text">{t('sidebar.add')}</span>
+            <span className={styles.btnText}>{t('sidebar.add')}</span>
           </Button>
         </Space>
       </div>
 
-      <div className="channel-sidebar__list">
-        {isLoading && <div style={{ padding: 16 }}>{t('common.loading')}</div>}
+      <div className={styles.list}>
+        {isLoading && <div className={styles.loading}>{t('common.loading')}</div>}
         {channels.map((ch) => (
           <ChannelItem
             key={ch.id}

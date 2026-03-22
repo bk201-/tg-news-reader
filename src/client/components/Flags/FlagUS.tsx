@@ -1,4 +1,14 @@
 import React from 'react';
+import { createStyles } from 'antd-style';
+
+const useStyles = createStyles(({ css }) => ({
+  flag: css`
+    display: inline-block;
+    vertical-align: middle;
+    border-radius: 2px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  `,
+}));
 
 interface FlagProps {
   size?: number;
@@ -40,15 +50,11 @@ const CANTON_H = 7 * SH;
 
 /** US flag: 13 stripes + blue canton with 50 stars */
 export function FlagUS({ size = 20 }: FlagProps) {
+  const { styles } = useStyles();
   const w = size;
   const h = Math.round((size * 10) / 19);
   return (
-    <svg
-      width={w}
-      height={h}
-      viewBox="0 0 190 100"
-      style={{ display: 'inline-block', verticalAlign: 'middle', borderRadius: 2, border: '1px solid rgba(0,0,0,.12)' }}
-    >
+    <svg width={w} height={h} viewBox="0 0 190 100" className={styles.flag}>
       {Array.from({ length: 13 }, (_, i) => (
         <rect key={i} x="0" y={i * SH} width="190" height={SH} fill={i % 2 === 0 ? '#B22234' : '#FFF'} />
       ))}

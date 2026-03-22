@@ -1,12 +1,40 @@
 import React, { useMemo } from 'react';
 import { Modal, Form, Input, Select, Button, Table, Switch, Tag, Space, Typography, Divider } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Filter } from '@shared/types.ts';
 import { useFilters, useCreateFilter, useUpdateFilter, useDeleteFilter } from '../../api/filters';
 import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css, token }) => ({
+  description: css`
+    margin-bottom: 16px;
+  `,
+  form: css`
+    margin-bottom: 16px;
+  `,
+  formType: css`
+    width: 120px;
+  `,
+  formField: css`
+    flex: 1;
+  `,
+  divider: css`
+    margin: 8px 0;
+  `,
+  metaText: css`
+    font-size: 11px;
+  `,
+  summary: css`
+    margin-top: 16px;
+    padding: 8px 12px;
+    background: ${token.colorFillAlter};
+    border-radius: 6px;
+  `,
+}));
 
 interface FilterPanelProps {
   channelId: number;
@@ -20,6 +48,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
   const deleteFilter = useDeleteFilter(channelId);
   const [form] = Form.useForm();
   const { t } = useTranslation();
+  const { styles } = useStyles();
 
   const tagFilters = useMemo(() => filters.filter((f) => f.type === 'tag'), [filters]);
   const keywordFilters = useMemo(() => filters.filter((f) => f.type === 'keyword'), [filters]);
@@ -53,7 +82,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
         <Space>
           <Tag color={record.type === 'tag' ? 'blue' : 'green'}>{record.type === 'tag' ? '#' : '🔤'}</Tag>
           <Text>{name}</Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" className={styles.metaText}>
             ({record.value})
           </Text>
         </Space>
@@ -86,21 +115,21 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
       footer={null}
       width={600}
     >
-      <div style={{ marginBottom: 16 }}>
+      <div className={styles.description}>
         <Text type="secondary">{t('filters.description')}</Text>
       </div>
 
-      <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
+      <Form form={form} layout="inline" className={styles.form}>
         <Form.Item name="type" initialValue="tag" rules={[{ required: true }]}>
-          <Select style={{ width: 120 }}>
+          <Select className={styles.formType}>
             <Select.Option value="tag">{t('filters.type_tag')}</Select.Option>
             <Select.Option value="keyword">{t('filters.type_keyword')}</Select.Option>
           </Select>
         </Form.Item>
-        <Form.Item name="name" rules={[{ required: true, message: t('common.none') }]} style={{ flex: 1 }}>
+        <Form.Item name="name" rules={[{ required: true, message: t('common.none') }]} className={styles.formField}>
           <Input placeholder={t('filters.name_placeholder')} />
         </Form.Item>
-        <Form.Item name="value" rules={[{ required: true, message: t('common.none') }]} style={{ flex: 1 }}>
+        <Form.Item name="value" rules={[{ required: true, message: t('common.none') }]} className={styles.formField}>
           <Input placeholder={t('filters.value_placeholder')} />
         </Form.Item>
         <Form.Item>
@@ -110,7 +139,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
         </Form.Item>
       </Form>
 
-      <Divider style={{ margin: '8px 0' }} />
+      <Divider className={styles.divider} />
 
       <Table
         dataSource={filters}
@@ -121,7 +150,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
         locale={{ emptyText: t('filters.empty') }}
       />
 
-      <div style={{ marginTop: 16, padding: '8px 12px', background: '#f5f5f5', borderRadius: 6 }}>
+      <div className={styles.summary}>
         <Text strong>{t('filters.active_tags')} </Text>
         {tagFilters
           .filter((f) => f.isActive)

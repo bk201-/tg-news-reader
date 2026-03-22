@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, App as AntApp, theme } from 'antd';
+import { StyleProvider } from 'antd-style';
 import ruRU from 'antd/locale/ru_RU';
 import enUS from 'antd/locale/en_US';
 import { AppLayout } from './components/Layout/AppLayout';
@@ -39,11 +40,13 @@ function ThemedApp() {
         hashed: false,
       }}
     >
-      <AntApp>
-        <AuthGate>
-          <AppLayout />
-        </AuthGate>
-      </AntApp>
+      <StyleProvider>
+        <AntApp>
+          <AuthGate>
+            <AppLayout />
+          </AuthGate>
+        </AntApp>
+      </StyleProvider>
     </ConfigProvider>
   );
 }

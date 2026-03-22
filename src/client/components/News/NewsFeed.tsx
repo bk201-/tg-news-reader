@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { App, Empty, Grid } from 'antd';
+import { createStyles } from 'antd-style';
+import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
@@ -14,17 +16,53 @@ import { NewsAccordionList } from './NewsAccordionList';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 
+const useStyles = createStyles(({ css, token }) => ({
+  feed: css`
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 64px);
+    overflow: hidden;
+    /* Below xxl breakpoint, parent Layout.Content controls height */
+    @media (max-width: 1599px) {
+      height: 100%;
+    }
+  `,
+  body: css`
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  `,
+  bodyAccordion: css`
+    flex-direction: column;
+  `,
+  detail: css`
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: ${token.colorBgLayout};
+  `,
+  detailEmpty: css`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+  `,
+}));
+
 interface NewsFeedProps {
   channel: Channel;
 }
 
 export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
 
   const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
     useUIStore();
 
   const screens = Grid.useBreakpoint();
+  const { styles, cx } = useStyles();
   // screens.xl = true when ≥ 1200px → list view available; below → force accordion
   const forceAccordion = !screens.xl;
   const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
@@ -84,7 +122,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       } else {
         void createFilter
           .mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() })
-          .then(() => void message.success(`Тег ${tag} добавлен в фильтры`));
+          .then(() => void message.success(t('news.list.tag_added_toast', { tag })));
       }
     },
     [setHashTagFilter, setShowAll, createFilter, message],
@@ -152,7 +190,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [selectedNewsId, effectiveViewMode]);
 
   return (
-    <div className="news-feed">
+    <div className={styles.feed}>
       <NewsFeedToolbar
         fetchPending={fetchChannel.isPending}
         fetchPeriod={fetchPeriod}
@@ -175,7 +213,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         isMobile={forceAccordion}
       />
 
-      <div className={`news-feed__body${effectiveViewMode === 'accordion' ? ' news-feed__body--accordion' : ''}`}>
+      <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>
         {effectiveViewMode === 'accordion' ? (
           <NewsAccordionList
             isLoading={isLoading}
@@ -205,7 +243,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
               onTagClick={handleTagClick}
               listRef={listRef}
             />
-            <div className="news-feed__detail">
+            <div className={styles.detail}>
               {selectedItem ? (
                 <NewsDetail
                   key={selectedItem.id}
@@ -214,8 +252,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
                   onMarkedRead={handleMarkedRead}
                 />
               ) : (
-                <div className="news-feed__detail-empty">
-                  <Empty description="Выберите новость из списка" />
+                <div className={styles.detailEmpty}>
+                  <Empty description={t('news.list.select_item')} />
                 </div>
               )}
             </div>

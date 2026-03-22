@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
 import { Badge, Button, Drawer, Space, Tooltip, Spin, Grid } from 'antd';
 import { CloudDownloadOutlined, PushpinOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
 import { useDownloads, useDownloadsSSE, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
 import { useUIStore } from '../../store/uiStore';
+
+const useStyles = createStyles(({ css, token }, pinned: boolean) => ({
+  iconBtn: css`
+    color: ${token.colorTextLightSolid};
+    opacity: ${pinned ? 0.75 : 1};
+  `,
+  drawerTitle: css`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 4px;
+  `,
+}));
 
 /** Header badge button + Drawer (used when panel is NOT pinned).
  *  Also mounts useDownloadsSSE() once for the whole app lifetime. */
@@ -19,6 +33,7 @@ export function DownloadsPanel() {
 
   // Pin only available on full desktop (≥ 1600px / xxl)
   const effectivePinned = !!screens.xxl && downloadsPanelPinned;
+  const { styles } = useStyles(effectivePinned);
 
   // SSE always active — mounted once for the whole app lifetime
   useDownloadsSSE();
@@ -26,7 +41,7 @@ export function DownloadsPanel() {
   const activeCount = tasks.filter((t) => t.status === 'pending' || t.status === 'processing').length;
 
   const drawerTitle = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 4 }}>
+    <div className={styles.drawerTitle}>
       <Space size={6}>
         {activeCount > 0 && <Spin size="small" />}
         <span>{activeCount > 0 ? t('downloads.title_active', { count: activeCount }) : t('downloads.title')}</span>
@@ -60,7 +75,7 @@ export function DownloadsPanel() {
             onClick={() => {
               if (!effectivePinned) setOpen(true);
             }}
-            style={{ color: '#fff', opacity: effectivePinned ? 0.75 : 1 }}
+            className={styles.iconBtn}
           />
         </Badge>
       </Tooltip>

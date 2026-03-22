@@ -3,6 +3,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
+    "download": "Download",
     "loading": "Loading...",
     "none": "None",
     "retry": "Retry"
@@ -11,7 +12,8 @@
     "channels": "Channels",
     "refresh": "Refresh",
     "refresh_tooltip": "Count unread in Telegram",
-    "add": "Add"
+    "add": "Add",
+    "select_channel": "Select a channel from the list on the left"
   },
   "channels": {
     "updated": "Updated: {{date}}",
@@ -112,12 +114,31 @@
       "open": "Open",
       "open_tooltip": "Open in browser [Enter]",
       "mark_read": "Read",
-      "mark_unread": "Unread"
+      "mark_unread": "Unread",
+      "prev": "Previous",
+      "next": "Next",
+      "retry_download": "Retry download",
+      "download_media": "Download media",
+      "download_media_size": "Download media ({{size}})",
+      "photo_alt": "Photo {{current}} of {{total}}",
+      "space_hint": "· Space = mark read",
+      "no_text": "(no text)",
+      "full_content_divider": "Full article text",
+      "error": "Error: {{error}}",
+      "article_queued_toast": "Article queued for download",
+      "media_queued_toast": "Media queued for download",
+      "select_link_title": "Select link to download",
+      "text_panel_title": "Post text"
     },
     "list": {
       "empty_tag": "No news with tag {{tag}}",
       "empty_filtered": "No news matching filters. Click \"Show all\".",
-      "empty": "No news. Click \"Fetch\"."
+      "empty": "No news. Click \"Fetch\".",
+      "select_item": "Select a news item from the list",
+      "tag_show": "Show only this tag",
+      "tag_add_filter": "Add to filters",
+      "tag_added_toast": "Tag {{tag}} added to filters",
+      "message_fallback": "Message #{{id}}"
     }
   },
   "filters": {

@@ -10,10 +10,40 @@ import {
   LayoutOutlined,
   ProfileOutlined,
 } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsViewMode } from '../../store/uiStore';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css, token }) => ({
+  toolbar: css`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    flex-shrink: 0;
+    background: ${token.colorBgContainer};
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+  `,
+  divider: css`
+    width: 1px;
+    height: 1.4em;
+    background: ${token.colorBorderSecondary};
+    margin: 0 2px;
+    flex-shrink: 0;
+    align-self: center;
+  `,
+  hashTag: css`
+    font-size: 13px;
+    padding: 2px 8px;
+  `,
+  stats: css`
+    font-size: 12px;
+  `,
+}));
 
 interface NewsFeedToolbarProps {
   fetchPending: boolean;
@@ -59,6 +89,7 @@ export function NewsFeedToolbar({
   isMobile = false,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
 
   const periodOptions = [
     { value: '1', label: t('news.period.1d') },
@@ -77,7 +108,7 @@ export function NewsFeedToolbar({
   ];
 
   return (
-    <div className="news-feed__toolbar">
+    <div className={styles.toolbar}>
       <Space wrap>
         <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
           <Button icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
@@ -101,27 +132,13 @@ export function NewsFeedToolbar({
           </Tooltip>
         </Badge>
         {hashTagFilter && (
-          <Tag
-            color="blue"
-            closeIcon={<CloseCircleOutlined />}
-            onClose={onClearHashTag}
-            style={{ fontSize: 13, padding: '2px 8px' }}
-          >
+          <Tag color="blue" closeIcon={<CloseCircleOutlined />} onClose={onClearHashTag} className={styles.hashTag}>
             {hashTagFilter}
           </Tag>
         )}
         {!isMobile && (
           <>
-            <div
-              style={{
-                width: 1,
-                height: '1.4em',
-                background: 'var(--tgr-color-border-secondary, #e8e8e8)',
-                margin: '0 2px',
-                flexShrink: 0,
-                alignSelf: 'center',
-              }}
-            />
+            <div className={styles.divider} />
             <Tooltip title={t('news.toolbar.view_list')}>
               <Button
                 size="small"
@@ -142,7 +159,7 @@ export function NewsFeedToolbar({
         )}
       </Space>
 
-      <Space size={12} style={{ fontSize: 12 }}>
+      <Space size={12} className={styles.stats}>
         <Text type="secondary">{t('news.toolbar.shown', { count: shownCount })}</Text>
         {hiddenCount > 0 && <Text type="secondary">{t('news.toolbar.hidden', { count: hiddenCount })}</Text>}
         <Text type="secondary">{t('news.toolbar.total', { count: totalCount })}</Text>

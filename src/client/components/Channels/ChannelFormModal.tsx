@@ -1,8 +1,15 @@
 import React from 'react';
 import { Modal, Form, Input, Select, Spin } from 'antd';
 import type { FormInstance } from 'antd';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Channel, Group } from '@shared/types.ts';
+
+const useStyles = createStyles(({ css }) => ({
+  form: css`
+    margin-top: 16px;
+  `,
+}));
 
 interface ChannelFormModalProps {
   open: boolean;
@@ -28,6 +35,7 @@ export function ChannelFormModal({
   onTelegramIdBlur,
 }: ChannelFormModalProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   return (
     <Modal
       open={open}
@@ -38,7 +46,7 @@ export function ChannelFormModal({
       cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
     >
-      <Form form={form} layout="vertical" style={{ marginTop: 16 }} autoComplete="off">
+      <Form form={form} layout="vertical" className={styles.form} autoComplete="off">
         <Form.Item
           name="telegramId"
           label={t('channels.form.telegram_id_label')}

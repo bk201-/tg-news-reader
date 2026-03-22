@@ -1,11 +1,70 @@
 import React from 'react';
 import { Button, Typography, Divider, Modal, Radio } from 'antd';
 import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
+import { useTranslation } from 'react-i18next';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 import { NewsDetailMedia } from './NewsDetailMedia';
 
 const { Text, Paragraph } = Typography;
+
+const useStyles = createStyles(({ css, token }) => ({
+  content: css`
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  `,
+  contentInline: css`
+    flex: none;
+    overflow: visible;
+  `,
+  textBody: css`
+    width: 100%;
+    max-width: 680px;
+    min-width: 0;
+    margin-top: 20px;
+  `,
+  fullContent: css`
+    background: ${token.colorBgContainer};
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 8px;
+  `,
+  paragraph: css`
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.8;
+  `,
+  paragraphCompact: css`
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.7;
+  `,
+  loadBtn: css`
+    margin-top: 8px;
+  `,
+  errorText: css`
+    font-size: 12px;
+    display: block;
+    margin-top: 4px;
+  `,
+  dividerLabel: css`
+    font-size: 12px;
+  `,
+  radioGroup: css`
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  `,
+  radioLink: css`
+    font-size: 12px;
+  `,
+}));
 
 interface NewsDetailBodyProps {
   item: NewsItem;
@@ -32,6 +91,7 @@ interface NewsDetailBodyProps {
   onSelectedUrlChange: (url: string) => void;
   onModalConfirm: () => void;
   onModalCancel: () => void;
+  variant?: 'panel' | 'inline';
 }
 
 export function NewsDetailBody({
@@ -59,10 +119,14 @@ export function NewsDetailBody({
   onSelectedUrlChange,
   onModalConfirm,
   onModalCancel,
+  variant = 'panel',
 }: NewsDetailBodyProps) {
+  const { styles, cx } = useStyles();
+  const { t } = useTranslation();
+
   return (
     <>
-      <div className="news-detail__content">
+      <div className={cx(styles.content, variant === 'inline' && styles.contentInline)}>
         <NewsDetailMedia
           item={item}
           firstMediaPath={firstMediaPath}
@@ -77,16 +141,14 @@ export function NewsDetailBody({
           onDownload={onDownload}
         />
 
-        <div className="news-detail__text-body">
+        <div className={styles.textBody}>
           {channelType === 'link_continuation' ? (
             item.fullContent ? (
-              <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>
-                {item.fullContent}
-              </Paragraph>
+              <Paragraph className={styles.paragraph}>{item.fullContent}</Paragraph>
             ) : (
               <>
-                <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7 }}>
-                  {item.text || <Text type="secondary">(нет текста)</Text>}
+                <Paragraph className={styles.paragraphCompact}>
+                  {item.text || <Text type="secondary">{t('news.detail.no_text')}</Text>}
                 </Paragraph>
                 {links.filter((l) => !isYouTubeUrl(l)).length > 0 && (
                   <Button
@@ -94,35 +156,33 @@ export function NewsDetailBody({
                     onClick={onExtractClick}
                     loading={articleLoading}
                     disabled={articleQueued}
-                    style={{ marginTop: 8 }}
+                    className={styles.loadBtn}
                   >
-                    {articleQueued ? 'В очереди…' : 'Загрузить полный текст'}
+                    {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
                   </Button>
                 )}
                 {articleTaskStatus === 'failed' && (
-                  <Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                    Ошибка: {articleTaskError}
+                  <Text type="danger" className={styles.errorText}>
+                    {t('news.detail.error', { error: articleTaskError })}
                   </Text>
                 )}
               </>
             )
           ) : channelType === 'media_content' ? null : (
-            <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7 }}>
-              {item.text || <Text type="secondary">(нет текста)</Text>}
+            <Paragraph className={styles.paragraphCompact}>
+              {item.text || <Text type="secondary">{t('news.detail.no_text')}</Text>}
             </Paragraph>
           )}
 
           {channelType !== 'link_continuation' && item.fullContent && (
             <>
               <Divider>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Полный текст статьи
+                <Text type="secondary" className={styles.dividerLabel}>
+                  {t('news.detail.full_content_divider')}
                 </Text>
               </Divider>
-              <div className="news-detail__full-content">
-                <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8 }}>
-                  {item.fullContent}
-                </Paragraph>
+              <div className={styles.fullContent}>
+                <Paragraph className={styles.paragraph}>{item.fullContent}</Paragraph>
               </div>
             </>
           )}
@@ -131,22 +191,22 @@ export function NewsDetailBody({
 
       <Modal
         open={linkModalOpen}
-        title="Выберите ссылку для загрузки"
-        okText="Загрузить"
-        cancelText="Отмена"
+        title={t('news.detail.select_link_title')}
+        okText={t('common.download')}
+        cancelText={t('common.cancel')}
         onOk={onModalConfirm}
         onCancel={onModalCancel}
       >
         <Radio.Group
           value={selectedUrl}
           onChange={(e) => onSelectedUrlChange(e.target.value as string)}
-          style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+          className={styles.radioGroup}
         >
           {links
             .filter((l) => !isYouTubeUrl(l))
             .map((link) => (
               <Radio key={link} value={link}>
-                <Text style={{ fontSize: 12 }}>{link.length > 70 ? link.substring(0, 70) + '…' : link}</Text>
+                <Text className={styles.radioLink}>{link.length > 70 ? link.substring(0, 70) + '…' : link}</Text>
               </Radio>
             ))}
         </Radio.Group>

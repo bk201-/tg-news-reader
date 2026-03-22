@@ -1,7 +1,24 @@
 import React from 'react';
+import { createStyles } from 'antd-style';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { NewsListItem } from './NewsListItem';
 import { NewsDetail } from './NewsDetail';
+
+const useStyles = createStyles(({ css, token }) => ({
+  item: css`
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    /* Remove the inner item's own bottom border — accordion wrapper provides it */
+    & > div:first-child {
+      border-bottom: none;
+    }
+  `,
+  itemExpanded: css`
+    border-left: 3px solid ${token.colorPrimary};
+  `,
+  itemDimmed: css`
+    opacity: 0.45;
+  `,
+}));
 
 interface NewsAccordionItemProps {
   item: NewsItem;
@@ -24,6 +41,8 @@ export function NewsAccordionItem({
   onTagClick,
   onMarkedRead,
 }: NewsAccordionItemProps) {
+  const { styles, cx } = useStyles();
+
   if (!isFiltered && !showAll) return null;
 
   const dimmed = !isFiltered && showAll;
@@ -31,7 +50,7 @@ export function NewsAccordionItem({
   return (
     <div
       data-news-id={item.id}
-      className={`accordion-item${isSelected ? ' accordion-item--expanded' : ''}${dimmed ? ' accordion-item--dimmed' : ''}`}
+      className={cx(styles.item, isSelected && styles.itemExpanded, dimmed && styles.itemDimmed)}
     >
       {isSelected ? (
         <NewsDetail

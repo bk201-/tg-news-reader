@@ -3,6 +3,7 @@
     "save": "Сохранить",
     "cancel": "Отмена",
     "delete": "Удалить",
+    "download": "Загрузить",
     "loading": "Загрузка...",
     "none": "Не выбрано",
     "retry": "Повторить"
@@ -11,7 +12,8 @@
     "channels": "Каналы",
     "refresh": "Обновить",
     "refresh_tooltip": "Посчитать непрочитанные в Telegram",
-    "add": "Добавить"
+    "add": "Добавить",
+    "select_channel": "Выберите канал из списка слева"
   },
   "channels": {
     "updated": "Обновлено: {{date}}",
@@ -112,12 +114,31 @@
       "open": "Открыть",
       "open_tooltip": "Открыть в браузере [Enter]",
       "mark_read": "Прочитано",
-      "mark_unread": "Не прочитано"
+      "mark_unread": "Не прочитано",
+      "prev": "Предыдущее",
+      "next": "Следующее",
+      "retry_download": "Повторить загрузку",
+      "download_media": "Скачать медиа",
+      "download_media_size": "Скачать медиа ({{size}})",
+      "photo_alt": "Фото {{current}} из {{total}}",
+      "space_hint": "· Пробел = прочитано",
+      "no_text": "(нет текста)",
+      "full_content_divider": "Полный текст статьи",
+      "error": "Ошибка: {{error}}",
+      "article_queued_toast": "Статья поставлена в очередь загрузки",
+      "media_queued_toast": "Медиа поставлено в очередь загрузки",
+      "select_link_title": "Выберите ссылку для загрузки",
+      "text_panel_title": "Текст новости"
     },
     "list": {
       "empty_tag": "Нет новостей с тегом {{tag}}",
       "empty_filtered": "Нет новостей по фильтрам. Нажмите «Показать все».",
-      "empty": "Нет новостей. Нажмите «Выгрузить»."
+      "empty": "Нет новостей. Нажмите «Выгрузить».",
+      "select_item": "Выберите новость из списка",
+      "tag_show": "Показать только этот тег",
+      "tag_add_filter": "Добавить в фильтры",
+      "tag_added_toast": "Тег {{tag}} добавлен в фильтры",
+      "message_fallback": "Сообщение #{{id}}"
     }
   },
   "filters": {

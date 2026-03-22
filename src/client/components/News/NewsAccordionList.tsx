@@ -1,8 +1,25 @@
 import React from 'react';
 import { Spin, Empty } from 'antd';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
+
+const useStyles = createStyles(({ css, token }) => ({
+  accordion: css`
+    flex: 1;
+    overflow-y: auto;
+    background: ${token.colorBgContainer};
+  `,
+  loadingWrap: css`
+    display: flex;
+    justify-content: center;
+    padding: 32px;
+  `,
+  empty: css`
+    margin-top: 48px;
+  `,
+}));
 
 interface NewsAccordionListProps {
   isLoading: boolean;
@@ -34,6 +51,7 @@ export function NewsAccordionList({
   listRef,
 }: NewsAccordionListProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
 
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
@@ -42,13 +60,13 @@ export function NewsAccordionList({
       : t('news.list.empty');
 
   return (
-    <div className="news-feed__accordion" ref={listRef}>
+    <div className={styles.accordion} ref={listRef}>
       {isLoading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+        <div className={styles.loadingWrap}>
           <Spin size="large" />
         </div>
       )}
-      {!isLoading && items.length === 0 && <Empty description={emptyDescription} style={{ marginTop: 48 }} />}
+      {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {items.map((item) => (
         <NewsAccordionItem
           key={item.id}

@@ -1,10 +1,25 @@
 import React from 'react';
 import { Modal, Input, Typography } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
+import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
 
 const { Text } = Typography;
+
+const useStyles = createStyles(({ css }) => ({
+  body: css`
+    margin-top: 16px;
+    text-align: center;
+  `,
+  lockIcon: css`
+    margin-right: 8px;
+  `,
+  pinError: css`
+    display: block;
+    margin-top: 8px;
+  `,
+}));
 
 interface GroupPinModalProps {
   open: boolean;
@@ -29,12 +44,13 @@ export function GroupPinModal({
   onPinChange,
 }: GroupPinModalProps) {
   const { t } = useTranslation();
+  const { styles } = useStyles();
   return (
     <Modal
       open={open}
       title={
         <span>
-          <LockOutlined style={{ marginRight: 8, color: pinTarget?.color }} />
+          <LockOutlined className={styles.lockIcon} style={{ color: pinTarget?.color }} />
           {t('groups.pin_modal.title', { name: pinTarget?.name })}
         </span>
       }
@@ -48,7 +64,7 @@ export function GroupPinModal({
       }}
     >
       <div
-        style={{ marginTop: 16, textAlign: 'center' }}
+        className={styles.body}
         onKeyDown={(e) => {
           if (e.key === 'Enter') onConfirm();
         }}
@@ -64,7 +80,7 @@ export function GroupPinModal({
           styles={{ root: { justifyContent: 'center' }, input: { width: 56, height: 56, fontSize: 24 } }}
         />
         {pinError && (
-          <Text type="danger" style={{ display: 'block', marginTop: 8 }}>
+          <Text type="danger" className={styles.pinError}>
             {pinError}
           </Text>
         )}
