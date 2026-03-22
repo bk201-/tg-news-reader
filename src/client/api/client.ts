@@ -3,6 +3,43 @@ import { logger } from '../logger';
 
 const BASE = '/api';
 
+// ─── Typed HTTP error ─────────────────────────────────────────────────────────
+
+/** Thrown for non-2xx HTTP responses. Carries the status code so retry logic can skip 4xx. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// ─── Network-level retry (TypeError = "Failed to fetch") ─────────────────────
+
+const NETWORK_RETRY_ATTEMPTS = 3;
+
+async function fetchWithNetworkRetry(input: string, init?: RequestInit): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= NETWORK_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (err) {
+      lastErr = err;
+      // AbortError — never retry
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      // Only retry pure network errors (TypeError: "Failed to fetch")
+      if (!(err instanceof TypeError)) throw err;
+      if (attempt === NETWORK_RETRY_ATTEMPTS) break;
+      const delay = 500 * Math.pow(2, attempt); // 500ms, 1s, 2s
+      logger.debug({ module: 'client', attempt: attempt + 1, delay }, 'network error — retrying fetch');
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 // Prevent multiple simultaneous refresh calls
 let refreshing: Promise<string | null> | null = null;
 
@@ -36,7 +73,7 @@ async function tryRefresh(): Promise<string | null> {
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
   const { accessToken } = useAuthStore.getState();
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithNetworkRetry(`${BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -51,14 +88,14 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
     logger.debug({ module: 'client', path }, '401 — attempting token refresh');
     const newToken = await tryRefresh();
     if (newToken) return request<T>(path, options, true);
-    throw new Error('Session expired. Please log in again.');
+    throw new ApiError(401, 'Session expired. Please log in again.');
   }
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as { error?: string };
     const msg = err.error || `HTTP ${res.status}`;
     logger.warn({ module: 'client', path, status: res.status }, msg);
-    throw new Error(msg);
+    throw new ApiError(res.status, msg);
   }
 
   return res.json() as Promise<T>;

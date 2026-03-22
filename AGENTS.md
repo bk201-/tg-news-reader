@@ -41,6 +41,7 @@ src/
     routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
                       # downloadManager.ts, downloadProgress.ts, mediaProgress.ts
+                      # telegramCircuitBreaker.ts (retry + circuit breaker for all Telegram calls)
     logger.ts         # Single pino instance — import { logger } from '../logger.js'
   client/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
@@ -421,3 +422,49 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 - `newsViewMode: 'list' | 'accordion'` — user preference, persisted
 - `NewsViewMode` type exported from `uiStore.ts`
 
+## Resilience Layer
+
+### Client-side retries
+- **`ApiError`** (`src/client/api/client.ts`) — typed HTTP error with `status: number`; thrown by `request()` instead of plain `Error`
+- **Network retry**: `fetchWithNetworkRetry()` wraps bare `fetch()` — retries `TypeError` ("Failed to fetch") up to 3× with **500ms → 1s → 2s** backoff; `AbortError` never retried
+- **TanStack Query retry** (`src/client/main.tsx`): 4xx `ApiError` → `return false` (no retry); 5xx / network → up to 3 attempts with **1s → 2s → 4s → 30s cap** exponential backoff. Mutations stay at default `retry: 0` — don't add global mutation retry (duplicate writes)
+
+### Server-side: Telegram circuit breaker
+`src/server/services/telegramCircuitBreaker.ts` — singleton `telegramCircuit`:
+- **Retry**: 3 attempts; `FloodWaitError` → waits exactly `error.seconds * 1000ms`; other transient errors → **2s → 4s → 8s**; permanent errors (wrong username, missing media) pass through immediately
+- **Circuit breaker**: opens after **5 consecutive transient failures**, half-opens after **30s**, closes on first success; logs every state transition at `warn`/`error`/`info`
+- All exported functions in `telegram.ts` are wrapped: `fetchChannelMessages`, `getChannelInfo`, `getReadInboxMaxId`, `readChannelHistory`, `fetchMessageById`, `downloadMessageMedia` (only the `tg.downloadMedia` call, not the local size checks)
+- `GET /api/health` exposes circuit state: `{ status: 'ok'|'degraded', telegram: { circuit: 'closed'|'open'|'half-open' } }`
+
+### Server-side: download worker retry
+`src/server/services/downloadManager.ts`:
+- Inner retry loop in `runWorker`: up to `DOWNLOAD_MAX_RETRIES` (env, default 3) attempts per task
+- Transient: `FloodWaitError`, `ECONNRESET`, `ETIMEDOUT`, `circuit breaker OPEN` → retry with **30s → 60s → 120s** backoff
+- Permanent: "No media in message", "size limit", "Article task missing URL" → fail immediately
+- **`spawnWorker(id)`** — self-healing: if `runWorker()` throws (shouldn't, but safety), restarts after 5s
+
+### Azure boundary
+Azure App Service / Container Apps handles: process-level crash recovery (containers restart), TCP-level retries, health probing against `/api/health`. It does **not** retry application logic — that's all in code above.
+
+## Logging Pipeline
+
+```
+Client logger.warn/error
+  → POST /api/log/client (batched 2s; errors flush immediately; keepalive: true)
+  → server/routes/clientLog.ts → pino logger (module: 'client:xxx')
+  → stdout JSON (prod) / pino-pretty (dev)
+  → Azure Container Apps captures stdout → Log Analytics Workspace
+  → KQL queries
+```
+
+**Pino in prod** emits one JSON line per log call (no transport configured — raw stdout). Azure automatically ingests it into `ContainerAppConsoleLogs_CL`. Fields like `module`, `status`, `ms` become queryable. KQL example:
+```kusto
+ContainerAppConsoleLogs_CL
+| extend log = parse_json(Log_s)
+| where log.level >= 40  // warn+
+| project TimeGenerated, module=log.module, msg=log.msg
+```
+
+**Client logger** (`src/client/logger.ts`): `debug`/`info` → console only; `warn`/`error` → console + batched POST to `/api/log/client`. Prod level default: `warn` (override: `VITE_LOG_LEVEL`). Server level default: `info` in prod (override: `LOG_LEVEL`).
+
+**For Azure Monitor Metrics** (real-time dashboards, alerts by request count/error rate): add `applicationinsights` npm package and call `client.trackMetric()` / `client.trackRequest()`. Without it, only Log Analytics (query-based, minutes delay) is available — sufficient for this project.

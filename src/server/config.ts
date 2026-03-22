@@ -7,6 +7,8 @@ export const REFRESH_EXPIRES_DAYS = 7;
 export const DOWNLOAD_WORKER_CONCURRENCY = parseInt(process.env.DOWNLOAD_WORKER_CONCURRENCY ?? '10', 10);
 /** How long (ms) to keep a completed task before auto-deleting it. Env: DOWNLOAD_TASK_CLEANUP_DELAY_SEC */
 export const DOWNLOAD_TASK_CLEANUP_DELAY_MS = parseInt(process.env.DOWNLOAD_TASK_CLEANUP_DELAY_SEC ?? '30', 10) * 1_000;
+/** Max in-memory retry attempts for transient download errors. Env: DOWNLOAD_MAX_RETRIES */
+export const DOWNLOAD_MAX_RETRIES = parseInt(process.env.DOWNLOAD_MAX_RETRIES ?? '3', 10);
 
 // ─── Media size limits ────────────────────────────────────────────────────────
 // Configure in MB via env; stored as bytes internally. Applied only to background (priority < 10) downloads.

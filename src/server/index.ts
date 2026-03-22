@@ -18,6 +18,7 @@ import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { startWorkerPool } from './services/downloadManager.js';
 import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 import { logger } from './logger.js';
+import { getTelegramCircuitState } from './services/telegramCircuitBreaker.js';
 
 // Run DB migration on startup
 import './db/migrate.js';
@@ -92,8 +93,15 @@ app.route('/api/media', mediaRouter);
 app.route('/api/downloads', downloadsRouter);
 app.route('/api/log/client', clientLogRouter);
 
-// Health check
-app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
+// Health check — exposes Telegram circuit state for uptime monitors
+app.get('/api/health', (c) => {
+  const telegramCircuit = getTelegramCircuitState();
+  return c.json({
+    status: telegramCircuit === 'open' ? 'degraded' : 'ok',
+    timestamp: Date.now(),
+    telegram: { circuit: telegramCircuit },
+  });
+});
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

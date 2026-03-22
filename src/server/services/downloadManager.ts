@@ -4,11 +4,34 @@ import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { fetchMessageById, downloadMessageMedia } from './telegram.js';
 import { extractContentFromUrl, buildFullContent } from './readability.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
-import { DOWNLOAD_TASK_CLEANUP_DELAY_MS } from '../config.js';
+import { DOWNLOAD_TASK_CLEANUP_DELAY_MS, DOWNLOAD_MAX_RETRIES } from '../config.js';
 import type { DownloadType, DownloadTask } from '../../shared/types.js';
 import { logger } from '../logger.js';
 
 const WAKEUP_EVENT = 'wakeup';
+
+// ─── Transient error detection ────────────────────────────────────────────────
+
+/** Returns true for errors that are safe to retry (network/timeout/flood). */
+function isTransientDownloadError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  const code = (err as NodeJS.ErrnoException).code ?? '';
+  return (
+    err.constructor.name === 'FloodWaitError' ||
+    msg.includes('timeout') ||
+    msg.includes('flood') ||
+    msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('network') ||
+    msg.includes('connection') ||
+    msg.includes('socket') ||
+    msg.includes('circuit breaker') ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND'
+  );
+}
 
 // ─── Context query ────────────────────────────────────────────────────────────
 
@@ -144,14 +167,35 @@ async function runWorker(): Promise<never> {
     const taskCtx = await getTaskWithContext(task.id);
     if (taskCtx) emitTaskUpdate({ ...taskCtx, status: 'processing' });
 
-    try {
-      if (task.type === 'media') {
-        await processMediaTask(task.newsId, task.priority);
-      } else {
-        if (!task.url) throw new Error('Article task missing URL');
-        await processArticleTask(task.newsId, task.url);
-      }
+    // ── Inner retry loop for transient errors ────────────────────────────────
+    let lastErr: unknown;
+    let succeeded = false;
 
+    for (let attempt = 0; attempt < DOWNLOAD_MAX_RETRIES; attempt++) {
+      try {
+        if (task.type === 'media') {
+          await processMediaTask(task.newsId, task.priority);
+        } else {
+          if (!task.url) throw new Error('Article task missing URL');
+          await processArticleTask(task.newsId, task.url);
+        }
+        succeeded = true;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const isLast = attempt === DOWNLOAD_MAX_RETRIES - 1;
+        if (isLast || !isTransientDownloadError(err)) break; // permanent or exhausted
+        // Exponential backoff: 30s, 60s, 120s — capped at 5 min
+        const delay = Math.min(30_000 * Math.pow(2, attempt), 5 * 60_000);
+        logger.warn(
+          { module: 'download', taskId: task.id, type: task.type, attempt: attempt + 1, delayMs: delay },
+          `transient error — retrying in ${delay}ms`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+
+    if (succeeded) {
       const now = Math.floor(Date.now() / 1000);
       await db.update(downloads).set({ status: 'done', processedAt: now }).where(eq(downloads.id, task.id));
 
@@ -163,8 +207,8 @@ async function runWorker(): Promise<never> {
           void db.delete(downloads).where(eq(downloads.id, task.id));
         }, DOWNLOAD_TASK_CLEANUP_DELAY_MS);
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+    } else {
+      const errorMsg = lastErr instanceof Error ? lastErr.message : String(lastErr);
       const now = Math.floor(Date.now() / 1000);
       await db
         .update(downloads)
@@ -174,7 +218,10 @@ async function runWorker(): Promise<never> {
       const failedTask = await getTaskWithContext(task.id);
       if (failedTask) emitTaskUpdate({ ...failedTask, status: 'failed', error: errorMsg });
 
-      console.error(`[DownloadManager] Task ${task.id} (${task.type}, news=${task.newsId}) failed:`, err);
+      logger.error(
+        { module: 'download', taskId: task.id, type: task.type, newsId: task.newsId, err: lastErr },
+        `task failed after ${DOWNLOAD_MAX_RETRIES} attempts`,
+      );
     }
   }
 }
@@ -260,15 +307,22 @@ export async function getActiveTasks(): Promise<DownloadTask[]> {
 /**
  * Start N concurrent worker loops. Call once at server startup.
  * Resets any tasks stuck in 'processing' from a previous crash.
+ * Each worker is self-healing: if it crashes, it restarts after 5s.
  */
 export function startWorkerPool(concurrency = 10): void {
   // Reset crash-stuck tasks
   void db.update(downloads).set({ status: 'pending' }).where(eq(downloads.status, 'processing'));
 
   for (let i = 0; i < concurrency; i++) {
-    void runWorker().catch((err) => {
-      logger.error({ module: 'download', workerId: i, err }, 'worker crashed');
-    });
+    spawnWorker(i);
   }
   logger.info({ module: 'download', concurrency }, `worker pool started (${concurrency} workers)`);
+}
+
+/** Starts a single worker; automatically restarts it after 5s if it crashes. */
+function spawnWorker(id: number): void {
+  void runWorker().catch((err) => {
+    logger.error({ module: 'download', workerId: id, err }, 'worker crashed — restarting in 5s');
+    setTimeout(() => spawnWorker(id), 5_000);
+  });
 }

@@ -4,6 +4,8 @@ import { Api } from 'telegram';
 import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../logger.js';
+import { telegramCircuit } from './telegramCircuitBreaker.js';
+import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
 
 let client: TelegramClient | null = null;
 
@@ -35,62 +37,47 @@ export interface TelegramMessage {
   mediaSizeBytes?: number;
   rawMedia?: Api.TypeMessageMedia;
   // Album support
-  groupedId?: string; // BigInt serialised as string
-  rawMediaItems?: Api.TypeMessageMedia[]; // all media in album (index 0 = primary)
-  albumTelegramIds?: number[]; // telegram msg IDs for every album member
+  groupedId?: string;
+  rawMediaItems?: Api.TypeMessageMedia[];
+  albumTelegramIds?: number[];
 }
 
 function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
   const links: string[] = [];
-
   if (entities) {
     for (const entity of entities) {
       if (entity instanceof Api.MessageEntityUrl) {
-        const url = text.substring(entity.offset, entity.offset + entity.length);
-        links.push(url);
+        links.push(text.substring(entity.offset, entity.offset + entity.length));
       } else if (entity instanceof Api.MessageEntityTextUrl) {
         links.push(entity.url);
       }
     }
   }
-
-  // Also extract raw URLs with regex
   const urlRegex = /https?:\/\/[^\s\]]+/g;
-  const rawUrls = text.match(urlRegex) || [];
-  for (const url of rawUrls) {
-    if (!links.includes(url)) {
-      links.push(url);
-    }
+  for (const url of text.match(urlRegex) ?? []) {
+    if (!links.includes(url)) links.push(url);
   }
-
   return links;
 }
 
 function extractHashtags(text: string, entities?: Api.TypeMessageEntity[]): string[] {
   const hashtags: string[] = [];
-
   if (entities) {
     for (const entity of entities) {
       if (entity instanceof Api.MessageEntityHashtag) {
-        const tag = text.substring(entity.offset, entity.offset + entity.length);
-        hashtags.push(tag.toLowerCase());
+        hashtags.push(text.substring(entity.offset, entity.offset + entity.length).toLowerCase());
       }
     }
   }
-
   const tagRegex = /#[\wа-яА-Я]+/gu;
-  const rawTags = text.match(tagRegex) || [];
-  for (const tag of rawTags) {
+  for (const tag of text.match(tagRegex) ?? []) {
     const normalized = tag.toLowerCase();
-    if (!hashtags.includes(normalized)) {
-      hashtags.push(normalized);
-    }
+    if (!hashtags.includes(normalized)) hashtags.push(normalized);
   }
-
   return hashtags;
 }
 
-const BATCH_SIZE = 100; // Telegram's practical per-request limit
+const BATCH_SIZE = 100;
 
 function parseMessageFields(msg: Api.Message, channelUsername: string): TelegramMessage | null {
   void channelUsername;
@@ -136,13 +123,21 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
   };
 }
 
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export async function fetchChannelMessages(
+  channelUsername: string,
+  options: { sinceDate?: Date; limit?: number; offsetId?: number } = {},
+): Promise<TelegramMessage[]> {
+  return telegramCircuit.execute(() => _fetchChannelMessages(channelUsername, options), 'fetchChannelMessages');
+}
+
+async function _fetchChannelMessages(
   channelUsername: string,
   options: { sinceDate?: Date; limit?: number; offsetId?: number } = {},
 ): Promise<TelegramMessage[]> {
   const tg = await getTelegramClient();
   const { sinceDate, limit = 500 } = options;
-
   const allMessages: TelegramMessage[] = [];
   let offsetId = options.offsetId ?? 0;
 
@@ -154,29 +149,23 @@ export async function fetchChannelMessages(
       });
 
       if (!result || result.length === 0) break;
-
       let reachedSinceDate = false;
 
       for (const msg of result) {
         if (!(msg instanceof Api.Message)) continue;
-
         const msgDate = new Date((msg.date || 0) * 1000);
-
-        // Messages come newest-first; once we hit sinceDate, stop
         if (sinceDate && msgDate <= sinceDate) {
           reachedSinceDate = true;
           break;
         }
-
         const parsed = parseMessageFields(msg, channelUsername);
         if (parsed) allMessages.push(parsed);
       }
 
       if (reachedSinceDate) break;
-      if (result.length < BATCH_SIZE) break; // no more messages in channel
-      if (allMessages.length >= limit) break; // safety cap
+      if (result.length < BATCH_SIZE) break;
+      if (allMessages.length >= limit) break;
 
-      // Oldest message ID in this batch → next batch starts from there
       const lastMsg = result[result.length - 1];
       if (lastMsg instanceof Api.Message) {
         offsetId = lastMsg.id;
@@ -185,13 +174,11 @@ export async function fetchChannelMessages(
       }
     }
   } catch (err) {
-    console.error('Error fetching Telegram messages:', err);
+    logger.error({ module: 'telegram', channelUsername, err }, 'Error fetching Telegram messages');
     throw err;
   }
 
   // ── Album grouping ──────────────────────────────────────────────────────────
-  // Messages in the same album share a groupedId. Merge them into one primary
-  // message (lowest ID = has the caption) so we store one news row per album.
   const groupMap = new Map<string, TelegramMessage[]>();
   const singles: TelegramMessage[] = [];
 
@@ -207,11 +194,10 @@ export async function fetchChannelMessages(
 
   const albumPrimaries: TelegramMessage[] = [];
   for (const group of groupMap.values()) {
-    group.sort((a, b) => a.id - b.id); // lowest id = caption message
+    group.sort((a, b) => a.id - b.id);
     const primary = group[0];
     const rawMediaItems = group.map((g) => g.rawMedia).filter((m): m is Api.TypeMessageMedia => m !== undefined);
     const totalSize = group.reduce((sum, g) => sum + (g.mediaSizeBytes ?? 0), 0);
-
     albumPrimaries.push({
       ...primary,
       rawMediaItems: rawMediaItems.length > 1 ? rawMediaItems : undefined,
@@ -230,8 +216,8 @@ export interface ChannelInfo {
 }
 
 export async function getChannelInfo(username: string): Promise<ChannelInfo> {
-  const tg = await getTelegramClient();
-  try {
+  return telegramCircuit.execute(async () => {
+    const tg = await getTelegramClient();
     const entity = await tg.getEntity(username);
     let name = 'Unknown';
     let resolvedUsername: string | null = null;
@@ -240,7 +226,6 @@ export async function getChannelInfo(username: string): Promise<ChannelInfo> {
     if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
       name = (entity as Api.Channel).title ?? name;
       resolvedUsername = (entity as Api.Channel).username ?? null;
-      // Try to fetch full info for description
       try {
         const full = await tg.invoke(new Api.channels.GetFullChannel({ channel: entity as Api.Channel }));
         description = (full.fullChat as Api.ChannelFull).about || null;
@@ -253,45 +238,39 @@ export async function getChannelInfo(username: string): Promise<ChannelInfo> {
     }
 
     return { name, username: resolvedUsername, description };
-  } catch (err) {
-    console.error('Error getting channel info:', err);
-    throw err;
-  }
+  }, 'getChannelInfo');
 }
 
 /** Returns the last read message ID for a channel from Telegram (readInboxMaxId) */
 export async function getReadInboxMaxId(channelUsername: string): Promise<number | null> {
-  const tg = await getTelegramClient();
   try {
-    const inputPeer = await tg.getInputEntity(channelUsername);
-    const result = await tg.invoke(
-      new Api.messages.GetPeerDialogs({
-        peers: [new Api.InputDialogPeer({ peer: inputPeer })],
-      }),
-    );
-    const dialog = result.dialogs[0];
-    if (!dialog || !('readInboxMaxId' in dialog)) return null;
-    const maxId = dialog.readInboxMaxId;
-    return maxId > 0 ? maxId : null;
+    return await telegramCircuit.execute(async () => {
+      const tg = await getTelegramClient();
+      const inputPeer = await tg.getInputEntity(channelUsername);
+      const result = await tg.invoke(
+        new Api.messages.GetPeerDialogs({
+          peers: [new Api.InputDialogPeer({ peer: inputPeer })],
+        }),
+      );
+      const dialog = result.dialogs[0];
+      if (!dialog || !('readInboxMaxId' in dialog)) return null;
+      const maxId = dialog.readInboxMaxId;
+      return maxId > 0 ? maxId : null;
+    }, 'getReadInboxMaxId');
   } catch (err) {
-    console.warn('Failed to get readInboxMaxId from Telegram:', err);
+    logger.warn({ module: 'telegram', channelUsername, err }, 'Failed to get readInboxMaxId from Telegram');
     return null;
   }
 }
 
 /** Marks all messages up to maxId as read in Telegram (syncs read state across all devices) */
 export async function readChannelHistory(channelUsername: string, maxId: number): Promise<void> {
-  const tg = await getTelegramClient();
-  const entity = await tg.getEntity(channelUsername);
-  await tg.invoke(
-    new Api.channels.ReadHistory({
-      channel: entity,
-      maxId,
-    }),
-  );
+  await telegramCircuit.execute(async () => {
+    const tg = await getTelegramClient();
+    const entity = await tg.getEntity(channelUsername);
+    await tg.invoke(new Api.channels.ReadHistory({ channel: entity, maxId }));
+  }, 'readChannelHistory');
 }
-
-import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
 
 /** Downloads media for a message. Returns relative path like "channelId/123.jpg" or null.
  *  Pass ignoreLimit=true for user-initiated (on-demand) downloads. */
@@ -332,68 +311,72 @@ export async function downloadMessageMedia(
   const dir = join(process.cwd(), 'data', channelTelegramId);
   mkdirSync(dir, { recursive: true });
 
-  const filename = `${msg.id}.${ext}`;
+  const filename = `${msg.id}.${ext!}`;
   const filepath = join(dir, filename);
 
+  // Skip download if file already exists (idempotent)
   if (existsSync(filepath)) return `${channelTelegramId}/${filename}`;
 
-  const tg = await getTelegramClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-  const buffer = await tg.downloadMedia(msg.rawMedia, {} as any);
-  if (!buffer) return null;
-
-  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer as unknown as Uint8Array);
-  writeFileSync(filepath, bytes);
-  return `${channelTelegramId}/${filename}`;
+  // Only the actual network download goes through the circuit breaker
+  return telegramCircuit.execute(async () => {
+    const tg = await getTelegramClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const buffer = await tg.downloadMedia(msg.rawMedia!, {} as any);
+    if (!buffer) return null;
+    const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer as unknown as Uint8Array);
+    writeFileSync(filepath, bytes);
+    return `${channelTelegramId}/${filename}`;
+  }, 'downloadMessageMedia');
 }
 
 /** Fetches a single message by Telegram message ID (for on-demand media download). */
 export async function fetchMessageById(channelUsername: string, msgId: number): Promise<TelegramMessage | null> {
-  const tg = await getTelegramClient();
   try {
-    const result = await tg.getMessages(channelUsername, { ids: [msgId] });
-    const msg = result[0];
-    if (!(msg instanceof Api.Message)) return null;
+    return await telegramCircuit.execute(async () => {
+      const tg = await getTelegramClient();
+      const result = await tg.getMessages(channelUsername, { ids: [msgId] });
+      const msg = result[0];
+      if (!(msg instanceof Api.Message)) return null;
 
-    const text = msg.message || '';
-    const links = extractLinks(text, msg.entities);
-    const hashtags = extractHashtags(text, msg.entities);
+      const text = msg.message || '';
+      const links = extractLinks(text, msg.entities);
+      const hashtags = extractHashtags(text, msg.entities);
+      let mediaType: string | undefined;
+      let mediaSizeBytes: number | undefined;
 
-    let mediaType: string | undefined;
-    let mediaSizeBytes: number | undefined;
-
-    if (msg.media) {
-      if (msg.media instanceof Api.MessageMediaPhoto) {
-        mediaType = 'photo';
-        const photo = msg.media.photo;
-        if (photo instanceof Api.Photo) {
-          const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
-          const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
-          if (largest) mediaSizeBytes = largest.size;
+      if (msg.media) {
+        if (msg.media instanceof Api.MessageMediaPhoto) {
+          mediaType = 'photo';
+          const photo = msg.media.photo;
+          if (photo instanceof Api.Photo) {
+            const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
+            const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
+            if (largest) mediaSizeBytes = largest.size;
+          }
+        } else if (msg.media instanceof Api.MessageMediaDocument) {
+          mediaType = 'document';
+          const doc = msg.media.document;
+          if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
+        } else if (msg.media instanceof Api.MessageMediaWebPage) {
+          mediaType = 'webpage';
+        } else {
+          mediaType = 'other';
         }
-      } else if (msg.media instanceof Api.MessageMediaDocument) {
-        mediaType = 'document';
-        const doc = msg.media.document;
-        if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
-      } else if (msg.media instanceof Api.MessageMediaWebPage) {
-        mediaType = 'webpage';
-      } else {
-        mediaType = 'other';
       }
-    }
 
-    return {
-      id: msg.id,
-      message: text,
-      date: msg.date || 0,
-      links,
-      hashtags,
-      mediaType,
-      mediaSizeBytes,
-      rawMedia: msg.media ?? undefined,
-    };
+      return {
+        id: msg.id,
+        message: text,
+        date: msg.date || 0,
+        links,
+        hashtags,
+        mediaType,
+        mediaSizeBytes,
+        rawMedia: msg.media ?? undefined,
+      };
+    }, 'fetchMessageById');
   } catch (err) {
-    logger.warn({ module: 'telegram', err }, 'error fetching message by ID');
+    logger.warn({ module: 'telegram', channelUsername, msgId, err }, 'error fetching message by ID');
     return null;
   }
 }

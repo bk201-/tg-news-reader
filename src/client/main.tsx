@@ -16,6 +16,7 @@ import './styles.css';
 import './i18n';
 import { registerMediaServiceWorker } from './services/serviceWorker';
 import { logger } from './logger';
+import { ApiError } from './api/client';
 
 registerMediaServiceWorker();
 
@@ -52,7 +53,18 @@ const queryClient = new QueryClient({
       logger.warn({ module: 'query', err }, `Mutation error: ${err.message}`);
     },
   }),
-  defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      // Don't retry client errors (4xx) — only network and server errors
+      retry: (failureCount, err) => {
+        if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+        return failureCount < 3;
+      },
+      // Exponential backoff: 1s → 2s → 4s → … capped at 30s
+      retryDelay: (attempt) => Math.min(1_000 * Math.pow(2, attempt), 30_000),
+    },
+  },
 });
 
 function ThemedApp() {
