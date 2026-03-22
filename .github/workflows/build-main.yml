@@ -2,11 +2,12 @@ name: Build Main
 
 # Triggered by every push to main (i.e., after a PR is merged).
 # ─ checks : same quality gate as in PR — fails fast if something slipped through
-# ─ docker : builds the image, saves it as a gzip artifact, keeps only the 3 latest
+# ─ docker : builds the image, pushes to ACR, deploys to Container Apps
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:   # allows manual run from GitHub Actions UI
 
 permissions:
   contents: read
@@ -41,30 +42,51 @@ jobs:
       - name: Prettier
         run: npm run format:check
 
-  # ── 2. Build Docker image and save as artifact ───────────────────────────
+  # ── 2. Build, push to ACR, deploy to Container Apps ──────────────────────
   docker:
-    name: Build Docker Image
+    name: Build & Deploy
     needs: checks
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: |
-          docker build -t tg-news-reader:${{ github.sha }} .
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Export image to gzip archive
+      - name: Build and push Docker image to ACR
         run: |
-          docker save tg-news-reader:${{ github.sha }} | gzip > tg-news-reader.tar.gz
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }}
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ secrets.AZURE_CONTAINER_APP }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
+            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }}
+
+      - name: Export image archive (artifact backup)
+        run: |
+          docker save ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} | gzip > tg-news-reader.tar.gz
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: docker-image-${{ github.sha }}
           path: tg-news-reader.tar.gz
-          # Artifacts older than 3 are deleted by the cleanup step below;
-          # this is a safety-net expiry in case cleanup ever misses a run.
           retention-days: 90
 
       # ── Keep only 3 latest docker-image-* artifacts ──────────────────────
@@ -92,4 +114,3 @@ jobs:
               console.log(`Deleted: ${artifact.name} (created ${artifact.created_at})`);
             }
             console.log(`Kept: ${Math.min(images.length, 3)}, deleted: ${toDelete.length}`);
-
