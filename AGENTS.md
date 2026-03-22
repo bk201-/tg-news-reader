@@ -26,6 +26,35 @@ npm run lint           # ESLint
 npm run format:check   # Prettier (read-only check, use format to fix)
 ```
 
+## Git Workflow & CI/CD
+
+**`main` is protected** — direct pushes are blocked by a GitHub Ruleset. All changes must go through a PR.
+
+### Creating a PR
+```bash
+git checkout -b feat/my-feature   # branch off main
+# make changes
+git add . && git commit -m "feat: description"
+git push origin feat/my-feature
+# GitHub will print a URL to open the PR, or use: gh pr create --base main
+```
+
+### PR pipeline (`.github/workflows/pr-check.yml`)
+Runs automatically on every PR to `main`:
+1. `npm run build` → `npm run build:server` → `npm run lint` → `npm run format:check`
+2. If all pass **and** PR author is `bk201-` → PR is **auto-squash-merged** and the branch is deleted
+
+Required status check name in the Ruleset: **`Build & Lint`**
+
+### Main pipeline (`.github/workflows/build-main.yml`)
+Runs on every push to `main` (i.e., after PR merge):
+1. Same quality gate (fails the build if checks fail)
+2. `docker build` → `docker save | gzip` → uploaded as artifact `docker-image-<sha>.tar.gz`
+3. Cleanup step keeps only the **3 most recent** artifacts
+
+### Setup checklist
+One-time GitHub settings required after cloning/forking — see `.github/SETUP.md`.
+
 ## Architecture
 
 ```
