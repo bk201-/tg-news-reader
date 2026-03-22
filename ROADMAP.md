@@ -415,7 +415,8 @@ TURSO_AUTH_TOKEN=eyJ...
 ### CI/CD
 
 - GitHub Actions: push → build Docker image → push to ACR → deploy to Container Apps
-- Dockerfile: multi-stage (build Vite → Node prod)
+- **Base image**: `node:22-bookworm-slim` (Debian 12, glibc — работает с `@libsql/client` native binaries и `jsdom` без доп. пакетов; Alpine/musl исключён из-за несовместимости)
+- Multi-stage Dockerfile: builder (devDeps + Vite build + tsc) → runner (prodDeps only + `dist/`)
 - `npm run start` запускает сервер, он же раздаёт статику из `dist/client`
 
 ### Переменные окружения (prod)
