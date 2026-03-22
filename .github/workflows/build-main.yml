@@ -73,10 +73,7 @@ jobs:
           az containerapp update \
             --name ${{ secrets.AZURE_CONTAINER_APP }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
-            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
-            --registry-username ${{ secrets.ACR_USERNAME }} \
-            --registry-password ${{ secrets.ACR_PASSWORD }}
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }}
 
       - name: Export image archive (artifact backup)
         run: |
