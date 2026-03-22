@@ -1,4 +1,5 @@
 import { useAuthStore, type AuthUser } from '../store/authStore';
+import { logger } from '../logger';
 
 const BASE = '/api';
 
@@ -11,14 +12,17 @@ async function tryRefresh(): Promise<string | null> {
   refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
     .then(async (res) => {
       if (!res.ok) {
+        logger.info({ module: 'client' }, 'token refresh failed — clearing auth');
         useAuthStore.getState().clearAuth();
         return null;
       }
       const data = (await res.json()) as { accessToken: string; user: AuthUser };
+      logger.debug({ module: 'client' }, 'token refreshed');
       useAuthStore.getState().setAuth(data.accessToken, data.user);
       return data.accessToken;
     })
-    .catch(() => {
+    .catch((err: unknown) => {
+      logger.warn({ module: 'client', err }, 'token refresh network error');
       useAuthStore.getState().clearAuth();
       return null;
     })
@@ -44,6 +48,7 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
 
   // Auto-refresh on 401 (but not for auth endpoints themselves)
   if (res.status === 401 && !isRetry && !path.startsWith('/auth')) {
+    logger.debug({ module: 'client', path }, '401 — attempting token refresh');
     const newToken = await tryRefresh();
     if (newToken) return request<T>(path, options, true);
     throw new Error('Session expired. Please log in again.');
@@ -51,7 +56,9 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as { error?: string };
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const msg = err.error || `HTTP ${res.status}`;
+    logger.warn({ module: 'client', path, status: res.status }, msg);
+    throw new Error(msg);
   }
 
   return res.json() as Promise<T>;

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from './client';
 import { useAuthStore } from '../store/authStore';
+import { logger } from '../logger';
 import type { DownloadTask, DownloadType } from '@shared/types.ts';
 
 export const downloadsKeys = {
@@ -100,6 +101,7 @@ export function useDownloadsSSE() {
 
     es.onerror = () => {
       // Browser auto-reconnects EventSource on error
+      logger.warn({ module: 'downloads' }, 'SSE connection error — browser will reconnect');
     };
 
     return () => es.close();

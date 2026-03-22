@@ -5,6 +5,8 @@
  * with Vite HMR in development.
  */
 
+import { logger } from '../logger';
+
 export interface SwStats {
   count: number;
   maxEntries: number;
@@ -30,10 +32,10 @@ export function registerMediaServiceWorker(): void {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
       .then((reg) => {
-        console.log('[SW] registered, scope:', reg.scope);
+        logger.info({ module: 'sw', scope: reg.scope }, 'service worker registered');
       })
       .catch((err: unknown) => {
-        console.warn('[SW] registration failed:', err);
+        logger.warn({ module: 'sw', err }, 'service worker registration failed');
       });
   });
 }
