@@ -139,6 +139,13 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
+  // ── Auto-fetch on channel open ────────────────────────────────────────
+  useEffect(() => {
+    fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
+    // fetchChannel and onFetchSuccess are stable mutation refs — safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
+
   const handleFetchPeriod = useCallback(
     (val: string | number) => {
       const v = String(val);
