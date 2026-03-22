@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useLayoutEffect, useCallback, useRef, useState } from 'react';
 import { App, Empty, Grid } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -140,6 +140,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
+  // Safe now: NewsFeed stays mounted across breakpoint changes (AppLayout uses
+  // single Splitter return), so this fires only when the user picks a different channel.
   useEffect(() => {
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
     // fetchChannel and onFetchSuccess are stable mutation refs — safe to omit
@@ -189,11 +191,18 @@ export function NewsFeed({ channel }: NewsFeedProps) {
 
   // ── Scroll selected into view ─────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // useLayoutEffect fires before the browser paints — no visible flash of wrong position.
+  // el.offsetTop is the item's distance from .accordion top (which has position:relative,
+  // so it's the offsetParent). Setting scrollTop = offsetTop puts the header at the top.
+  useLayoutEffect(() => {
     if (!selectedNewsId || !listRef.current) return;
-    listRef.current
-      .querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: effectiveViewMode === 'accordion' ? 'start' : 'center' });
+    const el = listRef.current.querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`);
+    if (!el) return;
+    if (effectiveViewMode === 'accordion') {
+      listRef.current.scrollTop = el.offsetTop;
+    } else {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }, [selectedNewsId, effectiveViewMode]);
 
   return (

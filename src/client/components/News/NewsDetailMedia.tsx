@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Typography, Image } from 'antd';
+import { Button, Typography } from 'antd';
 import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -155,7 +155,7 @@ export function NewsDetailMedia({
           >
             <LeftOutlined />
           </button>
-          <Image
+          <img
             src={mediaUrl(paths[albumIndex])}
             alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumLength })}
             className={styles.mediaFile}

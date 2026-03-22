@@ -37,13 +37,6 @@ const useStyles = createStyles(({ css, token }) => ({
   emptyText: css`
     font-size: 16px;
   `,
-  mobileContent: css`
-    height: calc(100vh - 64px);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: ${token.colorBgLayout};
-  `,
   splitter: css`
     height: calc(100vh - 64px);
   `,
@@ -51,6 +44,11 @@ const useStyles = createStyles(({ css, token }) => ({
     background: ${token.colorBgContainer};
     border-right: 1px solid ${token.colorBorderSecondary};
     overflow: hidden;
+  `,
+  // When sidebarInDrawer: collapse sidebar panel to 0 and hide its border
+  sidebarPanelHidden: css`
+    overflow: hidden;
+    border-right: none !important;
   `,
   contentPanel: css`
     background: ${token.colorBgLayout};
@@ -77,12 +75,11 @@ export function AppLayout() {
   const { data: channels = [] } = useChannels();
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const { t } = useTranslation();
-  const { styles } = useStyles();
+  const { styles, cx } = useStyles();
   const initialized = useRef(false);
   const screens = Grid.useBreakpoint();
 
-  // screens.xxl = true when ≥ 1600px → full desktop with Splitter
-  // !screens.xxl → sidebar hidden in Drawer (< 1600px)
+  // screens.xxl = true when ≥ 1600px → inline sidebar; below → sidebar in Drawer
   const sidebarInDrawer = !screens.xxl;
 
   // Restore channel from URL once channels are loaded
@@ -121,45 +118,46 @@ export function AppLayout() {
     </div>
   );
 
-  if (sidebarInDrawer) {
-    return (
-      <Layout className={styles.layout}>
-        <AppHeader />
-        <Drawer
-          open={sidebarDrawerOpen}
-          onClose={() => setSidebarDrawerOpen(false)}
-          placement="left"
-          size="default"
-          styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
-          title={null}
-          closable={false}
-        >
-          {sidebarContent}
-        </Drawer>
-        <Layout.Content className={styles.mobileContent}>
-          {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
-        </Layout.Content>
-      </Layout>
-    );
-  }
-
+  // Single return: NewsFeed is always at the same tree position (Splitter.Panel[1] → contentMain),
+  // so it never remounts when sidebarInDrawer changes (breakpoint crossing or drawer toggle).
+  // On mobile: sidebar panel collapses to size=0, content moves to Drawer.
   return (
     <Layout className={styles.layout}>
       <AppHeader />
 
+      {/* Sidebar Drawer — only opens on mobile */}
+      <Drawer
+        open={sidebarInDrawer && sidebarDrawerOpen}
+        onClose={() => setSidebarDrawerOpen(false)}
+        placement="left"
+        size="default"
+        styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
+        title={null}
+        closable={false}
+      >
+        {sidebarContent}
+      </Drawer>
+
       <Splitter
         className={styles.splitter}
-        onResizeEnd={(sizes) => localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])))}
+        onResizeEnd={(sizes) => {
+          // Only persist when sidebar is visible (not collapsed to 0)
+          if (!sidebarInDrawer) localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])));
+        }}
       >
+        {/* Sidebar panel: visible + resizable on desktop, collapsed to 0 on mobile */}
         <Splitter.Panel
           defaultSize={parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10)}
-          min={200}
-          max={500}
-          className={styles.sidebarPanel}
+          min={sidebarInDrawer ? 0 : 200}
+          max={sidebarInDrawer ? 0 : 500}
+          size={sidebarInDrawer ? 0 : undefined}
+          resizable={!sidebarInDrawer}
+          className={cx(styles.sidebarPanel, sidebarInDrawer && styles.sidebarPanelHidden)}
         >
-          {sidebarContent}
+          {!sidebarInDrawer && sidebarContent}
         </Splitter.Panel>
 
+        {/* Content panel: NewsFeed always here — stable tree position → no remount */}
         <Splitter.Panel className={styles.contentPanel}>
           <div className={styles.contentFlex}>
             <div className={styles.contentMain}>

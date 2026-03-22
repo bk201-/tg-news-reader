@@ -9,6 +9,7 @@ const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
     flex: 1;
     overflow-y: auto;
+    position: relative;
     background: ${token.colorBgContainer};
   `,
   loadingWrap: css`
