@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../store/authStore';
+import { logger } from '../logger';
 import type { NewsItem } from '@shared/types.ts';
 
 interface MediaProgressEvent {
@@ -17,6 +19,7 @@ export function useMediaProgressSSE(
   onComplete?: () => void,
 ) {
   const qc = useQueryClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const onProgressRef = useRef(onProgress);
   const onCompleteRef = useRef(onComplete);
   useEffect(() => {
@@ -29,7 +32,8 @@ export function useMediaProgressSSE(
   useEffect(() => {
     if (!channelId) return;
 
-    const es = new EventSource(`/api/channels/${channelId}/media-progress`);
+    const token = accessToken ? `?token=${encodeURIComponent(accessToken)}` : '';
+    const es = new EventSource(`/api/channels/${channelId}/media-progress${token}`);
 
     es.addEventListener('item', (e: MessageEvent) => {
       const data = JSON.parse(e.data as string) as MediaProgressEvent;
@@ -57,11 +61,12 @@ export function useMediaProgressSSE(
     });
 
     es.onerror = () => {
+      logger.warn({ module: 'mediaProgress', channelId }, 'SSE error — closing stream');
       es.close();
       void qc.invalidateQueries({ queryKey: ['news', channelId] });
       onCompleteRef.current?.();
     };
 
     return () => es.close();
-  }, [channelId, key, qc]); // key forces reconnect on each fetch
+  }, [channelId, key, qc, accessToken]); // key forces reconnect on each fetch
 }

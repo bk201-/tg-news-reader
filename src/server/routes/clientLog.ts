@@ -1,0 +1,54 @@
+import { Hono } from 'hono';
+import { logger } from '../logger.js';
+
+interface ClientLogEntry {
+  level: 'warn' | 'error';
+  module?: unknown;
+  msg?: string;
+  time?: number;
+  url?: string;
+  [key: string]: unknown;
+}
+
+const ALLOWED_LEVELS = new Set(['warn', 'error']);
+const MAX_ENTRIES = 20;
+const MAX_STRING = 2000;
+
+function truncate(v: unknown): unknown {
+  if (typeof v === 'string' && v.length > MAX_STRING) return v.slice(0, MAX_STRING) + '…';
+  return v;
+}
+
+const router = new Hono();
+
+router.post('/', async (c) => {
+  const body = await c.req.json<{ entries: ClientLogEntry[] }>().catch(() => null);
+  if (!body || !Array.isArray(body.entries)) return c.json({ ok: false }, 400);
+
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
+  for (const entry of body.entries.slice(0, MAX_ENTRIES)) {
+    if (!ALLOWED_LEVELS.has(entry.level)) continue;
+
+    const { level, msg, module: mod, url, ...rest } = entry;
+    const moduleName = `client:${typeof mod === 'string' ? mod : 'unknown'}`;
+    const message = typeof msg === 'string' ? msg.slice(0, 500) : '(no message)';
+
+    const meta: Record<string, unknown> = {
+      module: moduleName,
+      ip,
+      ...(url ? { url: truncate(url) } : {}),
+      ...Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, truncate(v)])),
+    };
+
+    if (level === 'error') {
+      logger.error(meta, message);
+    } else {
+      logger.warn(meta, message);
+    }
+  }
+
+  return c.json({ ok: true });
+});
+
+export default router;
