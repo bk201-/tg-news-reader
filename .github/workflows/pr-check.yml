@@ -1,0 +1,60 @@
+name: PR Check
+
+# Runs on every PR targeting main.
+# ─ checks   : full build + lint + prettier (required status check)
+# ─ auto-merge: squash-merges the PR immediately after checks pass
+#               (only when the PR author is dshilov)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write       # needed to merge
+  pull-requests: write  # needed for gh pr merge
+
+jobs:
+  # ── 1. Full quality gate ──────────────────────────────────────────────────
+  checks:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Vite build (client)
+        run: npm run build
+
+      - name: TypeScript check (server)
+        run: npm run build:server
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier
+        run: npm run format:check
+
+  # ── 2. Auto-merge owner PRs ───────────────────────────────────────────────
+  # Runs only after `checks` passes, and only for PRs opened by dshilov.
+  # Uses squash-merge for a clean linear history on main.
+  auto-merge:
+    name: Auto-merge (owner PR)
+    needs: checks
+    runs-on: ubuntu-latest
+    if: github.actor == 'bk201-'
+
+    steps:
+      - name: Squash-merge and delete branch
+        run: |
+          gh pr merge --squash --delete-branch "${{ github.event.pull_request.html_url }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

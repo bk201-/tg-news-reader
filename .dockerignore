@@ -8,6 +8,7 @@ dist
 data
 # Dev / VCS
 .git
+.github
 .gitignore
 *.log
 # Editor cruft

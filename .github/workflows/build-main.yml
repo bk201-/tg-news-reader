@@ -1,0 +1,95 @@
+name: Build Main
+
+# Triggered by every push to main (i.e., after a PR is merged).
+# ─ checks : same quality gate as in PR — fails fast if something slipped through
+# ─ docker : builds the image, saves it as a gzip artifact, keeps only the 3 latest
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: write   # needed to delete old artifacts
+
+jobs:
+  # ── 1. Quality gate (same as PR) ─────────────────────────────────────────
+  checks:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Vite build (client)
+        run: npm run build
+
+      - name: TypeScript check (server)
+        run: npm run build:server
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier
+        run: npm run format:check
+
+  # ── 2. Build Docker image and save as artifact ───────────────────────────
+  docker:
+    name: Build Docker Image
+    needs: checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t tg-news-reader:${{ github.sha }} .
+
+      - name: Export image to gzip archive
+        run: |
+          docker save tg-news-reader:${{ github.sha }} | gzip > tg-news-reader.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: tg-news-reader.tar.gz
+          # Artifacts older than 3 are deleted by the cleanup step below;
+          # this is a safety-net expiry in case cleanup ever misses a run.
+          retention-days: 90
+
+      # ── Keep only 3 latest docker-image-* artifacts ──────────────────────
+      - name: Cleanup old artifacts (keep 3)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const images = data.artifacts
+              .filter(a => a.name.startsWith('docker-image-'))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const toDelete = images.slice(3);
+            for (const artifact of toDelete) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+              console.log(`Deleted: ${artifact.name} (created ${artifact.created_at})`);
+            }
+            console.log(`Kept: ${Math.min(images.length, 3)}, deleted: ${toDelete.length}`);
+
