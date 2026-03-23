@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { sendAlert } from './alertBot.js';
 
 // ─── Transient error detection ────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ class TelegramCircuitBreaker {
         { module: 'telegram', consecutiveFailures: this.consecutiveFailures },
         'circuit breaker → OPEN — Telegram unreachable, blocking calls for 30s',
       );
+      void sendAlert('Telegram circuit breaker OPEN — Telegram unreachable, calls blocked for 30s', 'circuit-open');
     }
   }
 
@@ -115,6 +117,13 @@ class TelegramCircuitBreaker {
       return result;
     } catch (err) {
       if (isTransientTelegramError(err)) this.recordFailure();
+      // Session expired → alert immediately (permanent, not caught by circuit breaker)
+      if (err instanceof Error && err.message.includes('AUTH_KEY_UNREGISTERED')) {
+        void sendAlert(
+          'Telegram session expired (AUTH_KEY_UNREGISTERED) — run <code>npm run tg:auth</code> and redeploy',
+          'auth-key-unregistered',
+        );
+      }
       throw err;
     }
   }

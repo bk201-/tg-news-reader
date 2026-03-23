@@ -96,6 +96,29 @@ jobs:
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --mode Single
 
+      # ── Post-deploy smoke test ─────────────────────────────────────────────
+      # Polls /api/health every 10s for up to 3 minutes.
+      # Fails the workflow if the container never becomes healthy.
+      - name: Smoke test — wait for healthy container
+        run: |
+          FQDN=$(az containerapp show \
+            --name ${{ secrets.AZURE_CONTAINER_APP }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+
+          echo "Polling https://${FQDN}/api/health (max 3 min)..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${FQDN}/api/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health check passed (attempt $i, status 200)"
+              exit 0
+            fi
+            echo "  attempt $i/18: status=$STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "❌ Health check failed after 3 minutes — container did not become healthy"
+          exit 1
+
       # ── Purge old ACR images — keep only the 5 most recent tags ──────────
       # ACR Basic = 10 GB limit; without cleanup images accumulate forever.
       # 'acr purge' runs as an ACR Task (no extra auth needed).
@@ -142,3 +165,26 @@ jobs:
               console.log(`Deleted: ${artifact.name} (created ${artifact.created_at})`);
             }
             console.log(`Kept: ${Math.min(images.length, 3)}, deleted: ${toDelete.length}`);
+
+      # ── Telegram alert on deploy failure ──────────────────────────────────
+      # Requires ALERT_BOT_TOKEN + ALERT_CHAT_ID secrets.
+      # No-op if they are not set — won't fail the workflow.
+      - name: Notify failure (Telegram)
+        if: failure()
+        env:
+          ALERT_BOT_TOKEN: ${{ secrets.ALERT_BOT_TOKEN }}
+          ALERT_CHAT_ID: ${{ secrets.ALERT_CHAT_ID }}
+        run: |
+          if [[ -z "$ALERT_BOT_TOKEN" || -z "$ALERT_CHAT_ID" ]]; then
+            echo "ALERT_BOT_TOKEN or ALERT_CHAT_ID not set — skipping Telegram notification"
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG="🚨 <b>TG Reader</b>%0ADeploy FAILED%0ASHA: <code>${{ github.sha }}</code>%0A<a href='${RUN_URL}'>View run</a>"
+          curl -s -X POST "https://api.telegram.org/bot${ALERT_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${ALERT_CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" \
+            --max-time 10 || true
+

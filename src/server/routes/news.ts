@@ -112,12 +112,14 @@ router.get('/', async (c) => {
       .map((f: (typeof activeFilters)[number]) => f.value.toLowerCase());
 
     if (tagValues.length > 0) {
-      const orClauses = tagValues.flatMap((tag: string) => [
-        sql`lower(value) = ${tag}`,
-        sql`lower(value) = ${'#' + tag}`,
-      ]);
-      const combined = orClauses.reduce((acc: SQL<unknown>, clause: SQL<unknown>) => sql`${acc} OR ${clause}`);
-      conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE ${combined})`);
+      // Build a flat list: each tag appears twice — with and without '#' prefix
+      // Use IN (...) instead of OR chain to avoid SQLite expression tree depth limit (max 100).
+      // OR chains hit the limit with ~50+ tag filters; IN handles thousands without issue.
+      const tagList = tagValues.flatMap((tag: string) => [tag, '#' + tag]);
+      const inValues = tagList
+        .map((t: string) => sql`${t}`)
+        .reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
+      conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE lower(value) IN (${inValues}))`);
       filtersApplied = true;
     }
 

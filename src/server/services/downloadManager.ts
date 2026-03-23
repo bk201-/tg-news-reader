@@ -7,6 +7,7 @@ import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 import { DOWNLOAD_TASK_CLEANUP_DELAY_MS, DOWNLOAD_MAX_RETRIES } from '../config.js';
 import type { DownloadType, DownloadTask } from '../../shared/types.js';
 import { logger } from '../logger.js';
+import { sendAlert } from './alertBot.js';
 
 const WAKEUP_EVENT = 'wakeup';
 
@@ -321,8 +322,9 @@ export function startWorkerPool(concurrency = 10): void {
 
 /** Starts a single worker; automatically restarts it after 5s if it crashes. */
 function spawnWorker(id: number): void {
-  void runWorker().catch((err) => {
+  void runWorker().catch((err: unknown) => {
     logger.error({ module: 'download', workerId: id, err }, 'worker crashed — restarting in 5s');
+    void sendAlert(`Download worker ${id} crashed: ${(err as Error).message ?? 'unknown'}`, 'worker-crash');
     setTimeout(() => spawnWorker(id), 5_000);
   });
 }
