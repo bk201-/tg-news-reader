@@ -49,6 +49,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Range requests (video seeking) return 206 Partial Content which the Cache API
+  // cannot store — let the browser talk directly to the server for those.
+  if (event.request.headers.has('Range')) {
+    return;
+  }
+
   event.respondWith(cacheFirst(event.request));
 });
 
@@ -90,7 +96,8 @@ async function cacheFirst(request) {
 async function fetchAndCache(request, key, cache) {
   const response = await fetch(request);
 
-  if (response.ok) {
+  // 206 Partial Content cannot be stored in the Cache API — skip caching
+  if (response.ok && response.status !== 206) {
     // Clone and attach a timestamp header so we can implement TTL
     const headers = new Headers(response.headers);
     headers.set('x-cached-at', String(Date.now()));
