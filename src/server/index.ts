@@ -19,6 +19,8 @@ import { startWorkerPool } from './services/downloadManager.js';
 import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 import { logger } from './logger.js';
 import { getTelegramCircuitState } from './services/telegramCircuitBreaker.js';
+import { sendAlert } from './services/alertBot.js';
+import { client } from './db/index.js';
 
 // Run DB migration on startup
 import './db/migrate.js';
@@ -27,7 +29,12 @@ import './db/migrate.js';
 
 process.on('uncaughtException', (err) => {
   logger.error({ module: 'process', err }, 'uncaughtException — shutting down');
-  process.exit(1);
+  // Best-effort alert before exit (give it 3s, then exit anyway)
+  const msg = `uncaughtException: ${(err as Error).message ?? String(err)}`;
+  void sendAlert(msg, 'uncaughtException')
+    .catch(() => {})
+    .finally(() => process.exit(1));
+  setTimeout(() => process.exit(1), 3_000).unref();
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -93,12 +100,23 @@ app.route('/api/media', mediaRouter);
 app.route('/api/downloads', downloadsRouter);
 app.route('/api/log/client', clientLogRouter);
 
-// Health check — exposes Telegram circuit state for uptime monitors
-app.get('/api/health', (c) => {
+// Health check — exposes DB + Telegram circuit state for uptime monitors
+app.get('/api/health', async (c) => {
+  let dbOk = true;
+  try {
+    await client.execute('SELECT 1');
+  } catch {
+    dbOk = false;
+  }
+
   const telegramCircuit = getTelegramCircuitState();
+  const status = !dbOk || telegramCircuit === 'open' ? 'degraded' : 'ok';
+
   return c.json({
-    status: telegramCircuit === 'open' ? 'degraded' : 'ok',
+    status,
     timestamp: Date.now(),
+    uptime: Math.floor(process.uptime()),
+    db: dbOk ? 'ok' : 'error',
     telegram: { circuit: telegramCircuit },
   });
 });
