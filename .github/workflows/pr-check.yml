@@ -56,5 +56,7 @@ jobs:
         run: |
           gh pr merge --squash --delete-branch "${{ github.event.pull_request.html_url }}"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          # PAT_TOKEN (not GITHUB_TOKEN) — pushes via GITHUB_TOKEN are intentionally
+          # ignored by GitHub to prevent loops, so build-main.yml would never fire.
+          # PAT_TOKEN push IS treated as a real push and triggers downstream workflows.
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
