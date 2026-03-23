@@ -103,7 +103,7 @@ jobs:
         run: |
           az acr run \
             --registry ${{ secrets.ACR_LOGIN_SERVER }} \
-            --cmd "acr purge --filter 'tg-news-reader:.*' --keep 5 --untagged" \
+            --cmd "acr purge --filter 'tg-news-reader:.*' --keep 5 --ago 0d --untagged" \
             /dev/null
 
       - name: Export image archive (artifact backup)
