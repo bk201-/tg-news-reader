@@ -13,7 +13,10 @@ export function useDownloads() {
   return useQuery({
     queryKey: downloadsKeys.all,
     queryFn: () => api.get<DownloadTask[]>('/downloads'),
-    refetchInterval: 5000,
+    // SSE (useDownloadsSSE) keeps this data up-to-date via push events —
+    // no polling needed.
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
 }
 
