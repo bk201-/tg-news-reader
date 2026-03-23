@@ -19,11 +19,25 @@ export default tseslint.config(
   // Server — TypeScript strict
   {
     name: 'server',
-    files: ['src/server/**/*.ts', 'scripts/**/*.ts'],
+    files: ['src/server/**/*.ts'],
     extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.server.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: sharedRules,
+  },
+
+  // Scripts — TypeScript strict (separate tsconfig so they don't affect rootDir inference)
+  {
+    name: 'scripts',
+    files: ['scripts/**/*.ts'],
+    extends: [...tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.scripts.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
