@@ -67,11 +67,14 @@ Required status check name in the Ruleset: **`Build & Lint`**
 Runs on every push to `main` (i.e., after PR merge):
 1. Same quality gate (fails the build if checks fail)
 2. `docker login ACR` → `docker build` → `docker push` to ACR
-3. `az login` (service principal via `AZURE_CREDENTIALS`) → `az containerapp registry set` (link ACR to app) → `az containerapp update` (deploy new image)
-4. `docker save | gzip` → uploaded as artifact `docker-image-<sha>.tar.gz`
-5. Cleanup step keeps only the **3 most recent** artifacts
+3. `az login` (service principal via `AZURE_CREDENTIALS`) → `az containerapp registry set` → `az containerapp update` (deploy new image) → set single-revision mode
+4. **Smoke test**: polls `https://<fqdn>/api/health` every 10s for up to 3 min — fails workflow if container never becomes healthy
+5. `docker save | gzip` → uploaded as artifact `docker-image-<sha>.tar.gz`
+6. Cleanup step keeps only the **3 most recent** artifacts
+7. **`Notify failure (Telegram)`** step: `if: failure()` — sends deploy-failed alert via Bot API; no-op if `ALERT_BOT_TOKEN`/`ALERT_CHAT_ID` secrets not set
 
-**Required secrets**: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`, `AZURE_CREDENTIALS`, `AZURE_RESOURCE_GROUP`, `AZURE_CONTAINER_APP`, `PAT_TOKEN`
+**Required secrets**: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`, `AZURE_CREDENTIALS`, `AZURE_RESOURCE_GROUP`, `AZURE_CONTAINER_APP`, `PAT_TOKEN`  
+**Optional secrets** (for Telegram deploy alerts): `ALERT_BOT_TOKEN`, `ALERT_CHAT_ID`
 
 ### Rebasing a stale branch
 If a branch was created before recent PRs merged to `main`, GitHub will report conflicts. Fix:
@@ -102,6 +105,7 @@ src/
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
                       # downloadManager.ts, downloadProgress.ts, mediaProgress.ts
                       # telegramCircuitBreaker.ts (retry + circuit breaker for all Telegram calls)
+                      # alertBot.ts (Telegram push alerts via Bot API; no-op when env vars absent)
     logger.ts         # Single pino instance — import { logger } from '../logger.js'
   client/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
@@ -531,4 +535,46 @@ ContainerAppConsoleLogs_CL
 
 **Client logger** (`src/client/logger.ts`): `debug`/`info` → console only; `warn`/`error` → console + batched POST to `/api/log/client`. Prod level default: `warn` (override: `VITE_LOG_LEVEL`). Server level default: `info` in prod (override: `LOG_LEVEL`).
 
-**For Azure Monitor Metrics** (real-time dashboards, alerts by request count/error rate): add `applicationinsights` npm package and call `client.trackMetric()` / `client.trackRequest()`. Without it, only Log Analytics (query-based, minutes delay) is available — sufficient for this project.
+## Monitoring
+
+### alertBot — instant Telegram push (`src/server/services/alertBot.ts`)
+Calls Telegram Bot API directly from the Node.js process. **No-op when env vars absent** — safe to call unconditionally everywhere.
+
+```ts
+import { sendAlert } from './alertBot.js';
+void sendAlert('message text', 'optional-dedup-key');  // dedup: 5-min cooldown per key
+```
+
+**Currently fires on:**
+- `uncaughtException` → `logger.fatal` + `sendAlert` → `process.exit(1)` (`index.ts`)
+- `unhandledRejection` → `logger.error` only (process continues)
+- Download worker crash → `logger.error` + `sendAlert` (`downloadManager.ts`)
+- Telegram circuit breaker OPEN → `logger.error` + `sendAlert` (`telegramCircuitBreaker.ts`)
+- `AUTH_KEY_UNREGISTERED` → `sendAlert` (`telegramCircuitBreaker.ts`)
+- Server startup (prod only) → `sendAlert('🟢 Server started')` (`index.ts`)
+
+**To enable** — set on the Container App:
+```bash
+az containerapp update --name tg-news-reader --resource-group personal-apps-rg \
+  --set-env-vars ALERT_BOT_TOKEN=<token> ALERT_CHAT_ID=<chat_id>
+```
+How to get values: open [@BotFather](https://t.me/BotFather) → `/newbot` → copy token. Send any message to the bot, then `curl https://api.telegram.org/bot<TOKEN>/getUpdates` → read `result[0].message.chat.id`.
+
+To also enable deploy-failure alerts from GitHub Actions, add `ALERT_BOT_TOKEN` + `ALERT_CHAT_ID` as **GitHub Secrets** (same values).
+
+### Azure Monitor Alerts (already deployed — `personal-apps-rg`)
+Two alert rules send email to `sceletron@gmail.com` via Action Group `tg-reader-alerts`:
+
+| Rule | Trigger | Delay |
+|---|---|---|
+| `tg-reader-error-logs` | KQL: `log.level >= 50` in 5-min window | 1–5 min |
+| `tg-reader-restart` | Metric: `RestartCount > 0` in 5-min window | 1–5 min |
+
+To recreate from scratch on a different subscription: `scripts/setup-monitoring.sh` (fill in vars at the top). **Note**: the bash script's KQL uses `|` pipes — on Windows/PowerShell use `az rest --body @file.json` instead (see `C:\Users\dshilov\alert-kql-rule.json` as reference body).
+
+### UptimeRobot (optional — external HTTP monitor)
+Checks `/api/health` from outside Azure every 5 min. Catches what Azure Monitor can't: Azure region outage, event-loop freeze, etc.
+1. Register free at [uptimerobot.com](https://uptimerobot.com)
+2. Add monitor: type `HTTP(s)`, URL `https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/api/health`, interval 5 min
+3. Alert Contacts: add Telegram (native support) or email
+

@@ -28,9 +28,9 @@ import './db/migrate.js';
 // ─── Process-level error handlers ────────────────────────────────────────────
 
 process.on('uncaughtException', (err) => {
-  logger.error({ module: 'process', err }, 'uncaughtException — shutting down');
+  logger.fatal({ module: 'process', err }, 'uncaughtException — shutting down');
   // Best-effort alert before exit (give it 3s, then exit anyway)
-  const msg = `uncaughtException: ${(err as Error).message ?? String(err)}`;
+  const msg = `uncaughtException: ${err.message ?? String(err)}`;
   void sendAlert(msg, 'uncaughtException')
     .catch(() => {})
     .finally(() => process.exit(1));
@@ -134,3 +134,10 @@ startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
 
 serve({ fetch: app.fetch, port });
 logger.info({ module: 'server', port }, `Server running on http://localhost:${port}`);
+
+// Startup alert — no dedup key so every (re)start fires (process is fresh each time).
+// In prod: signals that the container came back up after a restart / new deploy.
+// No-op in dev (ALERT_BOT_TOKEN not set locally).
+if (process.env.NODE_ENV === 'production') {
+  void sendAlert(`🟢 Server started — port ${port}`).catch(() => {});
+}

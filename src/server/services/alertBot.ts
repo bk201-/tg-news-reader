@@ -52,4 +52,3 @@ export async function sendAlert(message: string, dedupKey?: string): Promise<voi
     logger.warn({ module: 'alert', err }, 'alert bot request failed');
   }
 }
-

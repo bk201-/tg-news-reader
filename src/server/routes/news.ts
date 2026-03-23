@@ -116,7 +116,9 @@ router.get('/', async (c) => {
       // Use IN (...) instead of OR chain to avoid SQLite expression tree depth limit (max 100).
       // OR chains hit the limit with ~50+ tag filters; IN handles thousands without issue.
       const tagList = tagValues.flatMap((tag: string) => [tag, '#' + tag]);
-      const inValues = tagList.map((t: string) => sql`${t}`).reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
+      const inValues = tagList
+        .map((t: string) => sql`${t}`)
+        .reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
       conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE lower(value) IN (${inValues}))`);
       filtersApplied = true;
     }
