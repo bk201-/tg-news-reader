@@ -46,11 +46,31 @@ Runs automatically on every PR to `main`:
 
 Required status check name in the Ruleset: **`Build & Lint`**
 
+> ⚠️ **Auto-merge uses `PAT_TOKEN`, not `GITHUB_TOKEN`.**  
+> GitHub intentionally ignores workflow triggers from pushes made by `GITHUB_TOKEN` (to prevent infinite loops).  
+> The auto-merge step in `pr-check.yml` must use a PAT stored as `secrets.PAT_TOKEN`  
+> (fine-grained, `Contents: write` + `Pull requests: write` on this repo).  
+> Without this, `build-main.yml` will never fire automatically after a PR merge.
+
 ### Main pipeline (`.github/workflows/build-main.yml`)
 Runs on every push to `main` (i.e., after PR merge):
 1. Same quality gate (fails the build if checks fail)
-2. `docker build` → `docker save | gzip` → uploaded as artifact `docker-image-<sha>.tar.gz`
-3. Cleanup step keeps only the **3 most recent** artifacts
+2. `docker login ACR` → `docker build` → `docker push` to ACR
+3. `az login` (service principal via `AZURE_CREDENTIALS`) → `az containerapp registry set` (link ACR to app) → `az containerapp update` (deploy new image)
+4. `docker save | gzip` → uploaded as artifact `docker-image-<sha>.tar.gz`
+5. Cleanup step keeps only the **3 most recent** artifacts
+
+**Required secrets**: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`, `AZURE_CREDENTIALS`, `AZURE_RESOURCE_GROUP`, `AZURE_CONTAINER_APP`, `PAT_TOKEN`
+
+### Rebasing a stale branch
+If a branch was created before recent PRs merged to `main`, GitHub will report conflicts. Fix:
+```bash
+git fetch origin
+git checkout main && git reset --hard origin/main
+git checkout your-branch
+git rebase origin/main   # resolve conflicts, then: git rebase --continue
+git push origin your-branch --force-with-lease
+```
 
 ### Setup checklist
 One-time GitHub settings required after cloning/forking — see `.github/SETUP.md`.
