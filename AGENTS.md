@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Full-stack personal Telegram news reader. **Backend**: Hono (Node.js) + SQLite via `@libsql/client` + Drizzle ORM. **Frontend**: React 19 + Ant Design 6 + TanStack Query v5 + Zustand. Server runs on port `3173`, Vite dev server on `5173`.
+Full-stack personal Telegram news reader. **Backend**: Hono (Node.js) + SQLite/Turso via `@libsql/client` + Drizzle ORM. **Frontend**: React 19 + Ant Design 6 + TanStack Query v5 + Zustand. Server runs on port `3173`, Vite dev server on `5173`.
 
 ## Key Commands
 
@@ -96,7 +96,7 @@ src/
     db/
       schema.ts       # Drizzle schema (source of truth for types)
       migrate.ts      # Manual migration runner (CREATE TABLE IF NOT EXISTS + ALTER TABLE)
-      index.ts        # libsql client + drizzle instance
+      index.ts        # libsql client + drizzle instance; reads DATABASE_URL+TURSO_AUTH_TOKEN for Turso when set, falls back to file:data/db.sqlite locally
     middleware/       # auth.ts (JWT verify), cors.ts, rateLimit.ts (production only, 120 req/min)
     routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
@@ -161,7 +161,7 @@ JWT-based auth with httpOnly refresh-cookie rotation and optional TOTP:
 - **Client `authStore`** (`src/client/store/authStore.ts`): holds `accessToken | null`, `user`, `unlockedGroupIds: number[]` (parsed from JWT payload), `isCheckingAuth`.
 - **`AuthGate`** (`src/client/components/Auth/AuthGate.tsx`): wraps the whole app; on mount calls `POST /api/auth/refresh` to restore session from cookie; shows `<LoginPage>` when unauthenticated.
 - **`client.ts`** (`src/client/api/client.ts`): central `api.{get,post,patch,delete}` wrapper — automatically retries with a refreshed token on 401 (one retry only, not for `/auth` paths).
-- **Create first user**: `npm run auth:create-user` (interactive CLI, writes to DB).
+- **Create first user**: `npm run auth:create-user -- <email> <password>` (writes to DB). **For production (Turso)**: temporarily add `DATABASE_URL` + `TURSO_AUTH_TOKEN` to local `.env` before running, then remove them.
 
 ## Channel Strategy Pattern
 
