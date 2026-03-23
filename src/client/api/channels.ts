@@ -68,10 +68,21 @@ export function useFetchChannel() {
         since,
         limit,
       }),
-    onSuccess: (_data, variables) => {
-      void qc.invalidateQueries({ queryKey: ['news', variables.id] });
-      void qc.invalidateQueries({ queryKey: channelKeys.all });
+    onSuccess: (data, variables) => {
       clearPendingCount(variables.id);
+
+      // Always update lastFetchedAt in the channels cache so the sidebar
+      // shows a fresh "last synced" time without a full GET /api/channels.
+      const now = Math.floor(Date.now() / 1000);
+      qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
+        old ? old.map((ch) => (ch.id === variables.id ? { ...ch, lastFetchedAt: now } : ch)) : old,
+      );
+
+      if (data.inserted > 0) {
+        // New messages inserted → refresh the news list and unreadCount badge.
+        void qc.invalidateQueries({ queryKey: ['news', variables.id] });
+        void qc.invalidateQueries({ queryKey: channelKeys.all });
+      }
     },
   });
 }
