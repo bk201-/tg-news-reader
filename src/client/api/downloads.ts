@@ -3,7 +3,8 @@ import { useEffect } from 'react';
 import { api } from './client';
 import { useAuthStore } from '../store/authStore';
 import { logger } from '../logger';
-import type { DownloadTask, DownloadType } from '@shared/types.ts';
+import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
+import type { NewsResponse } from './news';
 
 export const downloadsKeys = {
   all: ['downloads'] as const,
@@ -81,14 +82,40 @@ export function useDownloadsSSE() {
     es.addEventListener('task_update', (e: MessageEvent) => {
       const task = JSON.parse(e.data as string) as DownloadTask;
 
-      if (task.status === 'done' && task.channelId) {
-        // Refetch news FIRST so the content is already in cache, THEN remove the task.
-        // Removing the task first causes a flash: button reappears before the news
-        // query finishes updating (invalidateQueries is async / background).
-        void qc.refetchQueries({ queryKey: ['news', task.channelId] }).then(() => {
+      if (task.status === 'done') {
+        if (task.type === 'media' && task.channelId) {
+          // Update localMediaPath / localMediaPaths in-place — no refetch needed.
+          // Same pattern as useMediaProgressSSE to avoid spammy GET /api/news.
+          qc.setQueriesData<NewsResponse>({ queryKey: ['news', task.channelId] }, (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              items: old.items.map((item: NewsItem) => {
+                if (item.id !== task.newsId) return item;
+                return {
+                  ...item,
+                  localMediaPath: task.localMediaPath ?? item.localMediaPath,
+                  localMediaPaths: task.localMediaPaths
+                    ? (JSON.parse(task.localMediaPaths) as string[])
+                    : item.localMediaPaths,
+                };
+              }),
+            };
+          });
           qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => (old ?? []).filter((t) => t.id !== task.id));
-        });
-        return;
+          return;
+        }
+
+        if (task.channelId) {
+          // Article task: need fullContent — refetch the news list, then drop the task.
+          // Refetch FIRST so content is in cache before button state changes.
+          void qc.refetchQueries({ queryKey: ['news', task.channelId] }).then(() => {
+            qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
+              (old ?? []).filter((t) => t.id !== task.id),
+            );
+          });
+          return;
+        }
       }
 
       qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => {

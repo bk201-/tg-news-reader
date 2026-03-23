@@ -85,11 +85,9 @@ export function useFetchChannel() {
           : old,
       );
 
-      if (data.inserted > 0) {
-        // New messages arrived — refresh the news list so they appear.
-        // unreadCount badge is already updated above via setQueryData.
-        void qc.invalidateQueries({ queryKey: ['news', variables.id] });
-      }
+      // Always refresh the news list after fetch — even if inserted=0,
+      // media paths / read state may have changed since last load.
+      void qc.invalidateQueries({ queryKey: ['news', variables.id] });
     },
   });
 }
