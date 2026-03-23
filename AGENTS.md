@@ -39,6 +39,17 @@ git push origin feat/my-feature
 # GitHub will print a URL to open the PR, or use: gh pr create --base main
 ```
 
+> ⚠️ **После каждого мержа — вернись на main и обнови его перед следующей веткой.**  
+> Локальный `main` не обновляется автоматически после мержа PR на GitHub.  
+> Если создать новую ветку от устаревшего `main` — при следующем PR будут конфликты.
+
+```bash
+# После мержа PR — всегда делай это перед новой веткой:
+git checkout main
+git pull origin main          # или: git reset --hard origin/main
+git checkout -b feat/next-feature
+```
+
 ### PR pipeline (`.github/workflows/pr-check.yml`)
 Runs automatically on every PR to `main`:
 1. `npm run build` → `npm run build:server` → `npm run lint` → `npm run format:check`

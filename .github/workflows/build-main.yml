@@ -82,7 +82,28 @@ jobs:
           az containerapp update \
             --name ${{ secrets.AZURE_CONTAINER_APP }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }}
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
+            --revision-suffix ${{ github.sha }}
+
+      # ── Single-revision mode: deactivate all revisions except the new one ──
+      # Container Apps keeps old revisions by default — they consume quota.
+      # "Single" mode means only one active revision at a time.
+      - name: Set single-revision mode
+        run: |
+          az containerapp revision set-mode \
+            --name ${{ secrets.AZURE_CONTAINER_APP }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --mode Single
+
+      # ── Purge old ACR images — keep only the 5 most recent tags ──────────
+      # ACR Basic = 10 GB limit; without cleanup images accumulate forever.
+      # 'acr purge' runs as an ACR Task (no extra auth needed).
+      - name: Purge old ACR images (keep 5)
+        run: |
+          az acr run \
+            --registry ${{ secrets.ACR_LOGIN_SERVER }} \
+            --cmd "acr purge --filter 'tg-news-reader:.*' --keep 5 --untagged" \
+            /dev/null
 
       - name: Export image archive (artifact backup)
         run: |
