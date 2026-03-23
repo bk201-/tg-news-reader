@@ -168,7 +168,10 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const handleSpaceKey = useCallback(
     (item: (typeof displayItems)[number]) => {
       if (item.isRead === 0) {
-        markRead.mutate({ id: item.id, isRead: 1 }, { onSuccess: () => handleMarkedRead(item.id) });
+        markRead.mutate(
+          { id: item.id, isRead: 1, channelId: item.channelId },
+          { onSuccess: () => handleMarkedRead(item.id) },
+        );
       } else {
         const idx = displayItems.findIndex((n) => n.id === item.id);
         const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
@@ -184,7 +187,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     if (showAll || !selectedNewsId) return;
     if (displayItems.some((n) => n.id === selectedNewsId)) return;
     const item = newsItems.find((n) => n.id === selectedNewsId);
-    if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1 });
+    if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1, channelId: item.channelId });
     setSelectedNewsId(displayItems.find((n) => n.isRead === 0)?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayItems]);

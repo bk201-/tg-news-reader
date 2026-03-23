@@ -123,6 +123,17 @@ app.get('/api/health', async (c) => {
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
+  // Cache-Control for static assets:
+  //   /assets/* → immutable (Vite content-hashes every filename → safe to cache 1 year)
+  //   everything else (index.html, sw.js, robots.txt) → no-cache (always revalidate)
+  app.use('/*', async (c, next) => {
+    await next();
+    if (c.req.path.startsWith('/assets/')) {
+      c.res.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      c.res.headers.set('Cache-Control', 'no-cache');
+    }
+  });
   app.use('/*', serveStatic({ root: './dist/client' }));
   app.get('*', serveStatic({ path: './dist/client/index.html' }));
 }
