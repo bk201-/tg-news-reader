@@ -51,6 +51,8 @@ async function getTaskWithContext(id: number): Promise<DownloadTask | null> {
       newsText: news.text,
       channelId: news.channelId,
       channelName: channels.name,
+      localMediaPath: news.localMediaPath,
+      localMediaPaths: news.localMediaPaths,
     })
     .from(downloads)
     .innerJoin(news, eq(downloads.newsId, news.id))
@@ -66,6 +68,8 @@ async function getTaskWithContext(id: number): Promise<DownloadTask | null> {
     newsText: row.newsText || undefined,
     channelId: row.channelId || undefined,
     channelName: row.channelName || undefined,
+    localMediaPath: row.localMediaPath ?? null,
+    localMediaPaths: row.localMediaPaths ?? null,
   };
 }
 

@@ -17,6 +17,9 @@ export interface DownloadTask {
   newsText?: string;
   channelId?: number;
   channelName?: string;
+  // Result fields (populated on done tasks so client can update cache in-place)
+  localMediaPath?: string | null;
+  localMediaPaths?: string | null; // raw JSON string, e.g. '["ch/1.jpg","ch/2.jpg"]'
 }
 
 export interface Group {
