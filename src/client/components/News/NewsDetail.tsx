@@ -211,7 +211,7 @@ export function NewsDetail({
   const handleRefresh = () => void qc.invalidateQueries({ queryKey: ['news', item.channelId] });
   const handleMarkRead = () =>
     markRead.mutate(
-      { id: item.id, isRead: isRead ? 0 : 1 },
+      { id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId },
       {
         onSuccess: () => {
           if (!isRead) onMarkedRead?.(item.id);
