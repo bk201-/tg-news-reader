@@ -5,9 +5,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "allowImportingTsExtensions": false,
-    "noEmit": false,
-    "outDir": "dist",
-    "rootDir": "src",
+    "noEmit": true,
     "jsx": "react-jsx",
     "lib": ["ES2024"],
     "paths": {
@@ -15,6 +13,6 @@
       "@server/*": ["./src/server/*"]
     }
   },
-  "include": ["src/server", "src/shared"]
+  "include": ["scripts", "src/server", "src/shared"]
 }
 
