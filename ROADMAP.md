@@ -38,7 +38,7 @@
 
 | Статус | Приоритет | Задача | Зависимости | Сложность |
 |--------|-----------|--------|-------------|-----------|
-| ⬜ | 🟡 | Деплой в Azure (Container Apps + Turso) | Auth | ⭐⭐⭐ |
+| ✅ | 🟡 | Деплой в Azure (Container Apps + Turso) | Auth | ⭐⭐⭐ |
 | ⬜ | 🟡 | Fail detection после деплоя | Деплой | ⭐⭐ |
 | ⬜ | 🟢 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
 | ⬜ | 🟢 | Accessibility: фокус по Tab, ARIA-роли, a11y-аудит | — | ⭐⭐⭐ |
@@ -402,15 +402,22 @@ app.use('/api/*', authMiddleware);
 
 **Итого**: ~$10–30/мес в зависимости от объёма медиа.
 
-### Turso — нулевая миграция
+### Turso — подключение через переменные окружения
 
-`@libsql/client` уже установлен. Единственное изменение — переменные окружения:
+`@libsql/client` уже установлен. `db/index.ts` читает `DATABASE_URL` при старте: если задана — подключается к Turso (+ `TURSO_AUTH_TOKEN`), иначе использует локальный `file:data/db.sqlite`.
+
 ```env
-DATABASE_URL=libsql://my-db-username.turso.io
+DATABASE_URL=libsql://my-db-name-username.turso.io
 TURSO_AUTH_TOKEN=eyJ...
 ```
 
-Код не меняется вообще. Free tier: 9 GB, auto-backup.
+> ⚠️ **Создание пользователя в Turso**: перед первым входом нужно добавить запись в удалённую БД.  
+> Временно пропишите `DATABASE_URL` + `TURSO_AUTH_TOKEN` в локальный `.env`, запустите скрипт, затем уберите:
+> ```bash
+> npm run auth:create-user -- your@email.com YourPassword123!
+> ```
+
+Free tier Turso: 9 GB, auto-backup.
 
 ### CI/CD
 
@@ -757,7 +764,7 @@ export async function sendAlert(msg: string) {
 - [x] Перенести `applyFilters` полностью на сервер (server-side filtering через `json_each()`)
 - [x] Вынести логику расчёта `sinceDate` в shared helper (`getSinceDate` в channels.ts, используется в fetch-роуте; `count-unread` намеренно использует `lastFetchedAt` напрямую во избежание двойного счёта)
 - [ ] Индексы SQLite на `channel_id + is_read` (уже есть, но проверить при росте данных)
-- [ ] При деплое: SQLite → Turso (нулевые изменения кода, только URL в .env)
+- [x] При деплое: SQLite → Turso — `db/index.ts` теперь читает `DATABASE_URL`+`TURSO_AUTH_TOKEN`; fallback на `file:data/db.sqlite` локально (исправлено в PR #14 — hardcoded путь не учитывал env vars)
 - [x] robots.txt + X-Robots-Tag header + rate limiting (production only)
 - [x] `getChannelInfo` в telegram.ts — задействована: автозаполнение названия/описания при добавлении канала (`GET /api/channels/lookup`, onBlur на поле telegramId)
 - [x] Настроить git user.name/email (`git config --global user.name "..."`)
