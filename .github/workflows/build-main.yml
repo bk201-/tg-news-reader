@@ -79,11 +79,12 @@ jobs:
 
       - name: Deploy to Container Apps
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
           az containerapp update \
             --name ${{ secrets.AZURE_CONTAINER_APP }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
-            --revision-suffix ${{ github.sha }}
+            --revision-suffix "r${SHORT_SHA}"
 
       # ── Single-revision mode: deactivate all revisions except the new one ──
       # Container Apps keeps old revisions by default — they consume quota.
