@@ -15,6 +15,7 @@ import { NewsFeedList } from './NewsFeedList';
 import { NewsAccordionList } from './NewsAccordionList';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
+import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
@@ -181,6 +182,12 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [displayItems, markRead, handleMarkedRead, setSelectedNewsId],
   );
   useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
+  useNewsFeedHotkeys({
+    onFetch: handleFetchDefault,
+    onToggleShowAll: () => setShowAll(!showAll),
+    onMarkAllRead: () => markAllRead.mutate(channel.id),
+    onOpenFilters: () => setFilterPanelOpen(true),
+  });
 
   // ── Auto-mark read when selected post gets filtered out ───────────────
   useEffect(() => {

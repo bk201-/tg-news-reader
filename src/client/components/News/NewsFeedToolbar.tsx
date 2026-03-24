@@ -114,7 +114,7 @@ export function NewsFeedToolbar({
           <Button icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
         </Tooltip>
         <Segmented options={periodOptions} value={fetchPeriod} onChange={onFetchPeriod} disabled={fetchPending} />
-        <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
+        <Tooltip title={t('news.toolbar.show_all_tooltip')}>
           <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
             {showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all')}
           </Button>

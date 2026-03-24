@@ -77,14 +77,15 @@
   },
   "news": {
     "toolbar": {
-      "fetch_default_tooltip": "Выгрузить с последнего прочитанного",
+      "fetch_default_tooltip": "Выгрузить с последнего прочитанного · [U]",
       "sync_tooltip": "С последней синхронизации",
       "show_all": "Показать все",
+      "show_all_tooltip": "Переключить фильтр / все · [A]",
       "hide_filtered": "Только отфильтрованные",
       "mark_all_read": "Прочитать все",
-      "mark_all_read_tooltip": "Отметить все прочитанными и очистить список",
+      "mark_all_read_tooltip": "Отметить все прочитанными и очистить список · [M]",
       "filter": "Фильтр",
-      "filter_tooltip": "Фильтры",
+      "filter_tooltip": "Фильтры · [P]",
       "view_list": "Вид: список (две панели)",
       "view_accordion": "Вид: аккордеон",
       "shown": "Показано: {{count}}",
