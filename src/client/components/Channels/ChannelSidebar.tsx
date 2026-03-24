@@ -19,6 +19,7 @@ import { useUIStore } from '../../store/uiStore';
 import { ChannelItem } from './ChannelItem';
 import { ChannelFormModal } from './ChannelFormModal';
 import { ChannelFetchModal } from './ChannelFetchModal';
+import { useChannelHotkeys } from './useChannelHotkeys';
 
 const { Text } = Typography;
 
@@ -67,6 +68,8 @@ export function ChannelSidebar() {
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
   const { styles } = useStyles();
+
+  useChannelHotkeys();
 
   const channels = allChannels.filter((ch) =>
     selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId,

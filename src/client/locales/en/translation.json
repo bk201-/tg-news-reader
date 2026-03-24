@@ -77,14 +77,15 @@
   },
   "news": {
     "toolbar": {
-      "fetch_default_tooltip": "Fetch since last read",
+      "fetch_default_tooltip": "Fetch since last read · [U]",
       "sync_tooltip": "Since last sync",
       "show_all": "Show all",
+      "show_all_tooltip": "Toggle filtered / show all · [A]",
       "hide_filtered": "Filtered only",
       "mark_all_read": "Mark all read",
-      "mark_all_read_tooltip": "Mark all as read and clear list",
+      "mark_all_read_tooltip": "Mark all as read and clear list · [M]",
       "filter": "Filter",
-      "filter_tooltip": "Filters",
+      "filter_tooltip": "Filters · [P]",
       "view_list": "List view (two panels)",
       "view_accordion": "Accordion view",
       "shown": "Shown: {{count}}",
