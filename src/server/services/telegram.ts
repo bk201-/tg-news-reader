@@ -1,7 +1,7 @@
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Api } from 'telegram';
-import { mkdirSync, existsSync, writeFileSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
@@ -320,11 +320,11 @@ export async function downloadMessageMedia(
   // Only the actual network download goes through the circuit breaker
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
+    // Pass outputFile so gramjs writes directly to disk — avoids buffering the whole
+    // file in memory (a 75 MB video would otherwise allocate a 75 MB Buffer per worker).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    const buffer = await tg.downloadMedia(msg.rawMedia!, {} as any);
-    if (!buffer) return null;
-    const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer as unknown as Uint8Array);
-    writeFileSync(filepath, bytes);
+    const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
+    if (!result) return null;
     return `${channelTelegramId}/${filename}`;
   }, 'downloadMessageMedia');
 }

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { existsSync, openSync, readSync, statSync, closeSync } from 'fs';
+import { existsSync, statSync, createReadStream } from 'fs';
+import { Readable } from 'stream';
 import { join } from 'path';
 
 const router = new Hono();
@@ -53,12 +54,10 @@ router.get('/:channel/:filename', (c) => {
     }
 
     const chunkSize = end - start + 1;
-    const buf = Buffer.allocUnsafe(chunkSize);
-    const fd = openSync(filepath, 'r');
-    readSync(fd, buf, 0, chunkSize, start);
-    closeSync(fd);
+    const nodeStream = createReadStream(filepath, { start, end });
+    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
-    return c.body(buf, 206, {
+    return c.body(webStream, 206, {
       'Content-Type': contentType,
       'Content-Range': `bytes ${start}-${end}/${totalSize}`,
       'Content-Length': String(chunkSize),
@@ -67,13 +66,11 @@ router.get('/:channel/:filename', (c) => {
     });
   }
 
-  // Full file response
-  const buf = Buffer.allocUnsafe(totalSize);
-  const fd = openSync(filepath, 'r');
-  readSync(fd, buf, 0, totalSize, 0);
-  closeSync(fd);
+  // Full file response — stream instead of buffering the whole file in memory
+  const nodeStream = createReadStream(filepath);
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
-  return c.body(buf, 200, {
+  return c.body(webStream, 200, {
     'Content-Type': contentType,
     'Content-Length': String(totalSize),
     'Accept-Ranges': 'bytes',

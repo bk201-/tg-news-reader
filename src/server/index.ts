@@ -21,9 +21,10 @@ import { logger } from './logger.js';
 import { getTelegramCircuitState } from './services/telegramCircuitBreaker.js';
 import { sendAlert } from './services/alertBot.js';
 import { client } from './db/index.js';
+import { runMigration } from './db/migrate.js';
 
-// Run DB migration on startup
-import './db/migrate.js';
+// DB migration is intentionally deferred — run AFTER the server starts listening
+// so the startup probe can connect immediately instead of timing out during migration.
 
 // ─── Process-level error handlers ────────────────────────────────────────────
 
@@ -140,11 +141,16 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = parseInt(process.env.SERVER_PORT || '3173', 10);
 
-// Start download manager workers
-startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
-
+// ── Start HTTP server FIRST so the startup probe can connect immediately ────
+// Migration runs after serve() — during the ~3s migration window the health
+// endpoint already responds (SELECT 1 works before schema changes), so the
+// probe never sees "connection refused" and never fails.
 serve({ fetch: app.fetch, port });
 logger.info({ module: 'server', port }, `Server running on http://localhost:${port}`);
+
+// Run migration, then start workers (both require a ready DB schema)
+await runMigration();
+startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
 
 // Startup alert — no dedup key so every (re)start fires (process is fresh each time).
 // In prod: signals that the container came back up after a restart / new deploy.
