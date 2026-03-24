@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, Button, Space, Typography, Tooltip, Form } from 'antd';
+import { Modal, Button, Space, Typography, Form } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -163,7 +164,7 @@ export function ChannelSidebar() {
   };
 
   return (
-    <div className={styles.sidebar}>
+    <nav className={styles.sidebar} aria-label={t('sidebar.channels')}>
       <div className={styles.header}>
         <Text strong className={styles.sidebarTitle}>
           {t('sidebar.channels')}
@@ -180,7 +181,7 @@ export function ChannelSidebar() {
         </Space>
       </div>
 
-      <div className={styles.list}>
+      <div role="listbox" aria-label={t('sidebar.channels')} className={styles.list}>
         {isLoading && <div className={styles.loading}>{t('common.loading')}</div>}
         {channels.map((ch) => (
           <ChannelItem
@@ -217,6 +218,6 @@ export function ChannelSidebar() {
         onClose={() => setFetchModalOpen(false)}
         onConfirm={handleFetch}
       />
-    </div>
+    </nav>
   );
 }

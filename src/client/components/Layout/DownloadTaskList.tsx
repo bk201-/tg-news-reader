@@ -1,5 +1,6 @@
 import React from 'react';
-import { List, Typography, Tag, Space, Button, Tooltip, Spin } from 'antd';
+import { List, Typography, Tag, Space, Button, Spin } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   CloudDownloadOutlined,
   DeleteOutlined,

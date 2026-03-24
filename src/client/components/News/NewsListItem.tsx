@@ -19,6 +19,10 @@ const useStyles = createStyles(({ css, token }) => ({
     &:hover {
       background: ${token.colorFillQuaternary};
     }
+    &:focus-visible {
+      outline: 2px solid ${token.colorPrimary};
+      outline-offset: -2px;
+    }
   `,
   itemSelected: css`
     background: ${token.colorPrimaryBg};
@@ -171,11 +175,14 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
 
   const handleMarkRead = (e: React.MouseEvent) => {
     e.stopPropagation();
-    markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1 });
+    markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId });
   };
 
   return (
     <div
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
       data-news-id={item.id}
       className={cx(
         styles.item,
@@ -184,6 +191,12 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
         dimmed && styles.itemDimmed,
       )}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <div className={styles.header}>
         <Checkbox checked={isRead} onClick={handleMarkRead} className={styles.checkbox} />

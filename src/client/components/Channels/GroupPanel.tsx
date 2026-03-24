@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Button, Modal, Form, Tooltip, Typography } from 'antd';
+import { Button, Modal, Form, Typography } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { FolderFilled, PlusOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -160,12 +161,21 @@ export function GroupPanel() {
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div className={styles.panel}>
+    <nav className={styles.panel} aria-label={t('groups.panel_label')}>
       {/* "Общее" — always first */}
       <Tooltip title={t('groups.general_tooltip')} placement="right">
         <div
+          role="option"
+          aria-selected={selectedGroupId === null}
+          tabIndex={0}
           className={cx(itemStyles.item, selectedGroupId === null && itemStyles.itemActive)}
           onClick={() => setSelectedGroupId(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSelectedGroupId(null);
+            }
+          }}
         >
           <div className={itemStyles.iconWrap}>
             <FolderFilled className={styles.generalIcon} />
@@ -217,6 +227,6 @@ export function GroupPanel() {
         onConfirm={(pin?: string) => void handleVerifyPIN(pin)}
         onPinChange={handlePinChange}
       />
-    </div>
+    </nav>
   );
 }

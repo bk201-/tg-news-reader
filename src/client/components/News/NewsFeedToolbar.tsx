@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Space, Typography, Tooltip, Badge, Tag, Segmented } from 'antd';
+import { Button, Space, Typography, Badge, Tag, Segmented } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   FilterOutlined,
   EyeOutlined,

@@ -52,6 +52,7 @@ export function NewsAccordionItem({
   return (
     <div
       data-news-id={item.id}
+      aria-expanded={isSelected}
       className={cx(styles.item, isSelected && styles.itemExpanded, dimmed && styles.itemDimmed)}
     >
       {isSelected ? (

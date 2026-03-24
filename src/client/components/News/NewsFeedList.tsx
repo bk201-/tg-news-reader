@@ -58,7 +58,7 @@ export function NewsFeedList({
       : t('news.list.empty');
 
   return (
-    <div className={styles.list} ref={listRef}>
+    <div role="listbox" aria-label={t('news.list.list_label')} className={styles.list} ref={listRef}>
       {isLoading && (
         <div className={styles.loadingWrap}>
           <Spin size="large" />

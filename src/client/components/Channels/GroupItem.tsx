@@ -28,6 +28,10 @@ export const useGroupItemStyles = createStyles(({ css, token }, color?: string) 
       &:hover {
         background: radial-gradient(circle at 50% 60%, color-mix(in srgb, ${c} 25%, transparent), transparent 70%);
       }
+      &:focus-visible {
+        outline: 2px solid ${c};
+        outline-offset: 2px;
+      }
     `,
     itemActive: css`
       box-shadow: 0 0 0 2px ${c};
@@ -105,7 +109,19 @@ export function GroupItem({ group, isActive, isLocked, count, onClick, onEdit, o
       }}
       trigger={['contextMenu']}
     >
-      <div className={cx(styles.item, isActive && styles.itemActive)} onClick={onClick}>
+      <div
+        role="option"
+        aria-selected={isActive}
+        tabIndex={0}
+        className={cx(styles.item, isActive && styles.itemActive)}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+      >
         <div className={styles.iconWrap}>
           {isLocked ? (
             <LockOutlined className={styles.icon} style={{ color: group.color }} />
