@@ -59,4 +59,3 @@ export function NewsYouTubeEmbeds({ links }: NewsYouTubeEmbedsProps) {
     </div>
   );
 }
-
