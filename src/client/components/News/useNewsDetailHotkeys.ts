@@ -62,17 +62,15 @@ export function useNewsDetailHotkeys({
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState('');
 
-  // Reset all state when the viewed item changes (accordion mode reuses the component)
-  useEffect(() => {
-    setTopPanel(null);
-    setAlbumIndex(0);
-    setLinkModalOpen(false);
-    setSelectedUrl('');
-  }, [item.id]);
-
-  const links = item.links || [];
+  // Note: no reset effect needed.
+  // In list mode NewsDetail gets key={item.id} and remounts on item change.
+  // In accordion mode each item renders its own NewsDetail instance, so
+  // the item prop never changes for a given component instance.
 
   useEffect(() => {
+    // Derive links inside the effect so the stable item.links reference
+    // is used as the dependency (avoids a new [] on every render).
+    const links = item.links || [];
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -160,7 +158,7 @@ export function useNewsDetailHotkeys({
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [
-    links,
+    item.links,
     item.text,
     item.fullContent,
     channelType,
