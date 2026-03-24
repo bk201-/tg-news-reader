@@ -64,6 +64,7 @@ export function NewsAccordionItem({
           onMarkedRead={onMarkedRead}
           variant="inline"
           onHeaderClick={() => onSelect(null)}
+          onTagClick={onTagClick}
         />
       ) : (
         <NewsListItem

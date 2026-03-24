@@ -73,6 +73,8 @@ interface NewsDetailBodyProps {
   firstMediaPath?: string;
   isAlbum: boolean;
   isVideo: boolean;
+  /** true when the post is an audio message */
+  isAudio: boolean;
   albumIndex: number;
   albumLength: number;
   albumExpectedLength: number;
@@ -102,6 +104,7 @@ export function NewsDetailBody({
   firstMediaPath,
   isAlbum,
   isVideo,
+  isAudio,
   albumIndex,
   albumLength,
   albumExpectedLength,
@@ -134,6 +137,7 @@ export function NewsDetailBody({
           firstMediaPath={firstMediaPath}
           isAlbum={isAlbum}
           isVideo={isVideo}
+          isAudio={isAudio}
           albumIndex={albumIndex}
           albumLength={albumLength}
           albumExpectedLength={albumExpectedLength}

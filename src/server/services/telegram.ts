@@ -40,6 +40,8 @@ export interface TelegramMessage {
   groupedId?: string;
   rawMediaItems?: Api.TypeMessageMedia[];
   albumTelegramIds?: number[];
+  // Telegram Instant View: full article text extracted from Page blocks at fetch time
+  instantViewContent?: string;
 }
 
 function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
@@ -79,6 +81,73 @@ function extractHashtags(text: string, entities?: Api.TypeMessageEntity[]): stri
 
 const BATCH_SIZE = 100;
 
+// ─── Instant View helpers ─────────────────────────────────────────────────────
+
+/** Recursively extracts plain text from a Telegram IV rich-text node. */
+function richTextToString(rt: Api.TypeRichText): string {
+  if (!rt) return '';
+  if (rt instanceof Api.TextEmpty) return '';
+  if (rt instanceof Api.TextPlain) return rt.text;
+  if (rt instanceof Api.TextConcat) return rt.texts.map(richTextToString).join('');
+  if (rt instanceof Api.TextImage) return '';
+  // TextBold, TextItalic, TextUnderline, TextStrike, TextFixed,
+  // TextUrl, TextEmail, TextSubscript, TextSuperscript, TextMarked, TextPhone, TextAnchor
+  // all have a single `.text: TypeRichText` child.
+  const wrapped = rt as unknown as { text?: Api.TypeRichText };
+  return wrapped.text ? richTextToString(wrapped.text) : '';
+}
+
+/** Extracts readable plain text from Telegram Instant View page blocks. */
+function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
+  const parts: string[] = [];
+  for (const block of blocks) {
+    if (
+      block instanceof Api.PageBlockTitle ||
+      block instanceof Api.PageBlockSubtitle ||
+      block instanceof Api.PageBlockHeader ||
+      block instanceof Api.PageBlockSubheader ||
+      block instanceof Api.PageBlockKicker ||
+      block instanceof Api.PageBlockParagraph ||
+      block instanceof Api.PageBlockPreformatted ||
+      block instanceof Api.PageBlockFooter
+    ) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(text.trim());
+    } else if (block instanceof Api.PageBlockBlockquote || block instanceof Api.PageBlockPullquote) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(`> ${text.trim()}`);
+    } else if (block instanceof Api.PageBlockList) {
+      for (const item of block.items) {
+        if (item instanceof Api.PageListItemText) {
+          const text = richTextToString(item.text);
+          if (text.trim()) parts.push(`• ${text.trim()}`);
+        } else if (item instanceof Api.PageListItemBlocks) {
+          const subText = extractInstantViewText(item.blocks);
+          if (subText.trim()) parts.push(`• ${subText.trim()}`);
+        }
+      }
+    } else if (block instanceof Api.PageBlockOrderedList) {
+      for (const item of block.items) {
+        if (item instanceof Api.PageListOrderedItemText) {
+          const text = richTextToString(item.text);
+          if (text.trim()) parts.push(`${item.num} ${text.trim()}`);
+        } else if (item instanceof Api.PageListOrderedItemBlocks) {
+          const subText = extractInstantViewText(item.blocks);
+          if (subText.trim()) parts.push(subText.trim());
+        }
+      }
+    } else if (block instanceof Api.PageBlockDetails) {
+      const title = richTextToString(block.title);
+      if (title.trim()) parts.push(title.trim());
+      const subText = extractInstantViewText(block.blocks);
+      if (subText.trim()) parts.push(subText.trim());
+    }
+    // Skip: Divider, Anchor, Photo, Video, Audio, Embed, Channel, Map,
+    // RelatedArticles, Cover, Table, AuthorDate, EmbedPost, Collage, Slideshow.
+  }
+  return parts.join('\n\n');
+}
+
 function parseMessageFields(msg: Api.Message, channelUsername: string): TelegramMessage | null {
   void channelUsername;
   if (!msg.message && !msg.media) return null;
@@ -89,6 +158,7 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
 
   let mediaType: string | undefined;
   let mediaSizeBytes: number | undefined;
+  let instantViewContent: string | undefined;
 
   if (msg.media) {
     if (msg.media instanceof Api.MessageMediaPhoto) {
@@ -100,11 +170,21 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
         if (largest) mediaSizeBytes = largest.size;
       }
     } else if (msg.media instanceof Api.MessageMediaDocument) {
-      mediaType = 'document';
       const doc = msg.media.document;
-      if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
+      if (doc instanceof Api.Document) {
+        mediaSizeBytes = Number(doc.size);
+        const mime = doc.mimeType ?? '';
+        mediaType = mime.startsWith('audio/') || mime === 'application/ogg' ? 'audio' : 'document';
+      } else {
+        mediaType = 'document';
+      }
     } else if (msg.media instanceof Api.MessageMediaWebPage) {
       mediaType = 'webpage';
+      const wp = msg.media.webpage;
+      if (wp instanceof Api.WebPage && wp.cachedPage instanceof Api.Page) {
+        const text = extractInstantViewText(wp.cachedPage.blocks);
+        if (text) instantViewContent = text;
+      }
     } else {
       mediaType = 'other';
     }
@@ -120,6 +200,7 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
     mediaSizeBytes,
     rawMedia: msg.media ?? undefined,
     groupedId: msg.groupedId != null ? String(msg.groupedId) : undefined,
+    instantViewContent,
   };
 }
 
@@ -297,9 +378,18 @@ export async function downloadMessageMedia(
     else if (mime === 'image/webp') ext = 'webp';
     else if (mime === 'video/mp4') ext = 'mp4';
     else if (mime === 'video/webm') ext = 'webm';
+    // Audio formats — only allow on-demand (user-initiated) downloads
+    else if (mime === 'audio/ogg' || mime === 'application/ogg') ext = 'ogg';
+    else if (mime === 'audio/mpeg') ext = 'mp3';
+    else if (mime === 'audio/mp4' || mime === 'audio/m4a' || mime === 'audio/x-m4a') ext = 'm4a';
+    else if (mime === 'audio/flac' || mime === 'audio/x-flac') ext = 'flac';
+    else if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave') ext = 'wav';
     else return null;
 
+    const isAudio = mime.startsWith('audio/') || mime === 'application/ogg';
     if (!options.ignoreLimit) {
+      // Audio is never auto-downloaded — user must explicitly request it
+      if (isAudio) return null;
       const isVideo = ext === 'mp4' || ext === 'webm';
       const limit = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMG_DOC_SIZE_BYTES;
       if (sizeNum > limit) return null;

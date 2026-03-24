@@ -195,7 +195,14 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     if (displayItems.some((n) => n.id === selectedNewsId)) return;
     const item = newsItems.find((n) => n.id === selectedNewsId);
     if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1, channelId: item.channelId });
-    setSelectedNewsId(displayItems.find((n) => n.isRead === 0)?.id ?? null);
+    // Navigate to the next unread item AFTER the current one (by newsItems order),
+    // falling back to the first unread in displayItems.
+    const currentIndex = newsItems.findIndex((n) => n.id === selectedNewsId);
+    const nextUnread =
+      displayItems.find((n) => newsItems.findIndex((m) => m.id === n.id) > currentIndex && n.isRead === 0) ??
+      displayItems.find((n) => n.isRead === 0) ??
+      null;
+    setSelectedNewsId(nextUnread?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayItems]);
 
@@ -278,6 +285,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
                   channelType={channel.channelType}
                   channelTelegramId={channel.telegramId}
                   onMarkedRead={handleMarkedRead}
+                  onTagClick={handleTagClick}
                 />
               ) : (
                 <div className={styles.detailEmpty}>

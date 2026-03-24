@@ -1,12 +1,13 @@
 import React from 'react';
-import { Tag, Typography, Checkbox, Dropdown } from 'antd';
-import { FilterOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { Typography, Checkbox } from 'antd';
+import { PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { NewsItem, Filter } from '@shared/types.ts';
 import { useMarkRead } from '../../api/news';
 import { mediaUrl } from '../../api/mediaUrl';
+import { NewsHashtags } from './NewsHashtags';
 
 const { Text } = Typography;
 
@@ -78,16 +79,6 @@ const useStyles = createStyles(({ css, token }) => ({
     overflow: hidden;
     justify-content: flex-end;
   `,
-  tag: css`
-    font-size: 10px;
-    margin: 0 2px;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: inline-block;
-    vertical-align: middle;
-  `,
   thumb: css`
     flex-shrink: 0;
     margin-left: 8px;
@@ -114,9 +105,21 @@ const useStyles = createStyles(({ css, token }) => ({
     align-items: center;
     justify-content: center;
   `,
+  thumbAudio: css`
+    width: 100%;
+    height: 100%;
+    background: ${token.colorFillSecondary};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `,
   videoIcon: css`
     font-size: 22px;
     color: ${token.colorTextLightSolid};
+  `,
+  audioIcon: css`
+    font-size: 20px;
+    color: ${token.colorPrimary};
   `,
   thumbPhoto: css`
     position: relative;
@@ -164,9 +167,12 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
   const title = getTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }));
   const hashtags = item.hashtags || [];
   const isRead = item.isRead === 1;
+  const isAudio = item.mediaType === 'audio';
   const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
   const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
   const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+  // Show thumbnail for downloaded media, or always for audio (even without a file)
+  const showThumb = !!firstMediaPath || isAudio;
 
   // If filtered out and not showAll, don't render
   if (!isFiltered && !showAll) return null;
@@ -207,15 +213,19 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
         >
           {title}
         </Text>
-        {firstMediaPath && (
+        {showThumb && (
           <div className={cx(styles.thumb, dimmed && styles.thumbDimmed)}>
-            {isVideo ? (
+            {isAudio ? (
+              <div className={styles.thumbAudio}>
+                <SoundOutlined className={styles.audioIcon} />
+              </div>
+            ) : isVideo ? (
               <div className={styles.thumbVideo}>
                 <PlayCircleOutlined className={styles.videoIcon} />
               </div>
             ) : (
               <div className={styles.thumbPhoto}>
-                <img src={mediaUrl(firstMediaPath)} alt="" className={styles.thumbImg} />
+                <img src={mediaUrl(firstMediaPath!)} alt="" className={styles.thumbImg} />
                 {isAlbum && <span className={styles.albumBadge}>{item.localMediaPaths!.length}</span>}
               </div>
             )}
@@ -226,34 +236,7 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
         <Text type="secondary" className={styles.metaDate}>
           {dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm')}
         </Text>
-        <div className={styles.tags}>
-          {hashtags.slice(0, 4).map((tag) => (
-            <Dropdown
-              key={tag}
-              trigger={['click']}
-              menu={{
-                items: [
-                  { key: 'show', label: t('news.list.tag_show'), icon: <FilterOutlined /> },
-                  { key: 'addFilter', label: t('news.list.tag_add_filter'), icon: <PlusOutlined /> },
-                ],
-                onClick: ({ key, domEvent }) => {
-                  domEvent.stopPropagation();
-                  onTagClick?.(tag, key as 'show' | 'addFilter');
-                },
-              }}
-            >
-              <Tag
-                color="blue"
-                className={styles.tag}
-                style={{ cursor: onTagClick ? 'pointer' : 'default' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {tag}
-              </Tag>
-            </Dropdown>
-          ))}
-          {hashtags.length > 4 && <Tag className={styles.overflowTag}>+{hashtags.length - 4}</Tag>}
-        </div>
+        <NewsHashtags hashtags={hashtags} onTagClick={onTagClick} maxVisible={4} className={styles.tags} />
       </div>
     </div>
   );
@@ -264,8 +247,20 @@ export function applyFilters(items: NewsItem[], filters: Filter[]): Set<number> 
   const activeFilters = filters.filter((f) => f.isActive === 1);
   if (activeFilters.length === 0) return new Set(items.map((i) => i.id));
 
-  const tagFilters = activeFilters.filter((f) => f.type === 'tag').map((f) => f.value.toLowerCase());
+  const tagFilterValues = activeFilters
+    .filter((f) => f.type === 'tag')
+    .map((f) => f.value.replace(/^#/, '').toLowerCase());
+
   const keywordFilters = activeFilters.filter((f) => f.type === 'keyword').map((f) => f.value.toLowerCase());
+
+  // Build a Set of normalised tag values for O(1) per-hashtag lookup.
+  // For each filter tag "cat" we add both "cat" and "#cat" so we match regardless of
+  // whether the hashtag was stored with or without the leading "#".
+  const tagFilterSet = new Set<string>();
+  for (const tag of tagFilterValues) {
+    tagFilterSet.add(tag);
+    tagFilterSet.add('#' + tag);
+  }
 
   const passedIds = new Set<number>();
 
@@ -273,17 +268,11 @@ export function applyFilters(items: NewsItem[], filters: Filter[]): Set<number> 
     const hashtags = (item.hashtags || []).map((h) => h.toLowerCase());
     const text = (item.text || '').toLowerCase();
 
-    // Exclude if matches any tag filter
-    if (tagFilters.length > 0) {
-      const tagMatch = tagFilters.some((tag) => hashtags.some((h) => h === tag || h === `#${tag}` || `#${h}` === tag));
-      if (tagMatch) continue; // excluded
-    }
+    // Exclude if any hashtag matches the filter set (O(T) instead of O(F×T))
+    if (tagFilterSet.size > 0 && hashtags.some((h) => tagFilterSet.has(h))) continue;
 
-    // Exclude if matches any keyword filter
-    if (keywordFilters.length > 0) {
-      const keywordMatch = keywordFilters.some((kw) => text.includes(kw));
-      if (keywordMatch) continue; // excluded
-    }
+    // Exclude if any keyword is found in the text
+    if (keywordFilters.length > 0 && keywordFilters.some((kw) => text.includes(kw))) continue;
 
     passedIds.add(item.id);
   }

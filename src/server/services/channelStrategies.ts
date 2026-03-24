@@ -44,8 +44,11 @@ class LinkContinuationStrategy implements ChannelPostProcessor {
 
 class MediaContentStrategy implements ChannelPostProcessor {
   async postProcess({ messages, insertedMap }: PostProcessArgs): Promise<void> {
-    // Queue all media as background tasks (priority=0); workers will process them
-    const toQueue = messages.filter((m) => m.rawMedia !== undefined && insertedMap.has(m.id));
+    // Queue all media as background tasks (priority=0); workers will process them.
+    // Skip audio — it is never auto-downloaded (user must explicitly request it).
+    const toQueue = messages.filter(
+      (m) => m.rawMedia !== undefined && m.mediaType !== 'audio' && insertedMap.has(m.id),
+    );
     for (const msg of toQueue) {
       const newsId = insertedMap.get(msg.id)!;
       await enqueueTask(newsId, 'media', undefined, 0);
