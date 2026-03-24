@@ -109,18 +109,26 @@ export function NewsDetail({
   // both listeners sit on `window` and fire in registration order — useNewsHotkeys
   // (from the parent NewsFeed) may be registered first, meaning stopImmediatePropagation()
   // called here would be too late to stop it.
-  const { albumIndex, setAlbumIndex, topPanel, setTopPanel, linkModalOpen, setLinkModalOpen, selectedUrl, setSelectedUrl } =
-    useNewsDetailHotkeys({
-      item,
-      channelType,
-      openUrl,
-      articleQueued,
-      isAlbum,
-      albumLength,
-      albumExpectedLength,
-      onRefresh: handleRefresh,
-      onExtractArticle: handleExtract,
-    });
+  const {
+    albumIndex,
+    setAlbumIndex,
+    topPanel,
+    setTopPanel,
+    linkModalOpen,
+    setLinkModalOpen,
+    selectedUrl,
+    setSelectedUrl,
+  } = useNewsDetailHotkeys({
+    item,
+    channelType,
+    openUrl,
+    articleQueued,
+    isAlbum,
+    albumLength,
+    albumExpectedLength,
+    onRefresh: handleRefresh,
+    onExtractArticle: handleExtract,
+  });
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleMarkRead = () =>

@@ -173,6 +173,14 @@ export function useNewsDetailHotkeys({
     onExtractArticle,
   ]);
 
-  return { albumIndex, setAlbumIndex, topPanel, setTopPanel, linkModalOpen, setLinkModalOpen, selectedUrl, setSelectedUrl };
+  return {
+    albumIndex,
+    setAlbumIndex,
+    topPanel,
+    setTopPanel,
+    linkModalOpen,
+    setLinkModalOpen,
+    selectedUrl,
+    setSelectedUrl,
+  };
 }
-

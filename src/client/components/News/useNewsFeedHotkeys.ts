@@ -47,4 +47,3 @@ export function useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onFetch, onToggleShowAll, onMarkAllRead, onOpenFilters]);
 }
-
