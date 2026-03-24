@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 import { NewsDetailMedia } from './NewsDetailMedia';
+import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
 
 const { Text, Paragraph } = Typography;
 
@@ -194,6 +195,8 @@ export function NewsDetailBody({
               </div>
             </>
           )}
+
+          <NewsYouTubeEmbeds links={links} />
         </div>
       </div>
 
