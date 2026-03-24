@@ -63,7 +63,7 @@ export function NewsAccordionList({
       : t('news.list.empty');
 
   return (
-    <div className={styles.accordion} ref={listRef}>
+    <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion} ref={listRef}>
       {isLoading && (
         <div className={styles.loadingWrap}>
           <Spin size="large" />

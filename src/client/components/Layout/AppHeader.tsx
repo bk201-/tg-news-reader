@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Layout, Typography, Button, Tooltip, Dropdown, Modal, App, Grid } from 'antd';
+import { Layout, Typography, Button, Dropdown, Modal, App, Grid } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   MoonOutlined,
   SunOutlined,
@@ -227,11 +228,17 @@ export function AppHeader() {
               type="text"
               icon={isDarkTheme ? <SunOutlined /> : <MoonOutlined />}
               onClick={toggleTheme}
+              aria-label={isDarkTheme ? t('header.theme_light') : t('header.theme_dark')}
               className={styles.iconBtn}
             />
           </Tooltip>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-            <Button type="text" icon={<UserOutlined />} className={styles.iconBtn} />
+            <Button
+              type="text"
+              icon={<UserOutlined />}
+              aria-label={t('header.user_menu_label')}
+              className={styles.iconBtn}
+            />
           </Dropdown>
         </div>
       </Header>

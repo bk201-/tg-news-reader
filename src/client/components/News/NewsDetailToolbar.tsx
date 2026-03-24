@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Tooltip, Space, Tag } from 'antd';
+import { Button, Space, Tag } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   ReloadOutlined,
   LinkOutlined,

@@ -9,6 +9,37 @@ body {
   font-size: 14px;
 }
 
+/* ===== Consistent focus ring ===== */
+/* Ant Design's default focus ring uses rgba(primary, 0.2) — too pale.
+   box-shadow (not outline) is used so each element's border-radius is preserved. */
+
+/* Buttons — default/text/dashed: solid primary ring */
+.ant-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--tgr-color-primary) !important;
+  outline: none !important;
+}
+
+/* Primary buttons: same blue ring would be invisible on the blue background.
+   Double ring: 2px gap (page background) + 2px primary ring — always visible. */
+.ant-btn-primary:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--tgr-color-bg-container),
+    0 0 0 4px var(--tgr-color-primary) !important;
+  outline: none !important;
+}
+
+/* Checkbox */
+.ant-checkbox-input:focus-visible + .ant-checkbox-inner {
+  box-shadow: 0 0 0 2px var(--tgr-color-primary) !important;
+}
+
+/* Segmented: radio input is visually hidden; apply ring on the parent item via :has() */
+.ant-segmented-item:has(input:focus-visible) {
+  outline: 2px solid var(--tgr-color-primary);
+  outline-offset: 1px;
+  border-radius: var(--tgr-border-radius-sm, 6px);
+}
+
 /* ===== Hide scrollbars on touch devices (scroll still works) ===== */
 @media (pointer: coarse) {
   * {

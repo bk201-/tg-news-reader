@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Space, Tooltip, Badge, Typography } from 'antd';
+import { Button, Space, Badge, Typography } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { ReloadOutlined, EditOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,14 @@ const useStyles = createStyles(({ css, token }) => ({
     --actions-opacity: 0;
     &:hover {
       background: ${token.colorFillTertiary};
+      --actions-opacity: 1;
+    }
+    &:focus-visible {
+      outline: 2px solid ${token.colorPrimary};
+      outline-offset: -2px;
+      --actions-opacity: 1;
+    }
+    &:focus-within {
       --actions-opacity: 1;
     }
   `,
@@ -81,7 +90,19 @@ export function ChannelItem({
   const { styles, cx } = useStyles();
 
   return (
-    <div className={cx(styles.item, isSelected && styles.itemActive)} onClick={onSelect}>
+    <div
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
+      className={cx(styles.item, isSelected && styles.itemActive)}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+    >
       <div className={styles.info}>
         <Text strong ellipsis>
           {ch.isUnavailable ? (

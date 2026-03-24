@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Badge, Button, Drawer, Space, Tooltip, Spin, Grid } from 'antd';
+import { Badge, Button, Drawer, Space, Spin, Grid } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { CloudDownloadOutlined, PushpinOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';

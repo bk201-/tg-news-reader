@@ -15,7 +15,14 @@ export function useNewsHotkeys(
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement).isContentEditable) return;
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'button' ||
+        tag === 'a' ||
+        (e.target as HTMLElement).isContentEditable
+      )
+        return;
 
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();

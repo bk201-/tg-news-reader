@@ -52,6 +52,7 @@
   "groups": {
     "general": "Общее",
     "general_tooltip": "Общее (без группы)",
+    "panel_label": "Группы",
     "new_group_tooltip": "Новая группа",
     "delete_confirm_title": "Удалить группу \"{{name}}\"?",
     "delete_confirm_content": "Каналы из группы переместятся в «Общее».",
@@ -133,6 +134,7 @@
       "text_panel_title": "Текст новости"
     },
     "list": {
+      "list_label": "Список новостей",
       "empty_tag": "Нет новостей с тегом {{tag}}",
       "empty_filtered": "Нет новостей по фильтрам. Нажмите «Показать все».",
       "empty": "Нет новостей. Нажмите «Выгрузить».",
@@ -201,6 +203,7 @@
     "theme_dark": "Тёмная тема",
     "theme_light": "Светлая тема",
     "open_sidebar": "Открыть каналы",
+    "user_menu_label": "Меню пользователя",
     "user_menu": {
       "manage_2fa": "Управление 2FA",
       "enable_2fa": "Включить 2FA",

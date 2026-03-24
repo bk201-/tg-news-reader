@@ -1,5 +1,6 @@
 import React from 'react';
-import { Typography, Space, Button, Tooltip, Spin } from 'antd';
+import { Typography, Space, Button, Spin } from 'antd';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PushpinFilled } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';

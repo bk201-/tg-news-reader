@@ -52,6 +52,7 @@
   "groups": {
     "general": "General",
     "general_tooltip": "General (no group)",
+    "panel_label": "Groups",
     "new_group_tooltip": "New group",
     "delete_confirm_title": "Delete group \"{{name}}\"?",
     "delete_confirm_content": "Channels in this group will be moved to General.",
@@ -133,6 +134,7 @@
       "text_panel_title": "Post text"
     },
     "list": {
+      "list_label": "News list",
       "empty_tag": "No news with tag {{tag}}",
       "empty_filtered": "No news matching filters. Click \"Show all\".",
       "empty": "No news. Click \"Fetch\".",
@@ -201,6 +203,7 @@
     "theme_dark": "Dark theme",
     "theme_light": "Light theme",
     "open_sidebar": "Open channels",
+    "user_menu_label": "User menu",
     "user_menu": {
       "manage_2fa": "Manage 2FA",
       "enable_2fa": "Enable 2FA",
