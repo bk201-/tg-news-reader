@@ -34,7 +34,10 @@ const useStyles = createStyles(({ css, token }) => ({
     container-type: inline-size;
   `,
   headerInline: css`
-    position: static;
+    /* Stays sticky within the accordion scroll container so action buttons remain visible */
+    position: sticky;
+    top: 0;
+    z-index: 10;
     background: ${token.colorBgContainer};
   `,
 }));
@@ -47,6 +50,8 @@ interface NewsDetailProps {
   onMarkedRead?: (id: number) => void;
   variant?: 'panel' | 'inline';
   onHeaderClick?: () => void;
+  /** Tag click handler forwarded to the toolbar (show / addFilter dropdown) */
+  onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
 }
 
 export function NewsDetail({
@@ -56,6 +61,7 @@ export function NewsDetail({
   onMarkedRead,
   variant = 'panel',
   onHeaderClick,
+  onTagClick,
 }: NewsDetailProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -84,6 +90,7 @@ export function NewsDetail({
   // albumExpectedLength is used separately for Space-key blocking (see hotkey handler).
   const isAlbum = albumLength > 1;
   const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+  const isAudio = item.mediaType === 'audio';
   const articleLoading = extractContent.isPending || articleTask?.status === 'processing';
   const articleQueued = articleTask?.status === 'pending';
   const mediaLoading = downloadMedia.isPending || mediaTask?.status === 'processing';
@@ -171,6 +178,7 @@ export function NewsDetail({
           variant={variant}
           title={variant === 'inline' ? getNewsTitle(item) : undefined}
           onHeaderClick={onHeaderClick}
+          onTagClick={onTagClick}
         />
       </div>
 
@@ -185,6 +193,7 @@ export function NewsDetail({
         firstMediaPath={firstMediaPath}
         isAlbum={isAlbum}
         isVideo={isVideo}
+        isAudio={isAudio}
         albumIndex={albumIndex}
         albumLength={albumLength}
         albumExpectedLength={albumExpectedLength}

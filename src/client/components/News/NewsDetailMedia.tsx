@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Typography } from 'antd';
-import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined, SoundOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
@@ -27,6 +27,22 @@ const useStyles = createStyles(({ css, token }) => ({
     object-fit: contain;
     border-radius: 8px;
     margin: 0 auto;
+  `,
+  audioPlayer: css`
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+  `,
+  audioPlaceholder: css`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 12px;
+    gap: 4px;
+    color: ${token.colorTextSecondary};
+    font-size: 32px;
   `,
   carousel: css`
     position: relative;
@@ -116,6 +132,8 @@ interface NewsDetailMediaProps {
   firstMediaPath?: string;
   isAlbum: boolean;
   isVideo: boolean;
+  /** true when the post is an audio message (shows audio player when downloaded) */
+  isAudio: boolean;
   albumIndex: number;
   albumLength: number; // downloaded images count (navigation limit)
   albumExpectedLength: number; // expected total from albumMsgIds (counter + Space-hint)
@@ -132,6 +150,7 @@ export function NewsDetailMedia({
   firstMediaPath,
   isAlbum,
   isVideo,
+  isAudio,
   albumIndex,
   albumLength,
   albumExpectedLength,
@@ -188,7 +207,14 @@ export function NewsDetailMedia({
   if (firstMediaPath) {
     return (
       <div className={styles.media}>
-        {isVideo ? (
+        {isAudio ? (
+          <>
+            <div className={styles.audioPlaceholder}>
+              <SoundOutlined />
+            </div>
+            <audio src={mediaUrl(firstMediaPath)} controls className={styles.audioPlayer} />
+          </>
+        ) : isVideo ? (
           <video src={mediaUrl(firstMediaPath)} controls muted autoPlay loop className={styles.mediaFile} />
         ) : (
           <img src={mediaUrl(firstMediaPath)} alt="media" className={styles.mediaFile} />

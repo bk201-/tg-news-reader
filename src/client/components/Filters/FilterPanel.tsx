@@ -146,7 +146,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
         columns={columns}
         rowKey="id"
         size="small"
-        pagination={false}
+        pagination={filters.length > 20 ? { pageSize: 20, showSizeChanger: false, size: 'small' } : false}
         locale={{ emptyText: t('filters.empty') }}
       />
 

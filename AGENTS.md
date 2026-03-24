@@ -39,14 +39,16 @@ git push origin feat/my-feature
 # GitHub will print a URL to open the PR, or use: gh pr create --base main
 ```
 
-> ⚠️ **После каждого мержа — вернись на main и обнови его перед следующей веткой.**  
+> ⚠️ **После каждого `git push` — немедленно переключись на `main` и обнови его.**  
+> Это обязательный шаг после каждого пуша фича-ветки, не только после мержа.  
 > Локальный `main` не обновляется автоматически после мержа PR на GitHub.  
 > Если создать новую ветку от устаревшего `main` — при следующем PR будут конфликты.
 
 ```bash
-# После мержа PR — всегда делай это перед новой веткой:
+# После каждого git push — ВСЕГДА делай это сразу:
 git checkout main
 git pull origin main          # или: git reset --hard origin/main
+# теперь можно создавать следующую ветку:
 git checkout -b feat/next-feature
 ```
 

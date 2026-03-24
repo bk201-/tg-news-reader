@@ -127,6 +127,18 @@ router.get('/', async (c) => {
       conditions.push(sql`lower(${news.text}) NOT LIKE ${'%' + kw + '%'}`);
       filtersApplied = true;
     }
+
+    // For media_content channels: auto-filter posts without real media attachment
+    // (text-only, webpage link previews, unsupported media types).
+    // Same toggle as other filters — "Show all" bypasses this too.
+    const [channelRow] = await db
+      .select({ channelType: channels.channelType })
+      .from(channels)
+      .where(eq(channels.id, channelId));
+    if (channelRow?.channelType === 'media_content') {
+      conditions.push(sql`${news.mediaType} IN ('photo', 'document')`);
+      filtersApplied = true;
+    }
   }
 
   const rows = await db

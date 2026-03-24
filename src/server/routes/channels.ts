@@ -300,6 +300,7 @@ router.post('/:id/fetch', async (c) => {
           postedAt: msg.date,
           mediaSize: msg.mediaSizeBytes,
           albumMsgIds: msg.albumTelegramIds ? JSON.stringify(msg.albumTelegramIds) : null,
+          ...(msg.instantViewContent ? { fullContent: msg.instantViewContent } : {}),
         })
         .onConflictDoNothing()
         .returning({ id: news.id });

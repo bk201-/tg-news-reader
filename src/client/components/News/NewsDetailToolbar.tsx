@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Space, Tag } from 'antd';
+import { Button, Space } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   ReloadOutlined,
@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { NewsItem, ChannelType } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
+import { NewsHashtags } from './NewsHashtags';
 
 const useStyles = createStyles(({ css, token }) => ({
   headerTop: css`
@@ -49,12 +50,6 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
   tags: css`
     margin-top: 4px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  `,
-  tag: css`
-    margin-right: 0;
   `,
   /* Hides button text labels when the detail header gets narrow (container set on header in NewsDetail) */
   ndBtnText: css`
@@ -87,6 +82,8 @@ interface NewsDetailToolbarProps {
   title?: string;
   /** Clicking the left (title/meta) area collapses the accordion item */
   onHeaderClick?: () => void;
+  /** Tag click handler — if provided tags show a dropdown menu (show / addFilter) */
+  onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
 }
 
 export function NewsDetailToolbar({
@@ -107,6 +104,7 @@ export function NewsDetailToolbar({
   variant = 'panel',
   title,
   onHeaderClick,
+  onTagClick,
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -117,15 +115,7 @@ export function NewsDetailToolbar({
   const metaContent = (
     <>
       <span className={styles.dateLine}>{dayjs.unix(item.postedAt).format('DD MMMM YYYY, HH:mm')}</span>
-      {hashtags.length > 0 && (
-        <div className={styles.tags}>
-          {hashtags.map((tag) => (
-            <Tag key={tag} color="blue" className={styles.tag}>
-              {tag}
-            </Tag>
-          ))}
-        </div>
-      )}
+      {hashtags.length > 0 && <NewsHashtags hashtags={hashtags} onTagClick={onTagClick} className={styles.tags} />}
     </>
   );
 
