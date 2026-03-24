@@ -23,6 +23,25 @@ export function isYouTubeUrl(url: string): boolean {
   return /youtu\.be\/|youtube\.com\/(watch|shorts|embed)/i.test(url);
 }
 
+/** Extract YouTube video ID from any YouTube URL variant. Returns null if not a valid YT URL. */
+export function getYouTubeEmbedId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.slice(1).split('?')[0];
+      return id || null;
+    }
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || null;
+      if (u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2] || null;
+      return u.searchParams.get('v');
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} МБ` : `${(bytes / 1024).toFixed(0)} КБ`;
 }
