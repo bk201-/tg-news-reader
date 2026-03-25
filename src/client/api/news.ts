@@ -77,13 +77,14 @@ export function useExtractContent() {
 }
 
 export function useDownloadMedia() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (newsId: number) =>
       api.post<{ success: boolean }>('/downloads', { newsId, type: 'media', priority: 10 }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['news'] });
-      void qc.invalidateQueries({ queryKey: ['downloads'] });
-    },
+    // No cache invalidation here — the SSE handler in useDownloadsSSE updates
+    // both the news cache (localMediaPath) and the downloads cache in-place
+    // when the task completes. Invalidating ['news'] here would race against
+    // the SSE update: the refetch was issued before the download completes, so
+    // the server returns localMediaPath=null, and the response arrives *after*
+    // the SSE already set the correct path — overwriting it and hiding the image.
   });
 }
