@@ -70,11 +70,12 @@ export function ChannelFormModal({
             <Input.TextArea rows={2} placeholder={t('channels.form.description_placeholder')} autoComplete="off" />
           </Form.Item>
         </Spin>
-        <Form.Item name="channelType" label={t('channels.form.channel_type_label')} initialValue="none">
+        <Form.Item name="channelType" label={t('channels.form.channel_type_label')} initialValue="news">
           <Select>
-            <Select.Option value="none">{t('channels.form.type_none')}</Select.Option>
-            <Select.Option value="link_continuation">{t('channels.form.type_link')}</Select.Option>
-            <Select.Option value="media_content">{t('channels.form.type_media')}</Select.Option>
+            <Select.Option value="news">{t('channels.form.type_news')}</Select.Option>
+            <Select.Option value="news_link">{t('channels.form.type_news_link')}</Select.Option>
+            <Select.Option value="media">{t('channels.form.type_media')}</Select.Option>
+            <Select.Option value="blog">{t('channels.form.type_blog')}</Select.Option>
           </Select>
         </Form.Item>
         <Form.Item name="groupId" label={t('channels.form.group_label')}>

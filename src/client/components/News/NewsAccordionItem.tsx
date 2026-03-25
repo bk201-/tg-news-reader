@@ -1,6 +1,6 @@
 import React from 'react';
 import { createStyles } from 'antd-style';
-import type { NewsItem, ChannelType } from '@shared/types.ts';
+import type { NewsItem } from '@shared/types.ts';
 import { NewsListItem } from './NewsListItem';
 import { NewsDetail } from './NewsDetail';
 
@@ -25,7 +25,6 @@ interface NewsAccordionItemProps {
   isSelected: boolean;
   isFiltered: boolean;
   showAll: boolean;
-  channelType: ChannelType;
   channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
@@ -37,7 +36,6 @@ export function NewsAccordionItem({
   isSelected,
   isFiltered,
   showAll,
-  channelType,
   channelTelegramId,
   onSelect,
   onTagClick,
@@ -59,7 +57,6 @@ export function NewsAccordionItem({
         <NewsDetail
           key={item.id}
           item={item}
-          channelType={channelType}
           channelTelegramId={channelTelegramId}
           onMarkedRead={onMarkedRead}
           variant="inline"

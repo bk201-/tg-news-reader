@@ -68,6 +68,7 @@ interface NewsFeedToolbarProps {
   onSetViewMode: (mode: NewsViewMode) => void;
   isMobile?: boolean;
   onOpenDigest: () => void;
+  /** Whether to show the Digest button (false for media-only channels) */
   showDigest?: boolean;
 }
 

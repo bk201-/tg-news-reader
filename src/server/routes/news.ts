@@ -106,8 +106,8 @@ router.get('/', async (c) => {
       .select({ channelType: channels.channelType })
       .from(channels)
       .where(eq(channels.id, channelId));
-    if (channelRow?.channelType === 'media_content') {
-      conditions.push(sql`${news.mediaType} IN ('photo', 'document')`);
+    if (channelRow?.channelType === 'media') {
+      conditions.push(sql`${news.mediaType} IN ('photo', 'document', 'audio')`);
     }
   }
 
@@ -138,6 +138,8 @@ router.get('/', async (c) => {
     localMediaPaths: r.localMediaPaths ? (JSON.parse(r.localMediaPaths) as string[]) : undefined,
     albumMsgIds: r.albumMsgIds ? (JSON.parse(r.albumMsgIds) as number[]) : undefined,
     mediaSize: r.mediaSize || undefined,
+    textInPanel: r.textInPanel ?? 0,
+    canLoadArticle: r.canLoadArticle ?? 0,
   }));
 
   return c.json({ items, filteredOut });

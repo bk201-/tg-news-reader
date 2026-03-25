@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { App } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem, ChannelType } from '../../../shared/types';
+import type { NewsItem } from '../../../shared/types';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
 import { useNewsDownloadTask } from '../../api/downloads';
 import { useQueryClient } from '@tanstack/react-query';
@@ -44,7 +44,6 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsDetailProps {
   item: NewsItem;
-  channelType: ChannelType;
   /** Telegram channel username — used to build a fallback t.me deep-link when the post has no links */
   channelTelegramId: string;
   onMarkedRead?: (id: number) => void;
@@ -56,7 +55,6 @@ interface NewsDetailProps {
 
 export function NewsDetail({
   item,
-  channelType,
   channelTelegramId,
   onMarkedRead,
   variant = 'panel',
@@ -127,7 +125,6 @@ export function NewsDetail({
     setSelectedUrl,
   } = useNewsDetailHotkeys({
     item,
-    channelType,
     openUrl,
     articleQueued,
     isAlbum,
@@ -162,7 +159,6 @@ export function NewsDetail({
       <div className={cx(styles.header, variant === 'inline' && styles.headerInline)}>
         <NewsDetailToolbar
           item={item}
-          channelType={channelType}
           links={links}
           topPanel={topPanel}
           onTogglePanel={(p) => setTopPanel((prev) => (prev === p ? null : p))}
@@ -188,7 +184,6 @@ export function NewsDetail({
 
       <NewsDetailBody
         item={item}
-        channelType={channelType}
         links={links}
         firstMediaPath={firstMediaPath}
         isAlbum={isAlbum}

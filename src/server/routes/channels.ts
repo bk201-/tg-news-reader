@@ -53,7 +53,13 @@ router.get('/', async (c) => {
     .leftJoin(news, and(eq(news.channelId, channels.id), eq(news.isRead, 0)))
     .groupBy(channels.id)
     .orderBy(channels.sortOrder, channels.createdAt);
-  return c.json(result);
+
+  return c.json(
+    result.map((r) => ({
+      ...r,
+      supportsDigest: r.channelType !== 'media',
+    })),
+  );
 });
 
 // POST /api/channels
@@ -82,7 +88,7 @@ router.post('/', async (c) => {
         telegramId,
         name: body.name.trim(),
         description: body.description?.trim(),
-        channelType: body.channelType ?? 'none',
+        channelType: body.channelType ?? 'news',
         groupId: body.groupId ?? null,
       })
       .returning();
@@ -284,11 +290,17 @@ router.post('/:id/fetch', async (c) => {
       limit: body.limit || NEWS_FETCH_LIMIT,
     });
 
+    const strategy = getChannelStrategy(channel.channelType as ChannelType);
+
     // Insert messages and collect inserted IDs
     let inserted = 0;
     const insertedMap = new Map<number, number>(); // telegramMsgId → news.id
 
     for (const msg of messages) {
+      // Let the strategy decide whether to skip this message entirely
+      if (strategy.shouldSkipMessage(msg)) continue;
+
+      const flags = strategy.getItemFlags(msg);
       const [row] = await db
         .insert(news)
         .values({
@@ -302,6 +314,8 @@ router.post('/:id/fetch', async (c) => {
           mediaSize: msg.mediaSizeBytes,
           albumMsgIds: msg.albumTelegramIds ? JSON.stringify(msg.albumTelegramIds) : null,
           ...(msg.instantViewContent ? { fullContent: msg.instantViewContent } : {}),
+          textInPanel: flags.textInPanel ? 1 : 0,
+          canLoadArticle: flags.canLoadArticle ? 1 : 0,
         })
         .onConflictDoNothing()
         .returning({ id: news.id });
@@ -321,7 +335,6 @@ router.post('/:id/fetch', async (c) => {
       .map((msg) => ({ newsId: insertedMap.get(msg.id)!, text: msg.message, hashtags: msg.hashtags }));
     await applyFiltersToInserted(channelId, insertedItems);
 
-    const strategy = getChannelStrategy(channel.channelType as ChannelType);
     const mediaProcessing = strategy.requiresMediaProcessing(messages);
 
     const args: PostProcessArgs = {

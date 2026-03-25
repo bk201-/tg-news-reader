@@ -1,10 +1,9 @@
 import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { NewsItem, ChannelType } from '@shared/types.ts';
+import type { NewsItem } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 
 interface UseNewsDetailHotkeysOptions {
   item: NewsItem;
-  channelType: ChannelType;
   openUrl: string;
   articleQueued: boolean;
   isAlbum: boolean;
@@ -48,7 +47,6 @@ export interface UseNewsDetailHotkeysResult {
  */
 export function useNewsDetailHotkeys({
   item,
-  channelType,
   openUrl,
   articleQueued,
   isAlbum,
@@ -106,7 +104,7 @@ export function useNewsDetailHotkeys({
           break;
         case 'KeyF': {
           const nonYt = links.filter((l) => !isYouTubeUrl(l));
-          if (channelType === 'link_continuation' && !item.fullContent && nonYt.length > 0 && !articleQueued) {
+          if (item.canLoadArticle === 1 && !item.fullContent && nonYt.length > 0 && !articleQueued) {
             e.preventDefault();
             if (nonYt.length === 1) {
               onExtractArticle(nonYt[0]);
@@ -161,7 +159,7 @@ export function useNewsDetailHotkeys({
     item.links,
     item.text,
     item.fullContent,
-    channelType,
+    item.canLoadArticle,
     openUrl,
     topPanel,
     articleQueued,

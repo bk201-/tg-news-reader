@@ -35,9 +35,10 @@
       "description_label": "Description",
       "description_placeholder": "Optional",
       "channel_type_label": "Channel type",
-      "type_none": "None",
-      "type_link": "Link — article continuation",
-      "type_media": "Media content (photos/videos)",
+      "type_news": "News (text + IV, media on demand)",
+      "type_news_link": "News with link (text + load article button)",
+      "type_media": "Media (photos/videos auto-download)",
+      "type_blog": "Blog (everything auto-download)",
       "group_label": "Group",
       "group_placeholder": "General (no group)"
     },

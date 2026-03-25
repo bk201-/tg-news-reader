@@ -45,6 +45,13 @@
 | ⬜ | Менеджер загрузок в папку (File System Access API) | SW кэш | ⭐⭐⭐ |
 | ⬜ | Клиентская скачка gramjs | Деплой | ⭐⭐⭐⭐⭐ |
 
+### ⬜ Технический долг
+
+| Статус | Задача | Описание | Сложность |
+|--------|--------|----------|-----------|
+| ⬜ | Перенести jsdom/Readability в worker_threads | `downloadManager.ts` запускает воркеры как обычные async-корутины в главном потоке. Вызов `new JSDOM(html)` + `Readability.parse()` — синхронный CPU-bound код, блокирует event loop на ~100–200 мс на статью. Решение: вынести парсинг в отдельный Worker thread (Node.js `worker_threads`), передавать HTML строкой, получать готовый `fullContent`. | ⭐⭐⭐⭐ |
+| ⬜ | Дайджест для `news_link` каналов | Сейчас дайджест берёт `news.text` — для `news_link` это только превью. Нужно: перед генерацией дайджеста сервер загружает `fullContent` для items без него (через download manager, priority=10), ждёт завершения, потом генерирует дайджест используя `COALESCE(full_content, text)`. Зависит от worker_threads задачи выше. | ⭐⭐⭐ |
+
 ---
 
 ## 1–4. Sidebar: Segmented, бейджи, сплиттер, адаптивные кнопки ✅

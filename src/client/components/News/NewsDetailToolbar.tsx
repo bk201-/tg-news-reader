@@ -13,7 +13,7 @@ import {
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
-import type { NewsItem, ChannelType } from '@shared/types.ts';
+import type { NewsItem } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 import { NewsHashtags } from './NewsHashtags';
 
@@ -61,7 +61,6 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsDetailToolbarProps {
   item: NewsItem;
-  channelType: ChannelType;
   links: string[];
   topPanel: 'links' | 'text' | null;
   onTogglePanel: (panel: 'links' | 'text') => void;
@@ -88,7 +87,6 @@ interface NewsDetailToolbarProps {
 
 export function NewsDetailToolbar({
   item,
-  channelType,
   links,
   topPanel,
   onTogglePanel,
@@ -170,7 +168,7 @@ export function NewsDetailToolbar({
           </Tooltip>
         )}
 
-        {channelType === 'link_continuation' && !item.fullContent && nonYtLinks.length > 0 && (
+        {item.canLoadArticle === 1 && !item.fullContent && nonYtLinks.length > 0 && (
           <Tooltip title={t('news.detail.load_article_tooltip')}>
             <Button
               icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
