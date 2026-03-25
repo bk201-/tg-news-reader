@@ -52,7 +52,7 @@ export function useDeleteChannel() {
 export function useCountUnreadChannels() {
   const setPendingCounts = useUIStore((s) => s.setPendingCounts);
   return useMutation({
-    mutationFn: () => api.post<Record<number, number>>('/channels/count-unread', {}),
+    mutationFn: (groupId: number | null) => api.post<Record<number, number>>('/channels/count-unread', { groupId }),
     onSuccess: (counts) => {
       setPendingCounts(counts);
     },

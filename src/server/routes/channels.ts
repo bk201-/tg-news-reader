@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, count, and, isNull } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
@@ -187,10 +187,20 @@ export function getSinceDate(channel: { lastFetchedAt: number | null; lastReadAt
 
 // POST /api/channels/count-unread — counts new messages in Telegram per channel without fetching
 router.post('/count-unread', async (c) => {
-  const allChannels = await db.select().from(channels);
+  const body = (await c.req.json().catch(() => ({}))) as { groupId?: number | null };
+
+  // Filter to the requested group: null = "Общее" (no group), number = specific group, undefined = all
+  let channelList;
+  if (body.groupId === undefined) {
+    channelList = await db.select().from(channels);
+  } else if (body.groupId === null) {
+    channelList = await db.select().from(channels).where(isNull(channels.groupId));
+  } else {
+    channelList = await db.select().from(channels).where(eq(channels.groupId, body.groupId));
+  }
   const counts: Record<number, number> = {};
 
-  for (const channel of allChannels) {
+  for (const channel of channelList) {
     try {
       // Use lastFetchedAt (not lastReadAt) so we only count messages that are NOT yet in the DB.
       // getSinceDate() uses lastReadAt first, which would double-count already-fetched unread messages.

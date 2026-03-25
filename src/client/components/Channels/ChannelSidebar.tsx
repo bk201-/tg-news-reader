@@ -57,15 +57,6 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
 }));
 
-/** Same normalization as the server — strips URL prefixes, @, and path suffixes. */
-function normalizeTelegramId(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^https?:\/\/t\.me\//i, '')
-    .replace(/^@/, '')
-    .split('/')[0];
-}
-
 export function ChannelSidebar() {
   const { data: allChannels = [], isLoading } = useChannels();
   const { data: groups = [] } = useGroups();
@@ -121,16 +112,6 @@ export function ChannelSidebar() {
       groupId?: number;
     };
 
-    // Re-check duplicate after validateFields — it clears custom setFields errors
-    if (!editingChannel) {
-      const normalized = normalizeTelegramId(values.telegramId);
-      const duplicate = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
-      if (duplicate) {
-        form.setFields([{ name: 'telegramId', errors: [t('channels.form.already_exists')] }]);
-        return;
-      }
-    }
-
     try {
       if (editingChannel) {
         await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: values.groupId ?? null });
@@ -150,18 +131,8 @@ export function ChannelSidebar() {
   const handleTelegramIdBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     if (editingChannel) return;
     const raw = e.target.value.trim();
-    if (!raw) return;
-
-    // Check for duplicate against already-added channels
-    const normalized = normalizeTelegramId(raw);
-    const duplicate = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
-    if (duplicate) {
-      form.setFields([{ name: 'telegramId', errors: [t('channels.form.already_exists')] }]);
-      return;
-    }
-
-    // Auto-fill name/description from Telegram
-    if (form.getFieldValue('name') as string | undefined) return;
+    // Auto-fill name/description from Telegram (only if name not yet filled)
+    if (!raw || (form.getFieldValue('name') as string | undefined)) return;
     setLookupLoading(true);
     try {
       const info = await lookupChannel.mutateAsync(raw);
@@ -211,7 +182,11 @@ export function ChannelSidebar() {
         </Text>
         <Space size={4}>
           <Tooltip title={t('sidebar.refresh_tooltip')}>
-            <Button icon={<ReloadOutlined />} onClick={() => countUnread.mutate()} loading={countUnread.isPending}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => countUnread.mutate(selectedGroupId)}
+              loading={countUnread.isPending}
+            >
               <span className={styles.btnText}>{t('sidebar.refresh')}</span>
             </Button>
           </Tooltip>
@@ -241,6 +216,7 @@ export function ChannelSidebar() {
       <ChannelFormModal
         open={modalOpen}
         editingChannel={editingChannel}
+        allChannels={allChannels}
         form={form}
         groups={groups}
         lookupLoading={lookupLoading}
