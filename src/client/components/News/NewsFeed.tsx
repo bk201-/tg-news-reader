@@ -13,6 +13,7 @@ import { FilterPanel } from '../Filters/FilterPanel';
 import { NewsFeedToolbar } from './NewsFeedToolbar';
 import { NewsFeedList } from './NewsFeedList';
 import { NewsAccordionList } from './NewsAccordionList';
+import { DigestDrawer } from './DigestDrawer';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
@@ -129,6 +130,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [setHashTagFilter, setShowAll, createFilter, message],
   );
 
+  // ── Digest ────────────────────────────────────────────────────────────
+  const [digestOpen, setDigestOpen] = useState(false);
+
   // ── Fetch period ──────────────────────────────────────────────────────
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
   useEffect(() => {
@@ -244,6 +248,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         newsViewMode={newsViewMode}
         onSetViewMode={setNewsViewMode}
         isMobile={forceAccordion}
+        onOpenDigest={() => setDigestOpen(true)}
       />
 
       <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>
@@ -298,6 +303,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       </div>
 
       <FilterPanel channelId={channel.id} />
+      <DigestDrawer open={digestOpen} params={{ channelIds: [channel.id] }} onClose={() => setDigestOpen(false)} />
     </div>
   );
 }

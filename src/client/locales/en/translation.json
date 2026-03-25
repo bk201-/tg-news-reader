@@ -220,6 +220,17 @@
       "language": "Language",
       "logout": "Sign out"
     }
+  },
+  "digest": {
+    "button": "Digest ✨",
+    "tooltip": "Generate AI digest of current news",
+    "title": "AI Digest",
+    "generating": "Generating digest…",
+    "empty": "No digest yet. Click the button to generate.",
+    "copy": "Copy",
+    "copied": "Copied to clipboard",
+    "powered_by": "Powered by Azure OpenAI · gpt-4o-mini",
+    "error_generic": "Failed to generate digest"
   }
 }
 

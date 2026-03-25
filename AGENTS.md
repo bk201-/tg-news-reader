@@ -103,11 +103,12 @@ src/
       migrate.ts      # Manual migration runner (CREATE TABLE IF NOT EXISTS + ALTER TABLE)
       index.ts        # libsql client + drizzle instance; reads DATABASE_URL+TURSO_AUTH_TOKEN for Turso when set, falls back to file:data/db.sqlite locally
     middleware/       # auth.ts (JWT verify), cors.ts, rateLimit.ts (production only, 120 req/min)
-    routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts
+    routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts, digest.ts
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
                       # downloadManager.ts, downloadProgress.ts, mediaProgress.ts
                       # telegramCircuitBreaker.ts (retry + circuit breaker for all Telegram calls)
                       # alertBot.ts (Telegram push alerts via Bot API; no-op when env vars absent)
+                      # openaiClient.ts (Azure OpenAI / OpenAI client factory + isAiConfigured())
     logger.ts         # Single pino instance — import { logger } from '../logger.js'
   client/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
@@ -574,9 +575,14 @@ Two alert rules send email to `sceletron@gmail.com` via Action Group `tg-reader-
 
 To recreate from scratch on a different subscription: `scripts/setup-monitoring.sh` (fill in vars at the top). **Note**: the bash script's KQL uses `|` pipes — on Windows/PowerShell use `az rest --body @file.json` instead (see `C:\Users\dshilov\alert-kql-rule.json` as reference body).
 
-### UptimeRobot (optional — external HTTP monitor)
+### UptimeRobot (optional — external HTTP monitor, **currently NOT active**)
 Checks `/api/health` from outside Azure every 5 min. Catches what Azure Monitor can't: Azure region outage, event-loop freeze, etc.
+
+> ⚠️ **Side effect with scale-to-zero**: a 5-min UptimeRobot interval will wake the container every 5 min via KEDA HTTP scaler, causing a constant sleep/wake cycle. Consider 15–30 min interval or skip entirely — Azure Monitor + alertBot already cover crashes.
+
+> ℹ️ **SSE wake-up**: `useDownloadsSSE()` (EventSource) auto-reconnects when the server goes to sleep. If a browser tab is open (even in background), it will wake the container every few minutes. This is expected behavior — the tab keeps the app alive while in use.
+
 1. Register free at [uptimerobot.com](https://uptimerobot.com)
-2. Add monitor: type `HTTP(s)`, URL `https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/api/health`, interval 5 min
+2. Add monitor: type `HTTP(s)`, URL `https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/api/health`, interval 15 min
 3. Alert Contacts: add Telegram (native support) or email
 
