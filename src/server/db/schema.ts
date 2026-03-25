@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const groups = sqliteTable('groups', {
@@ -47,6 +47,7 @@ export const news = sqliteTable('news', {
   localMediaPaths: text('local_media_paths'), // JSON array of paths for albums, e.g. ["ch/101.jpg","ch/102.jpg"]
   albumMsgIds: text('album_msg_ids'), // JSON array of telegram msg IDs, e.g. [101,102,103]
   mediaSize: integer('media_size'),
+  isFiltered: integer('is_filtered').notNull().default(0),
 });
 
 export const users = sqliteTable('users', {
@@ -106,3 +107,15 @@ export const filters = sqliteTable('filters', {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+export const filterStats = sqliteTable(
+  'filter_stats',
+  {
+    filterId: integer('filter_id')
+      .notNull()
+      .references(() => filters.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(), // 'YYYY-MM-DD'
+    hitCount: integer('hit_count').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.filterId, table.date] })],
+);

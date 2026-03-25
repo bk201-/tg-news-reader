@@ -91,6 +91,7 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE channels ADD COLUMN is_unavailable INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE news ADD COLUMN local_media_paths TEXT',
     'ALTER TABLE news ADD COLUMN album_msg_ids TEXT',
+    'ALTER TABLE news ADD COLUMN is_filtered INTEGER NOT NULL DEFAULT 0',
   ];
   for (const sql of alterMigrations) {
     try {
@@ -105,5 +106,17 @@ export async function runMigration(): Promise<void> {
     `UPDATE filters SET channel_id = (SELECT id FROM channels ORDER BY id LIMIT 1)
      WHERE channel_id IS NULL AND EXISTS (SELECT 1 FROM channels)`,
   );
+
+  // filter_stats table (idempotent)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS filter_stats (
+      filter_id INTEGER NOT NULL REFERENCES filters(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (filter_id, date)
+    )
+  `);
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_filter_stats ON filter_stats(filter_id, date)');
+
   logger.info('✅ Database migrated successfully');
 }

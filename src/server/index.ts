@@ -23,6 +23,11 @@ import { sendAlert } from './services/alertBot.js';
 import { client } from './db/index.js';
 import { runMigration } from './db/migrate.js';
 
+// All imports loaded — log how long module initialisation took
+// (gramjs TL schema + crypto is the dominant cost, typically 5–8 s)
+const tModules = performance.now();
+logger.info({ module: 'server', ms: Math.round(tModules) }, `Modules loaded in ${Math.round(tModules)}ms`);
+
 // DB migration is intentionally deferred — run AFTER the server starts listening
 // so the startup probe can connect immediately instead of timing out during migration.
 
@@ -146,11 +151,28 @@ const port = parseInt(process.env.SERVER_PORT || '3173', 10);
 // endpoint already responds (SELECT 1 works before schema changes), so the
 // probe never sees "connection refused" and never fails.
 serve({ fetch: app.fetch, port });
-logger.info({ module: 'server', port }, `Server running on http://localhost:${port}`);
+const honoMs = Math.round(performance.now() - tModules);
+logger.info({ module: 'server', port, ms: honoMs }, `Hono listening on :${port} (setup ${honoMs}ms)`);
 
 // Run migration, then start workers (both require a ready DB schema)
+const t1 = performance.now();
 await runMigration();
+logger.info(
+  { module: 'server', ms: Math.round(performance.now() - t1) },
+  `Migration done in ${Math.round(performance.now() - t1)}ms`,
+);
+
+const t2 = performance.now();
 startWorkerPool(DOWNLOAD_WORKER_CONCURRENCY);
+logger.info(
+  { module: 'server', workers: DOWNLOAD_WORKER_CONCURRENCY, ms: Math.round(performance.now() - t2) },
+  `Worker pool started (${DOWNLOAD_WORKER_CONCURRENCY} workers) in ${Math.round(performance.now() - t2)}ms`,
+);
+
+logger.info(
+  { module: 'server', totalMs: Math.round(performance.now()) },
+  `✅ Ready in ${Math.round(performance.now())}ms total`,
+);
 
 // Startup alert — no dedup key so every (re)start fires (process is fresh each time).
 // In prod: signals that the container came back up after a restart / new deploy.

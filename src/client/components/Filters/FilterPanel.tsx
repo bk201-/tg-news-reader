@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
-import { Modal, Form, Input, Select, Button, Table, Switch, Tag, Space, Typography, Divider } from 'antd';
+import { Modal, Form, Input, Select, Button, Table, Switch, Tag, Space, Typography, Divider, Tooltip } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Filter } from '@shared/types.ts';
-import { useFilters, useCreateFilter, useUpdateFilter, useDeleteFilter } from '../../api/filters';
+import { useFilters, useFilterStats, useCreateFilter, useUpdateFilter, useDeleteFilter } from '../../api/filters';
 import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
 
-const useStyles = createStyles(({ css, token }) => ({
+const useStyles = createStyles(({ css }) => ({
   description: css`
     margin-bottom: 16px;
   `,
@@ -28,11 +28,9 @@ const useStyles = createStyles(({ css, token }) => ({
   metaText: css`
     font-size: 11px;
   `,
-  summary: css`
-    margin-top: 16px;
-    padding: 8px 12px;
-    background: ${token.colorFillAlter};
-    border-radius: 6px;
+  statTag: css`
+    cursor: default;
+    margin: 0;
   `,
 }));
 
@@ -43,15 +41,14 @@ interface FilterPanelProps {
 export function FilterPanel({ channelId }: FilterPanelProps) {
   const { filterPanelOpen, setFilterPanelOpen } = useUIStore();
   const { data: filters = [] } = useFilters(channelId);
+  const { data: stats = [] } = useFilterStats(channelId);
+  const statsMap = useMemo(() => new Map(stats.map((s) => [s.filterId, s])), [stats]);
   const createFilter = useCreateFilter(channelId);
   const updateFilter = useUpdateFilter(channelId);
   const deleteFilter = useDeleteFilter(channelId);
   const [form] = Form.useForm();
   const { t } = useTranslation();
   const { styles } = useStyles();
-
-  const tagFilters = useMemo(() => filters.filter((f) => f.type === 'tag'), [filters]);
-  const keywordFilters = useMemo(() => filters.filter((f) => f.type === 'keyword'), [filters]);
 
   const handleAdd = async () => {
     const values = (await form.validateFields()) as { name: string; type: 'tag' | 'keyword'; value: string };
@@ -98,6 +95,27 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
       ),
     },
     {
+      title: t('filters.col_stats'),
+      key: 'stats',
+      width: 70,
+      render: (_: unknown, record: Filter) => {
+        const s = statsMap.get(record.id);
+        const hits7 = s?.hitsLast7 ?? 0;
+        const total = s?.hitsTotal ?? 0;
+        const tip =
+          total > 0
+            ? `${t('filters.stats_total', { count: total })}${s?.lastHitDate ? ` · ${s.lastHitDate}` : ''}`
+            : t('filters.stats_never');
+        return (
+          <Tooltip title={tip}>
+            <Tag color={hits7 > 0 ? 'blue' : undefined} className={styles.statTag}>
+              {hits7}
+            </Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: '',
       key: 'actions',
       width: 40,
@@ -113,7 +131,7 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
       title={t('filters.title')}
       onCancel={() => setFilterPanelOpen(false)}
       footer={null}
-      width={600}
+      width={680}
     >
       <div className={styles.description}>
         <Text type="secondary">{t('filters.description')}</Text>
@@ -149,28 +167,6 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
         pagination={filters.length > 20 ? { pageSize: 20, showSizeChanger: false, size: 'small' } : false}
         locale={{ emptyText: t('filters.empty') }}
       />
-
-      <div className={styles.summary}>
-        <Text strong>{t('filters.active_tags')} </Text>
-        {tagFilters
-          .filter((f) => f.isActive)
-          .map((f) => (
-            <Tag key={f.id} color="blue">
-              {f.value}
-            </Tag>
-          ))}
-        {tagFilters.filter((f) => f.isActive).length === 0 && <Text type="secondary">{t('filters.none')}</Text>}
-        <br />
-        <Text strong>{t('filters.keywords')} </Text>
-        {keywordFilters
-          .filter((f) => f.isActive)
-          .map((f) => (
-            <Tag key={f.id} color="green">
-              {f.value}
-            </Tag>
-          ))}
-        {keywordFilters.filter((f) => f.isActive).length === 0 && <Text type="secondary">{t('filters.none')}</Text>}
-      </div>
     </Modal>
   );
 }

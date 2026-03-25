@@ -31,7 +31,7 @@
 | ✅ | 11 | Логи (структурированные + ротация) | ⭐⭐ |
 | ✅ | 12 | Локализация (i18n: en / ru) | ⭐⭐⭐ |
 | ✅ | 13 | Менеджер загрузок медиа (сервер, фоновые задачи, SSE) | ⭐⭐⭐ |
-| ✅ | 14 | Режим просмотра «аккордион» | ⭐⭐⭐⭐ |
+| ✅ | 14 | Режим просмотра «аккордеон» | ⭐⭐⭐⭐ |
 | ✅ | 15 | Адаптивный layout (AntD breakpoints, Drawer-сайдбар) | ⭐⭐⭐ |
 | ✅ | 16 | Деплой в Azure (Container Apps + Turso) | ⭐⭐⭐ |
 | ✅ | 17 | Мониторинг + Fail detection (alertBot, Azure Monitor, smoke test) | ⭐⭐ |
@@ -331,16 +331,16 @@ export const logger = pino({
 
 ---
 
-## 14. Режим просмотра «аккордион» ✅
+## 14. Режим просмотра «аккордеон» ✅
 
-**Задача**: список новостей во всю ширину, каждая новость — раскрывающийся аккордион.
+**Задача**: список новостей во всю ширину, каждая новость — раскрывающийся аккордеон.
 
 ### Реализовано
 
 - `newsViewMode: 'list' | 'accordion'` в `uiStore` (persisted в `localStorage`)
 - Переключатель в `NewsFeedToolbar` (скрыт на мобильных)
 - `NewsFeedList` (list mode) и `NewsAccordionList` + `NewsAccordionItem` (accordion mode)
-- `effectiveViewMode` в `NewsFeed` — на мобильных (`< 768px`) принудительно аккордион
+- `effectiveViewMode` в `NewsFeed` — на мобильных (`< 768px`) принудительно аккордеон
 - `NewsDetail` поддерживает `variant='panel'` (list mode) и `variant='inline'` (accordion)
 - При нажатии "Прочитано" — новость схлопывается, фокус переходит на следующую
 
@@ -613,14 +613,14 @@ Response: SSE stream (text/event-stream)
 - [x] Структурированные логи через pino: pino-pretty в dev, JSON в prod; access-log; auth-попытки (без email/пароля); rate-limit хиты; uncaughtException/unhandledRejection
 - [x] Локализация: EN по умолчанию, RU fallback; переключатель в хедере; SVG-флаги
 - [x] Менеджер загрузок медиа: `downloads` таблица + воркеры; SSE-прогресс; DownloadsPanel + DownloadsPinnedContent
-- [x] Аккордион-режим: `newsViewMode` в uiStore (persisted); NewsAccordionList + NewsAccordionItem; мобильные — всегда аккордион
+- [x] Аккордион-режим: `newsViewMode` в uiStore (persisted); NewsAccordionList + NewsAccordionItem; мобильные — всегда аккордеон
 - [x] Адаптивный layout: `useMatchMedia`; BP-константы; Splitter только на xxl; Drawer на < xxl; DownloadsPanel pinned только на xxl
 - [x] Мониторинг: alertBot; Azure Monitor KQL + Metric alerts в personal-apps-rg; smoke test в CI; Notify failure (Telegram) в workflow
 - [x] Accessibility: `role`/`aria-selected`/`tabIndex`/`onKeyDown` на ChannelItem/GroupItem/NewsListItem/"Общее"; `<nav>`+`role="listbox/list"` на контейнерах; `aria-expanded` на NewsAccordionItem; focus-ring (box-shadow + двойное кольцо для primary); MaybeTooltip на touch; Segmented focus через `:has()`; исправлен баг `markRead` без `channelId`
 - [x] Instant View (IV): `telegram.ts` при фетче парсит `MessageMediaWebPage.webpage.cachedPage.blocks` через `richTextToString` + `extractInstantViewText`; текст сохраняется в `news.fullContent` сразу при INSERT; в `link_continuation` каналах кнопка "Загрузить статью" не показывается если IV уже есть
-- [x] media_content авто-фильтр: `GET /api/news?filtered=1` добавляет `mediaType IN ('photo','document')` для каналов типа `media_content`; сообщения без реального медиа (text-only, webpage) скрыты но видны через "Показать все"
+- [x] media_content авто-фильтр: `GET /api/news?filtered=1` добавляет `mediaType IN ('photo','document')` для каналов типа `media_content`; сообщения без реального медиа (text-only, webpage) скрыты, но видны через "Показать все"
 - [x] Аудио-сообщения: `telegram.ts` определяет `mediaType='audio'` по MIME `audio/*`; авто-скачка никогда не запускается (ignoreLimit=false → return null); `downloadMessageMedia` поддерживает ogg/mp3/m4a/flac/wav для ручной скачки; `MediaContentStrategy` пропускает аудио при авто-очереди; `NewsListItem` показывает иконку `SoundOutlined`; `NewsDetailMedia` показывает `<audio controls>` когда файл скачан
-- [x] Теги в аккордеоне: создан `NewsHashtags.tsx` (shared component) — рендерит теги с Dropdown (show/addFilter) и `e.stopPropagation()`; используется везде вместо inline Dropdown+Tag; `onTagClick` прокинут через `NewsAccordionItem → NewsDetail → NewsDetailToolbar`; теги в развёрнутом заголовке больше не схлопывают аккордион
+- [x] Теги в аккордеоне: создан `NewsHashtags.tsx` (shared component) — рендерит теги с Dropdown (show/addFilter) и `e.stopPropagation()`; используется везде вместо inline Dropdown+Tag; `onTagClick` прокинут через `NewsAccordionItem → NewsDetail → NewsDetailToolbar`; теги в развёрнутом заголовке больше не схлопывают аккордеон
 - [x] Навигация после фильтрации тега: `useEffect` в `NewsFeed` теперь ищет следующую непрочитанную ПОСЛЕ текущей позиции в `newsItems`, а не первую глобально; fallback на первую глобальную если нет следующей
 - [x] Sticky header в аккордеоне: `headerInline: position: sticky; top: 0; z-index: 10` — кнопки Прочитано/Обновить/Открыть всегда видны при скролле длинной новости
 - [x] Производительность фильтров (80+): `applyFilters` использует `Set<string>` для тегов → O(T) вместо O(F×T) на новость; `FilterPanel` таблица получила пагинацию по 20 строк при filters.length > 20

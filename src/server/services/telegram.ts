@@ -1,11 +1,28 @@
-import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions/index.js';
-import { Api } from 'telegram';
+// Type-only imports — zero runtime cost, used only for TypeScript annotations
+import type { Api, TelegramClient } from 'telegram';
 import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
 import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
+
+// Lazy runtime references — gramjs loads TL schema on import (~2.5s), so defer until first use
+let _Api: typeof Api;
+let _TelegramClient: typeof TelegramClient;
+let _StringSession: (typeof import('telegram/sessions/index.js'))['StringSession'];
+
+async function ensureTgLibs(): Promise<void> {
+  if (_Api) return;
+  const t = performance.now();
+  const [tgMod, sessionMod] = await Promise.all([import('telegram'), import('telegram/sessions/index.js')]);
+  _Api = tgMod.Api;
+  _TelegramClient = tgMod.TelegramClient;
+  _StringSession = sessionMod.StringSession;
+  logger.info(
+    { module: 'telegram', ms: Math.round(performance.now() - t) },
+    `gramjs loaded lazily in ${Math.round(performance.now() - t)}ms`,
+  );
+}
 
 let client: TelegramClient | null = null;
 
@@ -14,15 +31,12 @@ const API_HASH = process.env.TG_API_HASH || '';
 const SESSION = process.env.TG_SESSION || '';
 
 export async function getTelegramClient(): Promise<TelegramClient> {
+  await ensureTgLibs();
   if (client && client.connected) {
     return client;
   }
-
-  const stringSession = new StringSession(SESSION);
-  client = new TelegramClient(stringSession, API_ID, API_HASH, {
-    connectionRetries: 5,
-  });
-
+  const stringSession = new _StringSession(SESSION);
+  client = new _TelegramClient(stringSession, API_ID, API_HASH, { connectionRetries: 5 });
   await client.connect();
   return client;
 }
@@ -48,9 +62,9 @@ function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[
   const links: string[] = [];
   if (entities) {
     for (const entity of entities) {
-      if (entity instanceof Api.MessageEntityUrl) {
+      if (entity instanceof _Api.MessageEntityUrl) {
         links.push(text.substring(entity.offset, entity.offset + entity.length));
-      } else if (entity instanceof Api.MessageEntityTextUrl) {
+      } else if (entity instanceof _Api.MessageEntityTextUrl) {
         links.push(entity.url);
       }
     }
@@ -66,7 +80,7 @@ function extractHashtags(text: string, entities?: Api.TypeMessageEntity[]): stri
   const hashtags: string[] = [];
   if (entities) {
     for (const entity of entities) {
-      if (entity instanceof Api.MessageEntityHashtag) {
+      if (entity instanceof _Api.MessageEntityHashtag) {
         hashtags.push(text.substring(entity.offset, entity.offset + entity.length).toLowerCase());
       }
     }
@@ -83,67 +97,60 @@ const BATCH_SIZE = 100;
 
 // ─── Instant View helpers ─────────────────────────────────────────────────────
 
-/** Recursively extracts plain text from a Telegram IV rich-text node. */
 function richTextToString(rt: Api.TypeRichText): string {
   if (!rt) return '';
-  if (rt instanceof Api.TextEmpty) return '';
-  if (rt instanceof Api.TextPlain) return rt.text;
-  if (rt instanceof Api.TextConcat) return rt.texts.map(richTextToString).join('');
-  if (rt instanceof Api.TextImage) return '';
-  // TextBold, TextItalic, TextUnderline, TextStrike, TextFixed,
-  // TextUrl, TextEmail, TextSubscript, TextSuperscript, TextMarked, TextPhone, TextAnchor
-  // all have a single `.text: TypeRichText` child.
+  if (rt instanceof _Api.TextEmpty) return '';
+  if (rt instanceof _Api.TextPlain) return rt.text;
+  if (rt instanceof _Api.TextConcat) return rt.texts.map(richTextToString).join('');
+  if (rt instanceof _Api.TextImage) return '';
   const wrapped = rt as unknown as { text?: Api.TypeRichText };
   return wrapped.text ? richTextToString(wrapped.text) : '';
 }
 
-/** Extracts readable plain text from Telegram Instant View page blocks. */
 function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
   const parts: string[] = [];
   for (const block of blocks) {
     if (
-      block instanceof Api.PageBlockTitle ||
-      block instanceof Api.PageBlockSubtitle ||
-      block instanceof Api.PageBlockHeader ||
-      block instanceof Api.PageBlockSubheader ||
-      block instanceof Api.PageBlockKicker ||
-      block instanceof Api.PageBlockParagraph ||
-      block instanceof Api.PageBlockPreformatted ||
-      block instanceof Api.PageBlockFooter
+      block instanceof _Api.PageBlockTitle ||
+      block instanceof _Api.PageBlockSubtitle ||
+      block instanceof _Api.PageBlockHeader ||
+      block instanceof _Api.PageBlockSubheader ||
+      block instanceof _Api.PageBlockKicker ||
+      block instanceof _Api.PageBlockParagraph ||
+      block instanceof _Api.PageBlockPreformatted ||
+      block instanceof _Api.PageBlockFooter
     ) {
       const text = richTextToString(block.text);
       if (text.trim()) parts.push(text.trim());
-    } else if (block instanceof Api.PageBlockBlockquote || block instanceof Api.PageBlockPullquote) {
+    } else if (block instanceof _Api.PageBlockBlockquote || block instanceof _Api.PageBlockPullquote) {
       const text = richTextToString(block.text);
       if (text.trim()) parts.push(`> ${text.trim()}`);
-    } else if (block instanceof Api.PageBlockList) {
+    } else if (block instanceof _Api.PageBlockList) {
       for (const item of block.items) {
-        if (item instanceof Api.PageListItemText) {
+        if (item instanceof _Api.PageListItemText) {
           const text = richTextToString(item.text);
           if (text.trim()) parts.push(`• ${text.trim()}`);
-        } else if (item instanceof Api.PageListItemBlocks) {
+        } else if (item instanceof _Api.PageListItemBlocks) {
           const subText = extractInstantViewText(item.blocks);
           if (subText.trim()) parts.push(`• ${subText.trim()}`);
         }
       }
-    } else if (block instanceof Api.PageBlockOrderedList) {
+    } else if (block instanceof _Api.PageBlockOrderedList) {
       for (const item of block.items) {
-        if (item instanceof Api.PageListOrderedItemText) {
+        if (item instanceof _Api.PageListOrderedItemText) {
           const text = richTextToString(item.text);
           if (text.trim()) parts.push(`${item.num} ${text.trim()}`);
-        } else if (item instanceof Api.PageListOrderedItemBlocks) {
+        } else if (item instanceof _Api.PageListOrderedItemBlocks) {
           const subText = extractInstantViewText(item.blocks);
           if (subText.trim()) parts.push(subText.trim());
         }
       }
-    } else if (block instanceof Api.PageBlockDetails) {
+    } else if (block instanceof _Api.PageBlockDetails) {
       const title = richTextToString(block.title);
       if (title.trim()) parts.push(title.trim());
       const subText = extractInstantViewText(block.blocks);
       if (subText.trim()) parts.push(subText.trim());
     }
-    // Skip: Divider, Anchor, Photo, Video, Audio, Embed, Channel, Map,
-    // RelatedArticles, Cover, Table, AuthorDate, EmbedPost, Collage, Slideshow.
   }
   return parts.join('\n\n');
 }
@@ -161,27 +168,27 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
   let instantViewContent: string | undefined;
 
   if (msg.media) {
-    if (msg.media instanceof Api.MessageMediaPhoto) {
+    if (msg.media instanceof _Api.MessageMediaPhoto) {
       mediaType = 'photo';
       const photo = msg.media.photo;
-      if (photo instanceof Api.Photo) {
-        const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
+      if (photo instanceof _Api.Photo) {
+        const photoSizes = photo.sizes.filter((s) => s instanceof _Api.PhotoSize);
         const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
         if (largest) mediaSizeBytes = largest.size;
       }
-    } else if (msg.media instanceof Api.MessageMediaDocument) {
+    } else if (msg.media instanceof _Api.MessageMediaDocument) {
       const doc = msg.media.document;
-      if (doc instanceof Api.Document) {
+      if (doc instanceof _Api.Document) {
         mediaSizeBytes = Number(doc.size);
         const mime = doc.mimeType ?? '';
         mediaType = mime.startsWith('audio/') || mime === 'application/ogg' ? 'audio' : 'document';
       } else {
         mediaType = 'document';
       }
-    } else if (msg.media instanceof Api.MessageMediaWebPage) {
+    } else if (msg.media instanceof _Api.MessageMediaWebPage) {
       mediaType = 'webpage';
       const wp = msg.media.webpage;
-      if (wp instanceof Api.WebPage && wp.cachedPage instanceof Api.Page) {
+      if (wp instanceof _Api.WebPage && wp.cachedPage instanceof _Api.Page) {
         const text = extractInstantViewText(wp.cachedPage.blocks);
         if (text) instantViewContent = text;
       }
@@ -233,7 +240,7 @@ async function _fetchChannelMessages(
       let reachedSinceDate = false;
 
       for (const msg of result) {
-        if (!(msg instanceof Api.Message)) continue;
+        if (!(msg instanceof _Api.Message)) continue;
         const msgDate = new Date((msg.date || 0) * 1000);
         if (sinceDate && msgDate <= sinceDate) {
           reachedSinceDate = true;
@@ -248,7 +255,7 @@ async function _fetchChannelMessages(
       if (allMessages.length >= limit) break;
 
       const lastMsg = result[result.length - 1];
-      if (lastMsg instanceof Api.Message) {
+      if (lastMsg instanceof _Api.Message) {
         offsetId = lastMsg.id;
       } else {
         break;
@@ -304,16 +311,16 @@ export async function getChannelInfo(username: string): Promise<ChannelInfo> {
     let resolvedUsername: string | null = null;
     let description: string | null = null;
 
-    if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
+    if (entity instanceof _Api.Channel || entity instanceof _Api.Chat) {
       name = (entity as Api.Channel).title ?? name;
       resolvedUsername = (entity as Api.Channel).username ?? null;
       try {
-        const full = await tg.invoke(new Api.channels.GetFullChannel({ channel: entity as Api.Channel }));
+        const full = await tg.invoke(new _Api.channels.GetFullChannel({ channel: entity as Api.Channel }));
         description = (full.fullChat as Api.ChannelFull).about || null;
       } catch {
         // description not critical
       }
-    } else if (entity instanceof Api.User) {
+    } else if (entity instanceof _Api.User) {
       name = [entity.firstName, entity.lastName].filter(Boolean).join(' ') || name;
       resolvedUsername = entity.username ?? null;
     }
@@ -322,15 +329,14 @@ export async function getChannelInfo(username: string): Promise<ChannelInfo> {
   }, 'getChannelInfo');
 }
 
-/** Returns the last read message ID for a channel from Telegram (readInboxMaxId) */
 export async function getReadInboxMaxId(channelUsername: string): Promise<number | null> {
   try {
     return await telegramCircuit.execute(async () => {
       const tg = await getTelegramClient();
       const inputPeer = await tg.getInputEntity(channelUsername);
       const result = await tg.invoke(
-        new Api.messages.GetPeerDialogs({
-          peers: [new Api.InputDialogPeer({ peer: inputPeer })],
+        new _Api.messages.GetPeerDialogs({
+          peers: [new _Api.InputDialogPeer({ peer: inputPeer })],
         }),
       );
       const dialog = result.dialogs[0];
@@ -344,17 +350,14 @@ export async function getReadInboxMaxId(channelUsername: string): Promise<number
   }
 }
 
-/** Marks all messages up to maxId as read in Telegram (syncs read state across all devices) */
 export async function readChannelHistory(channelUsername: string, maxId: number): Promise<void> {
   await telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
     const entity = await tg.getEntity(channelUsername);
-    await tg.invoke(new Api.channels.ReadHistory({ channel: entity, maxId }));
+    await tg.invoke(new _Api.channels.ReadHistory({ channel: entity, maxId }));
   }, 'readChannelHistory');
 }
 
-/** Downloads media for a message. Returns relative path like "channelId/123.jpg" or null.
- *  Pass ignoreLimit=true for user-initiated (on-demand) downloads. */
 export async function downloadMessageMedia(
   msg: TelegramMessage,
   channelTelegramId: string,
@@ -364,12 +367,12 @@ export async function downloadMessageMedia(
 
   let ext: string;
 
-  if (msg.rawMedia instanceof Api.MessageMediaPhoto) {
+  if (msg.rawMedia instanceof _Api.MessageMediaPhoto) {
     ext = 'jpg';
     if (!options.ignoreLimit && msg.mediaSizeBytes && msg.mediaSizeBytes > MAX_PHOTO_SIZE_BYTES) return null;
-  } else if (msg.rawMedia instanceof Api.MessageMediaDocument) {
+  } else if (msg.rawMedia instanceof _Api.MessageMediaDocument) {
     const doc = msg.rawMedia.document;
-    if (!(doc instanceof Api.Document)) return null;
+    if (!(doc instanceof _Api.Document)) return null;
     const sizeNum = Number(doc.size ?? 0);
     const mime = doc.mimeType ?? '';
     if (mime === 'image/jpeg') ext = 'jpg';
@@ -378,7 +381,6 @@ export async function downloadMessageMedia(
     else if (mime === 'image/webp') ext = 'webp';
     else if (mime === 'video/mp4') ext = 'mp4';
     else if (mime === 'video/webm') ext = 'webm';
-    // Audio formats — only allow on-demand (user-initiated) downloads
     else if (mime === 'audio/ogg' || mime === 'application/ogg') ext = 'ogg';
     else if (mime === 'audio/mpeg') ext = 'mp3';
     else if (mime === 'audio/mp4' || mime === 'audio/m4a' || mime === 'audio/x-m4a') ext = 'm4a';
@@ -388,7 +390,6 @@ export async function downloadMessageMedia(
 
     const isAudio = mime.startsWith('audio/') || mime === 'application/ogg';
     if (!options.ignoreLimit) {
-      // Audio is never auto-downloaded — user must explicitly request it
       if (isAudio) return null;
       const isVideo = ext === 'mp4' || ext === 'webm';
       const limit = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMG_DOC_SIZE_BYTES;
@@ -404,14 +405,10 @@ export async function downloadMessageMedia(
   const filename = `${msg.id}.${ext!}`;
   const filepath = join(dir, filename);
 
-  // Skip download if file already exists (idempotent)
   if (existsSync(filepath)) return `${channelTelegramId}/${filename}`;
 
-  // Only the actual network download goes through the circuit breaker
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
-    // Pass outputFile so gramjs writes directly to disk — avoids buffering the whole
-    // file in memory (a 75 MB video would otherwise allocate a 75 MB Buffer per worker).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
     if (!result) return null;
@@ -419,14 +416,13 @@ export async function downloadMessageMedia(
   }, 'downloadMessageMedia');
 }
 
-/** Fetches a single message by Telegram message ID (for on-demand media download). */
 export async function fetchMessageById(channelUsername: string, msgId: number): Promise<TelegramMessage | null> {
   try {
     return await telegramCircuit.execute(async () => {
       const tg = await getTelegramClient();
       const result = await tg.getMessages(channelUsername, { ids: [msgId] });
       const msg = result[0];
-      if (!(msg instanceof Api.Message)) return null;
+      if (!(msg instanceof _Api.Message)) return null;
 
       const text = msg.message || '';
       const links = extractLinks(text, msg.entities);
@@ -435,19 +431,19 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       let mediaSizeBytes: number | undefined;
 
       if (msg.media) {
-        if (msg.media instanceof Api.MessageMediaPhoto) {
+        if (msg.media instanceof _Api.MessageMediaPhoto) {
           mediaType = 'photo';
           const photo = msg.media.photo;
-          if (photo instanceof Api.Photo) {
-            const photoSizes = photo.sizes.filter((s) => s instanceof Api.PhotoSize);
+          if (photo instanceof _Api.Photo) {
+            const photoSizes = photo.sizes.filter((s) => s instanceof _Api.PhotoSize);
             const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
             if (largest) mediaSizeBytes = largest.size;
           }
-        } else if (msg.media instanceof Api.MessageMediaDocument) {
+        } else if (msg.media instanceof _Api.MessageMediaDocument) {
           mediaType = 'document';
           const doc = msg.media.document;
-          if (doc instanceof Api.Document) mediaSizeBytes = Number(doc.size);
-        } else if (msg.media instanceof Api.MessageMediaWebPage) {
+          if (doc instanceof _Api.Document) mediaSizeBytes = Number(doc.size);
+        } else if (msg.media instanceof _Api.MessageMediaWebPage) {
           mediaType = 'webpage';
         } else {
           mediaType = 'other';

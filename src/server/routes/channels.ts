@@ -8,6 +8,7 @@ import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
 import { mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
 import { getChannelStrategy, type PostProcessArgs } from '../services/channelStrategies.js';
+import { applyFiltersToInserted } from '../services/filterEngine.js';
 import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
 import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
@@ -313,6 +314,12 @@ router.post('/:id/fetch', async (c) => {
 
     const now = Math.floor(Date.now() / 1000);
     await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
+
+    // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
+    const insertedItems = messages
+      .filter((msg) => insertedMap.has(msg.id))
+      .map((msg) => ({ newsId: insertedMap.get(msg.id)!, text: msg.message, hashtags: msg.hashtags }));
+    await applyFiltersToInserted(channelId, insertedItems);
 
     const strategy = getChannelStrategy(channel.channelType as ChannelType);
     const mediaProcessing = strategy.requiresMediaProcessing(messages);

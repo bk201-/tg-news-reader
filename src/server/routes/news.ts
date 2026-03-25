@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
-import { news, channels, filters as filtersTable } from '../db/schema.js';
+import { news, channels } from '../db/schema.js';
 import { eq, and, asc, max, sql, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -96,48 +96,18 @@ router.get('/', async (c) => {
   const conditions: SQL[] = [...baseConditions];
   let filtersApplied = false;
 
-  // Server-side filter application via SQLite json_each()
+  // Server-side filter application: use pre-computed is_filtered flag
   if (applyServerFilters && channelId !== undefined) {
-    const activeFilters = await db
-      .select()
-      .from(filtersTable)
-      .where(and(eq(filtersTable.channelId, channelId), eq(filtersTable.isActive, 1)));
-
-    const tagValues = activeFilters
-      .filter((f: (typeof activeFilters)[number]) => f.type === 'tag')
-      .map((f: (typeof activeFilters)[number]) => f.value.replace(/^#/, '').toLowerCase());
-
-    const keywordValues = activeFilters
-      .filter((f: (typeof activeFilters)[number]) => f.type === 'keyword')
-      .map((f: (typeof activeFilters)[number]) => f.value.toLowerCase());
-
-    if (tagValues.length > 0) {
-      // Build a flat list: each tag appears twice — with and without '#' prefix
-      // Use IN (...) instead of OR chain to avoid SQLite expression tree depth limit (max 100).
-      // OR chains hit the limit with ~50+ tag filters; IN handles thousands without issue.
-      const tagList = tagValues.flatMap((tag: string) => [tag, '#' + tag]);
-      const inValues = tagList
-        .map((t: string) => sql`${t}`)
-        .reduce((a: SQL<unknown>, b: SQL<unknown>) => sql`${a}, ${b}`);
-      conditions.push(sql`NOT EXISTS (SELECT 1 FROM json_each(hashtags) WHERE lower(value) IN (${inValues}))`);
-      filtersApplied = true;
-    }
-
-    for (const kw of keywordValues) {
-      conditions.push(sql`lower(${news.text}) NOT LIKE ${'%' + kw + '%'}`);
-      filtersApplied = true;
-    }
+    conditions.push(eq(news.isFiltered, 0));
+    filtersApplied = true;
 
     // For media_content channels: auto-filter posts without real media attachment
-    // (text-only, webpage link previews, unsupported media types).
-    // Same toggle as other filters — "Show all" bypasses this too.
     const [channelRow] = await db
       .select({ channelType: channels.channelType })
       .from(channels)
       .where(eq(channels.id, channelId));
     if (channelRow?.channelType === 'media_content') {
       conditions.push(sql`${news.mediaType} IN ('photo', 'document')`);
-      filtersApplied = true;
     }
   }
 
@@ -147,14 +117,15 @@ router.get('/', async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(news.postedAt));
 
-  // Count how many rows were excluded by filters
+  // Count how many rows were excluded by user-defined filters (is_filtered=1)
   let filteredOut = 0;
-  if (filtersApplied) {
-    const [countResult] = await db
+  if (filtersApplied && channelId !== undefined) {
+    const filteredConditions = [...baseConditions, eq(news.isFiltered, 1)];
+    const [result] = await db
       .select({ count: sql<number>`count(*)` })
       .from(news)
-      .where(baseConditions.length > 0 ? and(...baseConditions) : undefined);
-    filteredOut = (countResult?.count ?? 0) - rows.length;
+      .where(and(...filteredConditions));
+    filteredOut = result?.count ?? 0;
   }
 
   const items: NewsItem[] = rows.map((r: (typeof rows)[number]) => ({
