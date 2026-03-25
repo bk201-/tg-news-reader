@@ -120,6 +120,17 @@ export function ChannelSidebar() {
       channelType: ChannelType;
       groupId?: number;
     };
+
+    // Re-check duplicate after validateFields — it clears custom setFields errors
+    if (!editingChannel) {
+      const normalized = normalizeTelegramId(values.telegramId);
+      const duplicate = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
+      if (duplicate) {
+        form.setFields([{ name: 'telegramId', errors: [t('channels.form.already_exists')] }]);
+        return;
+      }
+    }
+
     try {
       if (editingChannel) {
         await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: values.groupId ?? null });

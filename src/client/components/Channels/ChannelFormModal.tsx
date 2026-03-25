@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Form, Input, Select, Spin } from 'antd';
 import type { FormInstance } from 'antd';
 import { createStyles } from 'antd-style';
@@ -36,6 +36,8 @@ export function ChannelFormModal({
 }: ChannelFormModalProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
+  const [hasErrors, setHasErrors] = useState(false);
+
   return (
     <Modal
       open={open}
@@ -45,8 +47,15 @@ export function ChannelFormModal({
       okText={t('common.save')}
       cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
+      okButtonProps={{ disabled: hasErrors }}
     >
-      <Form form={form} layout="vertical" className={styles.form} autoComplete="off">
+      <Form
+        form={form}
+        layout="vertical"
+        className={styles.form}
+        autoComplete="off"
+        onFieldsChange={(_, allFields) => setHasErrors(allFields.some((f) => (f.errors?.length ?? 0) > 0))}
+      >
         <Form.Item
           name="telegramId"
           label={t('channels.form.telegram_id_label')}
