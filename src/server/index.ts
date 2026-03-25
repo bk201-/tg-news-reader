@@ -66,7 +66,11 @@ app.use('/api/*', async (c, next) => {
   );
 });
 
-app.use('*', secureHeaders());
+// Override default 'no-referrer' — YouTube embeds need the Referer header to
+// load their player configuration; without it they return Error 153.
+// strict-origin-when-cross-origin sends origin only (no path) on cross-origin
+// requests, which is sufficient for YouTube while still being safe.
+app.use('*', secureHeaders({ referrerPolicy: 'strict-origin-when-cross-origin' }));
 
 // Tell all crawlers and bots to stay away
 app.use('*', async (c, next) => {
