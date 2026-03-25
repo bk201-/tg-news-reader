@@ -53,11 +53,12 @@ export function ChannelFormModal({
   const telegramIdRules = [
     { required: true, message: t('channels.form.telegram_id_required') },
     {
-      validator: async (_: unknown, value: string) => {
-        if (!value || editingChannel) return;
+      validator: (_: unknown, value: string) => {
+        if (!value || editingChannel) return Promise.resolve();
         const normalized = normalizeTelegramId(value);
         const dup = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
-        if (dup) throw new Error(t('channels.form.already_exists'));
+        if (dup) return Promise.reject(new Error(t('channels.form.already_exists')));
+        return Promise.resolve();
       },
     },
   ];
