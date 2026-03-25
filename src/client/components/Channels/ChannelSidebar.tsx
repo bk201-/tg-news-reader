@@ -5,7 +5,7 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
-import type { Channel } from '@shared/types.ts';
+import type { Channel, ChannelType } from '@shared/types.ts';
 import {
   useChannels,
   useCreateChannel,
@@ -21,6 +21,7 @@ import { ChannelItem } from './ChannelItem';
 import { ChannelFormModal } from './ChannelFormModal';
 import { ChannelFetchModal } from './ChannelFetchModal';
 import { useChannelHotkeys } from './useChannelHotkeys';
+import { ApiError } from '../../api/client';
 
 const { Text } = Typography;
 
@@ -55,6 +56,15 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 14px;
   `,
 }));
+
+/** Same normalization as the server — strips URL prefixes, @, and path suffixes. */
+function normalizeTelegramId(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^https?:\/\/t\.me\//i, '')
+    .replace(/^@/, '')
+    .split('/')[0];
+}
 
 export function ChannelSidebar() {
   const { data: allChannels = [], isLoading } = useChannels();
@@ -107,21 +117,40 @@ export function ChannelSidebar() {
       telegramId: string;
       name: string;
       description?: string;
-      channelType: 'none' | 'link_continuation' | 'media_content';
+      channelType: ChannelType;
       groupId?: number;
     };
-    if (editingChannel) {
-      await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: values.groupId ?? null });
-    } else {
-      await createChannel.mutateAsync({ ...values, groupId: values.groupId ?? null });
+    try {
+      if (editingChannel) {
+        await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: values.groupId ?? null });
+      } else {
+        await createChannel.mutateAsync({ ...values, groupId: values.groupId ?? null });
+      }
+      setModalOpen(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        form.setFields([{ name: 'telegramId', errors: [t('channels.form.already_exists')] }]);
+      } else {
+        throw err;
+      }
     }
-    setModalOpen(false);
   };
 
   const handleTelegramIdBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     if (editingChannel) return;
     const raw = e.target.value.trim();
-    if (!raw || (form.getFieldValue('name') as string | undefined)) return;
+    if (!raw) return;
+
+    // Check for duplicate against already-added channels
+    const normalized = normalizeTelegramId(raw);
+    const duplicate = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
+    if (duplicate) {
+      form.setFields([{ name: 'telegramId', errors: [t('channels.form.already_exists')] }]);
+      return;
+    }
+
+    // Auto-fill name/description from Telegram
+    if (form.getFieldValue('name') as string | undefined) return;
     setLookupLoading(true);
     try {
       const info = await lookupChannel.mutateAsync(raw);
