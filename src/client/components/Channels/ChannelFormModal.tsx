@@ -11,9 +11,20 @@ const useStyles = createStyles(({ css }) => ({
   `,
 }));
 
+/** Same normalization as the server — strips URL prefixes, @, and path suffixes. */
+function normalizeTelegramId(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^https?:\/\/t\.me\//i, '')
+    .replace(/^@/, '')
+    .split('/')[0];
+}
+
 interface ChannelFormModalProps {
   open: boolean;
   editingChannel: Channel | null;
+  /** Full list of existing channels — used for duplicate validation */
+  allChannels: Channel[];
   form: FormInstance;
   groups: Group[];
   lookupLoading: boolean;
@@ -26,6 +37,7 @@ interface ChannelFormModalProps {
 export function ChannelFormModal({
   open,
   editingChannel,
+  allChannels,
   form,
   groups,
   lookupLoading,
@@ -37,6 +49,19 @@ export function ChannelFormModal({
   const { t } = useTranslation();
   const { styles } = useStyles();
   const [hasErrors, setHasErrors] = useState(false);
+
+  const telegramIdRules = [
+    { required: true, message: t('channels.form.telegram_id_required') },
+    {
+      validator: (_: unknown, value: string) => {
+        if (!value || editingChannel) return Promise.resolve();
+        const normalized = normalizeTelegramId(value);
+        const dup = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
+        if (dup) return Promise.reject(new Error(t('channels.form.already_exists')));
+        return Promise.resolve();
+      },
+    },
+  ];
 
   return (
     <Modal
@@ -59,7 +84,8 @@ export function ChannelFormModal({
         <Form.Item
           name="telegramId"
           label={t('channels.form.telegram_id_label')}
-          rules={[{ required: true, message: t('channels.form.telegram_id_required') }]}
+          rules={telegramIdRules}
+          validateTrigger={['onBlur']}
         >
           <Input
             placeholder={t('channels.form.telegram_id_placeholder')}

@@ -71,7 +71,7 @@ export const useUIStore = create<UIStore>()((set) => ({
     set({ newsViewMode: mode });
   },
   pendingCounts: {},
-  setPendingCounts: (counts) => set({ pendingCounts: counts }),
+  setPendingCounts: (counts) => set((state) => ({ pendingCounts: { ...state.pendingCounts, ...counts } })),
   clearPendingCount: (channelId) =>
     set((state) => {
       const next = { ...state.pendingCounts };
