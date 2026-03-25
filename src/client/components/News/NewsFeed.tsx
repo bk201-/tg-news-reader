@@ -180,10 +180,15 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       } else {
         const idx = displayItems.findIndex((n) => n.id === item.id);
         const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
-        if (next) setSelectedNewsId(next.id);
+        if (next) {
+          setSelectedNewsId(next.id);
+        } else {
+          // No more unread ahead — refresh channel (same as ↻ button)
+          handleFetchDefault();
+        }
       }
     },
-    [displayItems, markRead, handleMarkedRead, setSelectedNewsId],
+    [displayItems, markRead, handleMarkedRead, setSelectedNewsId, handleFetchDefault],
   );
   useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
   useNewsFeedHotkeys({
