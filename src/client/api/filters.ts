@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Filter } from '@shared/types.ts';
+import type { Filter, FilterStat } from '@shared/types.ts';
 
 export const filterKeys = {
   byChannel: (channelId: number) => ['filters', channelId] as const,
+  stats: (channelId: number) => ['filter-stats', channelId] as const,
 };
 
 export function useFilters(channelId: number) {
@@ -14,12 +15,23 @@ export function useFilters(channelId: number) {
   });
 }
 
+export function useFilterStats(channelId: number) {
+  return useQuery({
+    queryKey: filterKeys.stats(channelId),
+    queryFn: () => api.get<FilterStat[]>(`/channels/${channelId}/filters/stats`),
+    enabled: !!channelId,
+  });
+}
+
 export function useCreateFilter(channelId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { name: string; type: 'tag' | 'keyword'; value: string }) =>
       api.post<Filter>(`/channels/${channelId}/filters`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) });
+      void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    },
   });
 }
 
@@ -36,7 +48,10 @@ export function useUpdateFilter(channelId: number) {
       value?: string;
       isActive?: number;
     }) => api.put<Filter>(`/channels/${channelId}/filters/${id}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) });
+      void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    },
   });
 }
 
@@ -44,6 +59,9 @@ export function useDeleteFilter(channelId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/channels/${channelId}/filters/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) });
+      void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    },
   });
 }

@@ -1,5 +1,22 @@
-import { JSDOM } from 'jsdom';
-import { Readability } from '@mozilla/readability';
+import { logger } from '../logger.js';
+
+// Lazy runtime references — jsdom adds ~2s to cold start but is only needed
+// when the user clicks "Load article", so defer until first actual use.
+let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null;
+let ReadabilityClass: (typeof import('@mozilla/readability'))['Readability'] | null = null;
+
+async function getLibs() {
+  if (JSDOMClass && ReadabilityClass) return { JSDOM: JSDOMClass, Readability: ReadabilityClass };
+  const t = performance.now();
+  const [{ JSDOM }, { Readability }] = await Promise.all([import('jsdom'), import('@mozilla/readability')]);
+  JSDOMClass = JSDOM;
+  ReadabilityClass = Readability;
+  logger.info(
+    { module: 'readability', ms: Math.round(performance.now() - t) },
+    `jsdom loaded lazily in ${Math.round(performance.now() - t)}ms`,
+  );
+  return { JSDOM, Readability };
+}
 
 export interface ExtractedContent {
   title?: string;
@@ -41,6 +58,8 @@ export function buildFullContent(extracted: ExtractedContent): string {
 }
 
 export async function extractContentFromUrl(url: string): Promise<ExtractedContent> {
+  const { JSDOM, Readability } = await getLibs();
+
   const response = await fetch(url, {
     headers: {
       'User-Agent':

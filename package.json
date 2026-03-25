@@ -18,7 +18,8 @@
     "lint:fix": "eslint src scripts --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "checkup": "npm run build && npm run build:server && npm run format && npm run lint"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

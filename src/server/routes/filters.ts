@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import { db } from '../db/index.js';
+import { db, client } from '../db/index.js';
 import { filters } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { reprocessChannelFilters } from '../services/filterEngine.js';
 
 const router = new Hono();
 
@@ -9,6 +10,29 @@ const router = new Hono();
 router.get('/', async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
   const result = await db.select().from(filters).where(eq(filters.channelId, channelId)).orderBy(filters.createdAt);
+  return c.json(result);
+});
+
+// GET /api/channels/:channelId/filters/stats
+router.get('/stats', async (c) => {
+  const channelId = parseInt(c.req.param('channelId')!, 10);
+  const rows = await client.execute({
+    sql: `SELECT f.id as filter_id,
+            COALESCE(SUM(CASE WHEN fs.date >= date('now', '-6 days') THEN fs.hit_count ELSE 0 END), 0) as hits_last7,
+            COALESCE(SUM(fs.hit_count), 0) as hits_total,
+            MAX(fs.date) as last_hit_date
+          FROM filters f
+          LEFT JOIN filter_stats fs ON fs.filter_id = f.id
+          WHERE f.channel_id = ?
+          GROUP BY f.id`,
+    args: [channelId],
+  });
+  const result = rows.rows.map((r) => ({
+    filterId: r[0] as number,
+    hitsLast7: r[1] as number,
+    hitsTotal: r[2] as number,
+    lastHitDate: r[3] as string | null,
+  }));
   return c.json(result);
 });
 
@@ -28,6 +52,7 @@ router.post('/', async (c) => {
       value: body.value.trim().toLowerCase(),
     })
     .returning();
+  await reprocessChannelFilters(channelId);
   return c.json(created, 201);
 });
 
@@ -52,6 +77,7 @@ router.put('/:id', async (c) => {
     .where(and(eq(filters.id, id), eq(filters.channelId, channelId)))
     .returning();
   if (!updated) return c.json({ error: 'Filter not found' }, 404);
+  await reprocessChannelFilters(channelId);
   return c.json(updated);
 });
 
@@ -64,6 +90,7 @@ router.delete('/:id', async (c) => {
     .where(and(eq(filters.id, id), eq(filters.channelId, channelId)))
     .returning();
   if (!deleted) return c.json({ error: 'Filter not found' }, 404);
+  await reprocessChannelFilters(channelId);
   return c.json({ success: true });
 });
 

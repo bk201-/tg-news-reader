@@ -72,3 +72,10 @@ export interface Filter {
   isActive: number;
   createdAt: number;
 }
+
+export interface FilterStat {
+  filterId: number;
+  hitsLast7: number;
+  hitsTotal: number;
+  lastHitDate: string | null; // 'YYYY-MM-DD'
+}
