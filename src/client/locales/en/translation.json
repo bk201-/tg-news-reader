@@ -29,6 +29,7 @@
       "telegram_id_label": "Telegram ID / username",
       "telegram_id_required": "Enter channel username",
       "telegram_id_placeholder": "durov, @durov or https://t.me/durov",
+      "already_exists": "This channel is already added",
       "name_label": "Name",
       "name_required": "Enter name",
       "name_placeholder": "My favourite channel",
@@ -234,4 +235,3 @@
     "error_generic": "Failed to generate digest"
   }
 }
-

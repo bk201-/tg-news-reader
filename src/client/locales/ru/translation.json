@@ -29,6 +29,7 @@
       "telegram_id_label": "Telegram ID / username",
       "telegram_id_required": "Введите username канала",
       "telegram_id_placeholder": "durov, @durov или https://t.me/durov",
+      "already_exists": "Этот канал уже добавлен",
       "name_label": "Название",
       "name_required": "Введите название",
       "name_placeholder": "Мой любимый канал",
@@ -234,4 +235,3 @@
     "error_generic": "Ошибка генерации дайджеста"
   }
 }
-
