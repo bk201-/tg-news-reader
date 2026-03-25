@@ -2,7 +2,7 @@ import React from 'react';
 import { Spin, Empty } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem, ChannelType } from '@shared/types.ts';
+import type { NewsItem } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -30,7 +30,6 @@ interface NewsAccordionListProps {
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
-  channelType: ChannelType;
   channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
@@ -46,7 +45,6 @@ export function NewsAccordionList({
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
-  channelType,
   channelTelegramId,
   onSelect,
   onTagClick,
@@ -77,7 +75,6 @@ export function NewsAccordionList({
           isSelected={selectedNewsId === item.id}
           isFiltered={filteredIds.has(item.id)}
           showAll={showAll}
-          channelType={channelType}
           channelTelegramId={channelTelegramId}
           onSelect={onSelect}
           onTagClick={onTagClick}

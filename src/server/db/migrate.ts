@@ -92,6 +92,8 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE news ADD COLUMN local_media_paths TEXT',
     'ALTER TABLE news ADD COLUMN album_msg_ids TEXT',
     'ALTER TABLE news ADD COLUMN is_filtered INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE news ADD COLUMN text_in_panel INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE news ADD COLUMN can_load_article INTEGER NOT NULL DEFAULT 0',
   ];
   for (const sql of alterMigrations) {
     try {
@@ -106,6 +108,25 @@ export async function runMigration(): Promise<void> {
     `UPDATE filters SET channel_id = (SELECT id FROM channels ORDER BY id LIMIT 1)
      WHERE channel_id IS NULL AND EXISTS (SELECT 1 FROM channels)`,
   );
+
+  // Rename old channel types → new names (idempotent)
+  await client.execute(`UPDATE channels SET channel_type = 'news'      WHERE channel_type = 'none'`);
+  await client.execute(`UPDATE channels SET channel_type = 'news_link' WHERE channel_type = 'link_continuation'`);
+  await client.execute(`UPDATE channels SET channel_type = 'media'     WHERE channel_type = 'media_content'`);
+
+  // Backfill flags on existing rows
+  await client.execute(`
+    UPDATE news SET can_load_article = 1
+    WHERE can_load_article = 0
+      AND links != '[]'
+      AND full_content IS NULL
+      AND channel_id IN (SELECT id FROM channels WHERE channel_type = 'news_link')
+  `);
+  await client.execute(`
+    UPDATE news SET text_in_panel = 1
+    WHERE text_in_panel = 0
+      AND channel_id IN (SELECT id FROM channels WHERE channel_type = 'media')
+  `);
 
   // filter_stats table (idempotent)
   await client.execute(`

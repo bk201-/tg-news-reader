@@ -1,4 +1,4 @@
-export type ChannelType = 'none' | 'link_continuation' | 'media_content';
+export type ChannelType = 'news' | 'news_link' | 'media' | 'blog';
 
 export type DownloadType = 'media' | 'article';
 export type DownloadStatus = 'pending' | 'processing' | 'done' | 'failed';
@@ -44,6 +44,8 @@ export interface Channel {
   isUnavailable: number;
   unreadCount: number;
   createdAt: number;
+  /** Computed server-side: false for media channels where digest is not meaningful */
+  supportsDigest: boolean;
 }
 
 export interface NewsItem {
@@ -61,6 +63,10 @@ export interface NewsItem {
   localMediaPaths?: string[]; // album: all downloaded paths (JSON-decoded)
   albumMsgIds?: number[]; // album: full list of Telegram msg IDs — length = expected total, even before download
   mediaSize?: number;
+  /** 1 = post text shown in collapsible top panel (media channels); 0/absent = inline */
+  textInPanel?: number;
+  /** 1 = "Load article" button available (news_link items with a link but no fullContent yet) */
+  canLoadArticle?: number;
 }
 
 export interface Filter {

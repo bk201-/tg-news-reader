@@ -3,7 +3,7 @@ import { Button, Typography, Divider, Modal, Radio } from 'antd';
 import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem, ChannelType } from '@shared/types.ts';
+import type { NewsItem } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 import { NewsDetailMedia } from './NewsDetailMedia';
 import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
@@ -69,7 +69,6 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsDetailBodyProps {
   item: NewsItem;
-  channelType: ChannelType;
   links: string[];
   firstMediaPath?: string;
   isAlbum: boolean;
@@ -100,7 +99,6 @@ interface NewsDetailBodyProps {
 
 export function NewsDetailBody({
   item,
-  channelType,
   links,
   firstMediaPath,
   isAlbum,
@@ -151,7 +149,7 @@ export function NewsDetailBody({
         />
 
         <div className={styles.textBody}>
-          {channelType === 'link_continuation' ? (
+          {item.canLoadArticle === 1 ? (
             item.fullContent ? (
               <Paragraph className={styles.paragraph}>{item.fullContent}</Paragraph>
             ) : (
@@ -177,13 +175,13 @@ export function NewsDetailBody({
                 )}
               </>
             )
-          ) : channelType === 'media_content' ? null : (
+          ) : item.textInPanel === 1 ? null : (
             <Paragraph className={styles.paragraphCompact}>
               {item.text || <Text type="secondary">{t('news.detail.no_text')}</Text>}
             </Paragraph>
           )}
 
-          {channelType !== 'link_continuation' && item.fullContent && (
+          {item.canLoadArticle !== 1 && item.fullContent && (
             <>
               <Divider>
                 <Text type="secondary" className={styles.dividerLabel}>

@@ -17,9 +17,9 @@ export const channels = sqliteTable('channels', {
   telegramId: text('telegram_id').notNull().unique(),
   name: text('name').notNull(),
   description: text('description'),
-  channelType: text('channel_type', { enum: ['none', 'link_continuation', 'media_content'] })
+  channelType: text('channel_type', { enum: ['news', 'news_link', 'media', 'blog'] })
     .notNull()
-    .default('none'),
+    .default('news'),
   groupId: integer('group_id').references(() => groups.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
   lastFetchedAt: integer('last_fetched_at'),
@@ -48,6 +48,8 @@ export const news = sqliteTable('news', {
   albumMsgIds: text('album_msg_ids'), // JSON array of telegram msg IDs, e.g. [101,102,103]
   mediaSize: integer('media_size'),
   isFiltered: integer('is_filtered').notNull().default(0),
+  textInPanel: integer('text_in_panel').notNull().default(0),
+  canLoadArticle: integer('can_load_article').notNull().default(0),
 });
 
 export const users = sqliteTable('users', {

@@ -68,6 +68,8 @@ interface NewsFeedToolbarProps {
   onSetViewMode: (mode: NewsViewMode) => void;
   isMobile?: boolean;
   onOpenDigest: () => void;
+  /** Whether to show the Digest button (false for media-only channels) */
+  showDigest?: boolean;
 }
 
 export function NewsFeedToolbar({
@@ -91,6 +93,7 @@ export function NewsFeedToolbar({
   onSetViewMode,
   isMobile = false,
   onOpenDigest,
+  showDigest = true,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -135,11 +138,13 @@ export function NewsFeedToolbar({
             </Button>
           </Tooltip>
         </Badge>
-        <Tooltip title={t('digest.tooltip')}>
-          <Button icon={<BulbOutlined />} onClick={onOpenDigest}>
-            {t('digest.button')}
-          </Button>
-        </Tooltip>
+        {showDigest && (
+          <Tooltip title={t('digest.tooltip')}>
+            <Button icon={<BulbOutlined />} onClick={onOpenDigest}>
+              {t('digest.button')}
+            </Button>
+          </Tooltip>
+        )}
         {hashTagFilter && (
           <Tag color="blue" closeIcon={<CloseCircleOutlined />} onClose={onClearHashTag} className={styles.hashTag}>
             {hashTagFilter}

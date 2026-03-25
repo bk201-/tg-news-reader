@@ -249,6 +249,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         onSetViewMode={setNewsViewMode}
         isMobile={forceAccordion}
         onOpenDigest={() => setDigestOpen(true)}
+        showDigest={channel.supportsDigest}
       />
 
       <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>
@@ -261,7 +262,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             selectedNewsId={selectedNewsId}
             hashTagFilter={hashTagFilter}
             activeFilterCount={activeFilterCount}
-            channelType={channel.channelType}
             channelTelegramId={channel.telegramId}
             onSelect={setSelectedNewsId}
             onTagClick={handleTagClick}
@@ -287,7 +287,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
                 <NewsDetail
                   key={selectedItem.id}
                   item={selectedItem}
-                  channelType={channel.channelType}
                   channelTelegramId={channel.telegramId}
                   onMarkedRead={handleMarkedRead}
                   onTagClick={handleTagClick}
