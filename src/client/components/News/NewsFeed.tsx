@@ -249,6 +249,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         onSetViewMode={setNewsViewMode}
         isMobile={forceAccordion}
         onOpenDigest={() => setDigestOpen(true)}
+        showDigest={channel.channelType !== 'media_content'}
       />
 
       <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>

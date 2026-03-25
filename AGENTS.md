@@ -557,9 +557,17 @@ void sendAlert('message text', 'optional-dedup-key');  // dedup: 5-min cooldown 
 - Server startup (prod only) → `sendAlert('🟢 Server started')` (`index.ts`)
 
 **To enable** — set on the Container App:
+
+> ⚠️ **`--set-env-vars` replaces the entire env var list** — do NOT run with only these two keys or all other vars will be wiped.  
+> Safe approach: use **Azure Portal** → Container App → Configuration → Environment variables → add individual variables there.  
+> If using CLI, always include the full list of all vars (see ROADMAP.md "Переменные окружения" for the complete set).
+
 ```bash
-az containerapp update --name tg-news-reader --resource-group personal-apps-rg \
-  --set-env-vars ALERT_BOT_TOKEN=<token> ALERT_CHAT_ID=<chat_id>
+# Safe: add secrets first, then reference them
+az containerapp secret set --name tg-news-reader --resource-group personal-apps-rg \
+  --secrets alert-bot-token=<token> alert-chat-id=<chat_id>
+
+# Then in Azure Portal, add env vars ALERT_BOT_TOKEN=secretref:alert-bot-token etc.
 ```
 How to get values: open [@BotFather](https://t.me/BotFather) → `/newbot` → copy token. Send any message to the bot, then `curl https://api.telegram.org/bot<TOKEN>/getUpdates` → read `result[0].message.chat.id`.
 

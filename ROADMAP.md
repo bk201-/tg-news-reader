@@ -393,12 +393,31 @@ export const logger = pino({
 
 ### Переменные окружения (prod)
 
+> ⚠️ **`--set-env-vars` в Azure CLI заменяет ВСЬ список, а не добавляет к нему.**  
+> Изменяй env vars через **Azure Portal** (UI) или передавай **полный список** всех переменных сразу.  
+> Секретные значения храни в Secrets Container App и ссылайся на них через `secretref:secret-name`.
+
+**Обязательные (прод упадёт без них):**
 ```
-TG_API_ID, TG_API_HASH, TG_SESSION
-DATABASE_URL, TURSO_AUTH_TOKEN
-JWT_SECRET
-ALLOWED_ORIGIN=https://yourdomain.com
 NODE_ENV=production
+TG_API_ID          → secretref:tg-api-id
+TG_API_HASH        → secretref:tg-api-hash
+TG_SESSION         → secretref:tg-session
+DATABASE_URL       → secretref:database-url
+TURSO_AUTH_TOKEN   → secretref:turso-auth-token
+JWT_SECRET         → secretref:jwt-secret
+ALLOWED_ORIGIN=https://yourdomain.com
+```
+
+**Опциональные (есть дефолты или no-op при отсутствии):**
+```
+ALERT_BOT_TOKEN    → secretref:alert-bot-token   (alertBot, no-op если не задан)
+ALERT_CHAT_ID      → secretref:alert-chat-id
+AZURE_OPENAI_ENDPOINT → secretref:azure-openai-endpoint  (AI-дайджест)
+AZURE_OPENAI_KEY   → secretref:azure-openai-key
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+OPENAI_API_KEY     → secretref:openai-api-key   (fallback если Azure не задан)
+LOG_LEVEL=info
 ```
 
 **Сложность**: ⭐⭐⭐. Реализовано.
@@ -420,8 +439,30 @@ NODE_ENV=production
 No-op если env vars не заданы. Срабатывает при: `uncaughtException`, worker crash, circuit breaker OPEN, `AUTH_KEY_UNREGISTERED`, старт сервера в prod.
 
 ```bash
+# ⚠️ ВАЖНО: --set-env-vars ЗАМЕНЯЕТ весь список env vars, а не добавляет к нему!
+# Если задать только ALERT_BOT_TOKEN и ALERT_CHAT_ID — все остальные переменные удалятся.
+#
+# Безопасный способ 1: Azure Portal → Container App → Configuration → Environment variables
+#   → добавить отдельные переменные через UI (не затрагивает остальные).
+#
+# Безопасный способ 2: CLI с полным списком ВСЕХ нужных переменных:
+#   (для секретов используй secretref:secret-name, если значение уже в Secrets)
 az containerapp update --name tg-news-reader --resource-group personal-apps-rg \
-  --set-env-vars ALERT_BOT_TOKEN=<token> ALERT_CHAT_ID=<chat_id>
+  --set-env-vars \
+    NODE_ENV=production \
+    ALLOWED_ORIGIN=https://yourdomain.com \
+    TG_API_ID=secretref:tg-api-id \
+    TG_API_HASH=secretref:tg-api-hash \
+    TG_SESSION=secretref:tg-session \
+    DATABASE_URL=secretref:database-url \
+    TURSO_AUTH_TOKEN=secretref:turso-auth-token \
+    JWT_SECRET=secretref:jwt-secret \
+    ALERT_BOT_TOKEN=secretref:alert-bot-token \
+    ALERT_CHAT_ID=secretref:alert-chat-id \
+    AZURE_OPENAI_ENDPOINT=secretref:azure-openai-endpoint \
+    AZURE_OPENAI_KEY=secretref:azure-openai-key \
+    AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini \
+    OPENAI_API_KEY=secretref:openai-api-key
 ```
 
 #### 3. Azure Monitor Alerts (задеплоены в `personal-apps-rg`)
