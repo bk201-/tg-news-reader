@@ -36,12 +36,7 @@
 | ✅ | 16 | Деплой в Azure (Container Apps + Turso) | ⭐⭐⭐ |
 | ✅ | 17 | Мониторинг + Fail detection (alertBot, Azure Monitor, smoke test) | ⭐⭐ |
 | ✅ | 18 | Accessibility: Tab-навигация, ARIA-роли, focus-ring, MaybeTooltip на touch | ⭐⭐⭐ |
-
-### ⬜ В работе / Следующие
-
-| Статус | Приоритет | Задача | Зависимости | Сложность |
-|--------|-----------|--------|-------------|-----------|
-| ⬜ | 🟢 | AI-дайджест (Azure OpenAI / OpenAI) | — | ⭐⭐⭐ |
+| ✅ | 19 | AI-дайджест (Azure OpenAI / OpenAI) | ⭐⭐⭐ |
 
 ### ⬜ Отложено (низкий приоритет)
 

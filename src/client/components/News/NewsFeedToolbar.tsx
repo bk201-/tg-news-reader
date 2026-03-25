@@ -10,6 +10,7 @@ import {
   HistoryOutlined,
   LayoutOutlined,
   ProfileOutlined,
+  BulbOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +67,7 @@ interface NewsFeedToolbarProps {
   newsViewMode: NewsViewMode;
   onSetViewMode: (mode: NewsViewMode) => void;
   isMobile?: boolean;
+  onOpenDigest: () => void;
 }
 
 export function NewsFeedToolbar({
@@ -88,6 +90,7 @@ export function NewsFeedToolbar({
   newsViewMode,
   onSetViewMode,
   isMobile = false,
+  onOpenDigest,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -132,6 +135,11 @@ export function NewsFeedToolbar({
             </Button>
           </Tooltip>
         </Badge>
+        <Tooltip title={t('digest.tooltip')}>
+          <Button icon={<BulbOutlined />} onClick={onOpenDigest}>
+            {t('digest.button')}
+          </Button>
+        </Tooltip>
         {hashTagFilter && (
           <Tag color="blue" closeIcon={<CloseCircleOutlined />} onClose={onClearHashTag} className={styles.hashTag}>
             {hashTagFilter}

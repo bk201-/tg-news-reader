@@ -12,6 +12,7 @@ import groupsRouter from './routes/groups.js';
 import authRouter from './routes/auth.js';
 import downloadsRouter from './routes/downloads.js';
 import clientLogRouter from './routes/clientLog.js';
+import digestRouter from './routes/digest.js';
 import { authMiddleware } from './middleware/auth.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
@@ -105,6 +106,7 @@ app.route('/api/content', contentRouter);
 app.route('/api/media', mediaRouter);
 app.route('/api/downloads', downloadsRouter);
 app.route('/api/log/client', clientLogRouter);
+app.route('/api/digest', digestRouter);
 
 // Health check — exposes DB + Telegram circuit state for uptime monitors
 app.get('/api/health', async (c) => {

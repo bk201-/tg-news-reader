@@ -25,6 +25,18 @@ export const NEWS_DEFAULT_FETCH_DAYS = parseInt(process.env.NEWS_DEFAULT_FETCH_D
 /** Max messages fetched per channel sync. Env: NEWS_FETCH_LIMIT */
 export const NEWS_FETCH_LIMIT = parseInt(process.env.NEWS_FETCH_LIMIT ?? '1000', 10);
 
+// ─── Azure OpenAI / OpenAI ───────────────────────────────────────────────────
+/** Azure OpenAI endpoint URL. When set, Azure provider is used; otherwise falls back to OPENAI_API_KEY. */
+export const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT ?? '';
+/** Azure OpenAI API key. */
+export const AZURE_OPENAI_KEY = process.env.AZURE_OPENAI_KEY ?? '';
+/** Azure OpenAI deployment name (e.g. "gpt-4o-mini"). */
+export const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o-mini';
+/** Direct OpenAI API key (fallback when Azure vars are absent). */
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
+/** Max news items to include in a single digest request. */
+export const DIGEST_MAX_ITEMS = parseInt(process.env.DIGEST_MAX_ITEMS ?? '200', 10);
+
 if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-secret-change-in-production') {
   throw new Error('JWT_SECRET env variable must be set in production!');
 }
