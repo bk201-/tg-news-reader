@@ -20,8 +20,7 @@ RUN npm run build && npm run build:server
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production \
-    LOG_LEVEL=info
+ENV NODE_ENV=production
 
 # Install only production dependencies
 COPY package*.json ./
