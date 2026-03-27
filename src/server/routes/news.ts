@@ -48,17 +48,24 @@ router.post('/read-all', async (c) => {
       const [channel] = await db.select().from(channels).where(eq(channels.id, body.channelId));
       if (channel) {
         const [result] = await db
-          .select({ maxMsgId: max(news.telegramMsgId) })
+          .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
           .from(news)
           .where(eq(news.channelId, body.channelId));
 
         if (result?.maxMsgId) {
           await readChannelHistory(channel.telegramId, result.maxMsgId);
         }
+
+        // Update lastReadAt so the next fetch won't re-fetch already-read messages.
+        // Without this, the fetch route deletes all isRead=1 news and then re-inserts
+        // them from Telegram (starting from the old lastReadAt) with isRead=0.
+        if (result?.maxPostedAt) {
+          await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, body.channelId));
+        }
       }
     } catch (err) {
       // Non-critical: local state already updated, Telegram sync failed
-      console.warn('Failed to sync read state to Telegram:', err);
+      logger.warn({ module: 'news', channelId: body.channelId, err }, 'failed to sync read state to Telegram');
     }
   }
 
