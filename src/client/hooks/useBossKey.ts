@@ -55,8 +55,7 @@ export function useBossKey() {
         const pinnedGroupIds = new Set(groups.filter((g) => g.hasPIN).map((g) => g.id));
         const currentGroupIsPinned = selectedGroupId !== null && pinnedGroupIds.has(selectedGroupId);
         const selectedCh = channels.find((c) => c.id === selectedChannelId);
-        const selectedChannelInPinnedGroup =
-          selectedCh?.groupId != null && pinnedGroupIds.has(selectedCh.groupId);
+        const selectedChannelInPinnedGroup = selectedCh?.groupId != null && pinnedGroupIds.has(selectedCh.groupId);
 
         if (currentGroupIsPinned || selectedChannelInPinnedGroup) {
           // setSelectedGroupId also clears selectedChannelId + selectedNewsId (uiStore)

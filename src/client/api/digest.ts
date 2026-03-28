@@ -7,9 +7,7 @@ export interface DigestParams {
   until?: string;
 }
 
-export type DigestEvent =
-  | { type: 'chunk'; content: string }
-  | { type: 'ref_map'; map: Record<number, number> };
+export type DigestEvent = { type: 'chunk'; content: string } | { type: 'ref_map'; map: Record<number, number> };
 
 /**
  * Streams a digest from POST /api/digest.

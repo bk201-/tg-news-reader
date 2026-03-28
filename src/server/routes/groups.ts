@@ -103,10 +103,7 @@ router.post('/lock-all', async (c) => {
 
   await db.update(sessions).set({ unlockedGroupIds: '[]' }).where(eq(sessions.id, sessionId));
 
-  const [session] = await db
-    .select({ userId: sessions.userId })
-    .from(sessions)
-    .where(eq(sessions.id, sessionId));
+  const [session] = await db.select({ userId: sessions.userId }).from(sessions).where(eq(sessions.id, sessionId));
   if (!session) return c.json({ success: true });
 
   const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, session.userId));

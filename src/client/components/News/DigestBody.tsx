@@ -70,4 +70,3 @@ export function DigestBody({ text, refMap, onRefClick }: DigestBodyProps) {
     </div>
   );
 }
-
