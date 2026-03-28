@@ -1,90 +1,89 @@
 # TG News Reader — Decisions & History
 
-> Архивный лог принятых решений и исправленных багов. Объясняет «почему», а не «что».
+> Archive of architectural decisions and resolved bugs. Explains the *why*, not just the *what*.
 
 ---
 
-## Архитектурные решения
+## Architectural decisions
 
-### Auth: ручная реализация vs better-auth
+### Auth: manual implementation vs better-auth
 
-Выбрана **ручная** (bcryptjs + hono/jwt + otpauth):
-- Простой кейс: один пользователь, один сервер
-- Нет зависимости от внешней библиотеки с обновлениями
-- Пересмотреть если добавим OAuth (Google/GitHub) или Passkeys
+Chose **manual** (bcryptjs + hono/jwt + otpauth):
+- Simple use case: single user, single server
+- No dependency on an external library with its own update cycle
+- Revisit if OAuth (Google/GitHub) or Passkeys are added
 
-### БД: SQLite/Turso vs PostgreSQL
+### DB: SQLite/Turso vs PostgreSQL
 
-SQLite локально, Turso (libSQL) в проде — через один `@libsql/client`:
-- `db/index.ts` читает `DATABASE_URL`: если задан → Turso, иначе `file:data/db.sqlite`
-- Минимальная инфраструктура, нет отдельного сервера БД
-- Bottleneck: write concurrency — не актуально для single-user приложения
+SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
+- `db/index.ts` reads `DATABASE_URL`: if set → Turso, otherwise `file:data/db.sqlite`
+- Minimal infrastructure, no separate DB server
+- Bottleneck: write concurrency — not relevant for a single-user app
 
 ### count-unread: lastFetchedAt vs lastReadAt
 
-`count-unread` намеренно использует `lastFetchedAt` (не `lastReadAt`):
-- Бейдж = `unreadCount (БД) + pendingCounts (uiStore)`
-- Если считать с `lastReadAt` — уже скачанные непрочитанные считались бы дважды
-- `getSinceDate` используется только в fetch-роуте
+`count-unread` intentionally uses `lastFetchedAt` (not `lastReadAt`):
+- Badge = `unreadCount (DB) + pendingCounts (uiStore)`
+- Using `lastReadAt` would double-count already-fetched unread messages
+- `getSinceDate` is used only in the fetch route
 
 ### Scale-to-zero cooldown
 
-28.03.2026 увеличен с 300s до **1800s** (30 минут):
-- Причина: частые ложные алерты от `RestartCount` при пробуждении контейнера
-- Параллельно: `tg-reader-restart` алерт изменён на `RestartCount > 1` за 15 мин
-- API: `PATCH` через `2024-10-02-preview` (stable API не принимал `cooldownPeriod` как writable)
+2026-03-28: increased from 300s to **1800s** (30 minutes):
+- Reason: frequent false alerts from `RestartCount` when the container woke from zero
+- Alongside: `tg-reader-restart` alert changed to `RestartCount > 1` over 15 min
+- API note: PATCH via `2024-10-02-preview` (stable API did not accept `cooldownPeriod` as writable)
 
 ---
 
-## Исправленные баги (исторический лог)
+## Resolved bugs (historical log)
 
-### Mark all as Read не работал (2 бага)
+### Mark all as Read — 2 bugs
 
-**Симптом**: после "Отметить все прочитанными" + refresh бейджи оставались, новости не помечались.
+**Symptom**: after "Mark all as read" + refresh, badges remained and items weren't marked.
 
-**Причина 1**: `useMarkAllRead.onSuccess` не очищал `pendingCounts[channelId]` в `uiStore`.  
-**Фикс**: добавить `clearPendingCount(channelId)` в `onSuccess`.
+**Bug 1**: `useMarkAllRead.onSuccess` did not clear `pendingCounts[channelId]` in `uiStore`.  
+**Fix**: add `clearPendingCount(channelId)` in `onSuccess`.
 
-**Причина 2**: fetch-роут удаляет `isRead=1` новости перед скачкой новых; `/read-all` не обновлял `lastReadAt` → после удаления сервер переfetch'ил их заново из Telegram с `isRead=0`.  
-**Фикс**: в `/read-all` обновлять `lastReadAt = max(news.postedAt)` для канала.
+**Bug 2**: fetch route deletes `isRead=1` items before fetching new ones; `/read-all` did not update `lastReadAt` → after deletion, the server re-fetched them from Telegram with `isRead=0`.  
+**Fix**: in `/read-all`, update `lastReadAt = max(news.postedAt)` for the channel.
 
-### Двойной счётчик непрочитанных
+### Double unread counter
 
-`count-unread` ошибочно использовал `lastReadAt` → исправлено на `lastFetchedAt` (см. раздел выше).
+`count-unread` mistakenly used `lastReadAt` → fixed to use `lastFetchedAt` (see decision above).
 
-### markRead без channelId
+### markRead without channelId
 
-`markRead.mutate` не передавал `channelId` — баг в `useNewsHotkeys`. Исправлено.
+`markRead.mutate` wasn't passing `channelId` — bug in `useNewsHotkeys`. Fixed.
 
-### Навигация после тег-фильтра
+### Tag-filter navigation
 
-`useEffect` в `NewsFeed` искал первую непрочитанную глобально вместо следующей после текущей позиции. Исправлено: ищем ПОСЛЕ текущей, fallback на первую глобальную.
+`useEffect` in `NewsFeed` was finding the first unread globally instead of the next one after the current position. Fixed: search AFTER current, fallback to first globally.
 
-### TG_SESSION попал в чат
+### TG_SESSION leaked in chat
 
-Ротация сессии: `npm run tg:auth`, старая сессия завершена вручную в Telegram → Settings → Active Sessions.
+Session rotated via `npm run tg:auth`; old session terminated manually in Telegram → Settings → Active Sessions.
 
 ---
 
-## Технический долг (выполнено)
+## Technical debt (completed)
 
-- [x] `applyFilters` перенесён на сервер (server-side filtering через `json_each()`)
-- [x] `getSinceDate` вынесен в shared helper (`channels.ts`)
-- [x] `getChannelInfo` — автозаполнение названия/описания при добавлении канала (`GET /api/channels/lookup`)
-- [x] `GroupPanel` разбит на `GroupItem` + `GroupFormModal` + `GroupPinModal`
-- [x] SW кэш медиа: Cache-First для `/api/media/*`, стрипает `?token=`, 2000 записей / 30 дней TTL
-- [x] Структурированные логи: pino-pretty в dev, JSON в prod; access-log; rate-limit хиты; uncaughtException/unhandledRejection
-- [x] Локализация: EN по умолчанию, RU fallback; SVG-флаги; переключатель в хедере
-- [x] Менеджер загрузок: `downloads` таблица + воркеры; SSE-прогресс; DownloadsPanel + DownloadsPinnedContent
-- [x] Аккордион-режим: `newsViewMode` persisted; NewsAccordionList + NewsAccordionItem; мобильные всегда аккордеон
-- [x] Адаптивный layout: Splitter только на xxl; Drawer на < xxl; DownloadsPanel pinned только на xxl
-- [x] Мониторинг: alertBot; Azure Monitor KQL + Metric alerts; smoke test в CI; Telegram notify on failure
-- [x] Accessibility: role/aria/tabIndex/onKeyDown; nav+listbox на контейнерах; focus-ring; MaybeTooltip
-- [x] Instant View: парсинг `cachedPage.blocks` через `richTextToString`; сохраняется в `news.fullContent` при INSERT
-- [x] media_content авто-фильтр: `mediaType IN ('photo','document')`; text-only скрыты, видны через "Показать все"
-- [x] Аудио-сообщения: `mediaType='audio'`; авто-скачка отключена; `<audio controls>` когда файл скачан
-- [x] `NewsHashtags.tsx`: shared component с `e.stopPropagation()`; прокинут через accordion → detail → toolbar
-- [x] Sticky header аккордеона: `position: sticky; top: 0; z-index: 10`
-- [x] Фильтры 80+: `Set<string>` для тегов O(T) вместо O(F×T); пагинация по 20 строк
-- [x] Дубликат канала: нормализация telegramId на blur → сравнение с allChannels; 409 fallback
-
+- [x] `applyFilters` moved to server (server-side filtering via `json_each()`)
+- [x] `getSinceDate` extracted to shared helper (`channels.ts`)
+- [x] `getChannelInfo` — auto-fill name/description when adding a channel (`GET /api/channels/lookup`)
+- [x] `GroupPanel` split into `GroupItem` + `GroupFormModal` + `GroupPinModal`
+- [x] SW media cache: Cache-First for `/api/media/*`, strips `?token=`, 2000 entries / 30-day TTL
+- [x] Structured logging: pino-pretty in dev, JSON in prod; access-log; rate-limit hits; uncaughtException/unhandledRejection
+- [x] Localization: English default, Russian fallback; SVG flags; language switcher in header
+- [x] Download manager: `downloads` table + workers; SSE progress; DownloadsPanel + DownloadsPinnedContent
+- [x] Accordion mode: `newsViewMode` persisted; NewsAccordionList + NewsAccordionItem; mobile always accordion
+- [x] Adaptive layout: Splitter on xxl only; Drawer on < xxl; DownloadsPanel pinned on xxl only
+- [x] Monitoring: alertBot; Azure Monitor KQL + Metric alerts; smoke test in CI; Telegram failure notification
+- [x] Accessibility: role/aria/tabIndex/onKeyDown; nav+listbox on containers; focus-ring; MaybeTooltip
+- [x] Instant View: parse `cachedPage.blocks` via `richTextToString`; stored in `news.fullContent` on INSERT
+- [x] media_content auto-filter: `mediaType IN ('photo','document')`; text-only hidden, visible via "Show all"
+- [x] Audio messages: `mediaType='audio'`; auto-download disabled; `<audio controls>` when file is downloaded
+- [x] `NewsHashtags.tsx`: shared component with `e.stopPropagation()`; passed through accordion → detail → toolbar
+- [x] Sticky accordion header: `position: sticky; top: 0; z-index: 10`
+- [x] Filters 80+: `Set<string>` for tags O(T) instead of O(F×T); pagination at 20 rows
+- [x] Channel duplicate check: telegramId normalization on blur → compare with allChannels; 409 fallback

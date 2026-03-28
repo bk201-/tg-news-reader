@@ -1,28 +1,28 @@
 # TG News Reader — Azure Operations
 
-> Операционный справочник по Azure Container Apps. Обновляется при изменении конфигурации.  
-> Ресурсы: подписка `f7758f68-5127-4e40-b8bf-3bd367b448a9`, ресурс-группа `personal-apps-rg`, приложение `tg-news-reader`.
+> Operational reference for Azure Container Apps. Updated when configuration changes.  
+> Resources: subscription `f7758f68-5127-4e40-b8bf-3bd367b448a9`, resource group `personal-apps-rg`, app `tg-news-reader`.
 
 ---
 
-## Текущая конфигурация Container App
+## Current Container App configuration
 
-| Параметр | Значение | Обновлено |
+| Parameter | Value | Updated |
 |---|---|---|
 | `minReplicas` | 0 (scale-to-zero) | — |
 | `maxReplicas` | 10 | — |
-| `cooldownPeriod` | **1800 сек (30 мин)** | 28.03.2026 |
-| `pollingInterval` | 30 сек | — |
+| `cooldownPeriod` | **1800 sec (30 min)** | 2026-03-28 |
+| `pollingInterval` | 30 sec | — |
 
 ---
 
-## Переменные окружения
+## Environment variables
 
-> ⚠️ **`az containerapp update --set-env-vars` заменяет ВЕСЬ список переменных, а не добавляет к нему.**  
-> Безопасный способ: **Azure Portal** → Container App → Configuration → Environment variables → добавить отдельные переменные.  
-> Если через CLI — передавать полный список сразу (см. ниже).
+> ⚠️ **`az containerapp update --set-env-vars` replaces the ENTIRE variable list, it does NOT append.**  
+> Safe approach: **Azure Portal** → Container App → Configuration → Environment variables → add individual variables.  
+> If using CLI — always pass the full list at once (see below).
 
-### Обязательные (прод упадёт без них)
+### Required (app will crash without these)
 
 ```
 NODE_ENV=production
@@ -35,7 +35,7 @@ TURSO_AUTH_TOKEN   → secretref:turso-auth-token
 JWT_SECRET         → secretref:jwt-secret
 ```
 
-### Опциональные (no-op при отсутствии)
+### Optional (no-op when absent)
 
 ```
 ALERT_BOT_TOKEN    → secretref:alert-bot-token
@@ -47,7 +47,7 @@ OPENAI_API_KEY     → secretref:openai-api-key
 LOG_LEVEL=info
 ```
 
-### Полный CLI-список (использовать осторожно)
+### Full CLI list (use with caution)
 
 ```bash
 az containerapp update --name tg-news-reader --resource-group personal-apps-rg \
@@ -71,16 +71,16 @@ az containerapp update --name tg-news-reader --resource-group personal-apps-rg \
 
 ---
 
-## Управление секретами
+## Managing secrets
 
 ```bash
-# Добавить новый секрет
+# Add a new secret
 az containerapp secret set \
   --name tg-news-reader \
   --resource-group personal-apps-rg \
   --secrets my-secret-name=<value>
 
-# Затем в Portal: добавить env var MY_VAR = secretref:my-secret-name
+# Then in Portal: add env var MY_VAR = secretref:my-secret-name
 ```
 
 ---
@@ -88,13 +88,13 @@ az containerapp secret set \
 ## Scale-down cooldown
 
 ```bash
-# Посмотреть текущий конфиг scale
+# Check current scale config
 az containerapp show \
   --name tg-news-reader \
   --resource-group personal-apps-rg \
   --query "properties.template.scale"
 
-# Изменить cooldownPeriod (нужен preview API — stable его не принимает как writable)
+# Update cooldownPeriod (requires preview API — stable API rejects it as writable)
 az rest --method PATCH \
   --url "https://management.azure.com/subscriptions/f7758f68-5127-4e40-b8bf-3bd367b448a9/resourceGroups/personal-apps-rg/providers/Microsoft.App/containerApps/tg-news-reader?api-version=2024-10-02-preview" \
   --body '{"properties":{"template":{"scale":{"cooldownPeriod":1800,"maxReplicas":10,"minReplicas":null,"pollingInterval":30}}}}'
@@ -104,37 +104,37 @@ az rest --method PATCH \
 
 ## Azure Monitor Alerts
 
-Задеплоены в `personal-apps-rg`. Action Group: `tg-reader-alerts` → email `sceletron@gmail.com`.
+Deployed in `personal-apps-rg`. Action Group: `tg-reader-alerts` → email `sceletron@gmail.com`.
 
-| Правило | Метрика / KQL | Порог | Окно | Обновлено |
+| Rule | Metric / KQL | Threshold | Window | Updated |
 |---|---|---|---|---|
-| `tg-reader-restart` | `RestartCount` | **> 1** | **15 мин** | 28.03.2026 |
-| `tg-reader-error-logs` | KQL: `log.level >= 50` | > 0 | 5 мин | — |
+| `tg-reader-restart` | `RestartCount` | **> 1** | **15 min** | 2026-03-28 |
+| `tg-reader-error-logs` | KQL: `log.level >= 50` | > 0 | 5 min | — |
 
-### Изменить правило алерта
+### Update an alert rule
 
 ```bash
-# PATCH через REST API (2018-03-01)
+# PATCH via REST API (2018-03-01)
 az rest --method PATCH \
   --url "https://management.azure.com/subscriptions/f7758f68-5127-4e40-b8bf-3bd367b448a9/resourceGroups/personal-apps-rg/providers/Microsoft.Insights/metricAlerts/tg-reader-restart?api-version=2018-03-01" \
   --body @alert-patch.json
 ```
 
-Пересоздать всё с нуля: `scripts/setup-monitoring.sh`.  
-Референс тела KQL-правила: `C:\Users\dshilov\alert-kql-rule.json`.
+Recreate everything from scratch: `scripts/setup-monitoring.sh`.  
+Reference KQL rule body: `C:\Users\dshilov\alert-kql-rule.json`.
 
 ---
 
-## Полезные команды
+## Useful commands
 
 ```bash
-# Логи (последние 50 строк системных событий)
+# Logs (last 50 lines of system events)
 az containerapp logs show \
   --name tg-news-reader \
   --resource-group personal-apps-rg \
   --type system --tail 50
 
-# Статус ревизий
+# Revision status
 az containerapp revision list \
   --name tg-news-reader \
   --resource-group personal-apps-rg \
@@ -148,13 +148,12 @@ curl https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/
 
 ## GitHub Actions secrets
 
-| Secret | Назначение |
+| Secret | Purpose |
 |---|---|
 | `ACR_LOGIN_SERVER` | Azure Container Registry URL |
 | `ACR_USERNAME` / `ACR_PASSWORD` | ACR credentials |
-| `AZURE_CREDENTIALS` | Service principal JSON для az login |
+| `AZURE_CREDENTIALS` | Service principal JSON for az login |
 | `AZURE_RESOURCE_GROUP` | `personal-apps-rg` |
 | `AZURE_CONTAINER_APP` | `tg-news-reader` |
-| `PAT_TOKEN` | Fine-grained PAT (Contents+PRs write) — для auto-merge |
-| `ALERT_BOT_TOKEN` / `ALERT_CHAT_ID` | Telegram deploy-failure alerts (опционально) |
-
+| `PAT_TOKEN` | Fine-grained PAT (Contents+PRs write) — for auto-merge |
+| `ALERT_BOT_TOKEN` / `ALERT_CHAT_ID` | Telegram deploy-failure alerts (optional) |
