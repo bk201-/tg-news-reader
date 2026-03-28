@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Space, Badge, Typography } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { ReloadOutlined, EditOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EditOutlined, DeleteOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
@@ -123,6 +123,17 @@ export function ChannelItem({
       </div>
       <div className={styles.rightSide}>
         <Space className={styles.actions} size={4}>
+          <Tooltip title={t('channels.open_tg_tooltip')}>
+            <Button
+              icon={<LinkOutlined />}
+              size="small"
+              type="text"
+              href={`https://t.me/${ch.telegramId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Tooltip>
           <Tooltip title={t('channels.fetch_tooltip')}>
             <Button icon={<ReloadOutlined />} size="small" type="text" loading={isFetchingThis} onClick={onFetch} />
           </Tooltip>

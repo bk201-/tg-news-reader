@@ -11,6 +11,7 @@ import {
   LayoutOutlined,
   ProfileOutlined,
   BulbOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -70,6 +71,8 @@ interface NewsFeedToolbarProps {
   onOpenDigest: () => void;
   /** Whether to show the Digest button (false for media-only channels) */
   showDigest?: boolean;
+  /** Telegram ID of the current channel, used to render an "Open in Telegram" link */
+  channelTelegramId?: string;
 }
 
 export function NewsFeedToolbar({
@@ -94,6 +97,7 @@ export function NewsFeedToolbar({
   isMobile = false,
   onOpenDigest,
   showDigest = true,
+  channelTelegramId,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -121,6 +125,17 @@ export function NewsFeedToolbar({
           <Button icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
         </Tooltip>
         <Segmented options={periodOptions} value={fetchPeriod} onChange={onFetchPeriod} disabled={fetchPending} />
+        {channelTelegramId && (
+          <Tooltip title={t('channels.open_tg_tooltip')}>
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              href={`https://t.me/${channelTelegramId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </Tooltip>
+        )}
         <Tooltip title={t('news.toolbar.show_all_tooltip')}>
           <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
             {showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all')}

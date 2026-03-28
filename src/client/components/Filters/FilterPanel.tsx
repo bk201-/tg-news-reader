@@ -95,21 +95,27 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
       ),
     },
     {
-      title: t('filters.col_stats'),
+      title: t('filters.col_hits'),
       key: 'stats',
       width: 70,
+      defaultSortOrder: 'descend' as const,
+      sorter: (a: Filter, b: Filter) => {
+        const aTotal = statsMap.get(a.id)?.hitsTotal ?? 0;
+        const bTotal = statsMap.get(b.id)?.hitsTotal ?? 0;
+        return aTotal - bTotal;
+      },
       render: (_: unknown, record: Filter) => {
         const s = statsMap.get(record.id);
         const hits7 = s?.hitsLast7 ?? 0;
         const total = s?.hitsTotal ?? 0;
         const tip =
           total > 0
-            ? `${t('filters.stats_total', { count: total })}${s?.lastHitDate ? ` · ${s.lastHitDate}` : ''}`
+            ? `${t('filters.stats_7d', { count: hits7 })} · ${t('filters.stats_total', { count: total })}${s?.lastHitDate ? ` · ${s.lastHitDate}` : ''}`
             : t('filters.stats_never');
         return (
           <Tooltip title={tip}>
-            <Tag color={hits7 > 0 ? 'blue' : undefined} className={styles.statTag}>
-              {hits7}
+            <Tag color={total > 0 ? 'blue' : undefined} className={styles.statTag}>
+              {total}
             </Tag>
           </Tooltip>
         );

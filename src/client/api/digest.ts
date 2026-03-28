@@ -7,12 +7,19 @@ export interface DigestParams {
   until?: string;
 }
 
+export type DigestEvent =
+  | { type: 'chunk'; content: string }
+  | { type: 'ref_map'; map: Record<number, number> };
+
 /**
  * Streams a digest from POST /api/digest.
- * Returns an async generator that yields text chunks.
+ * Returns an async generator that yields DigestEvents (chunk or ref_map).
  * Caller is responsible for aborting via AbortController.
  */
-export async function* streamDigest(params: DigestParams, signal: AbortSignal): AsyncGenerator<string, void, unknown> {
+export async function* streamDigest(
+  params: DigestParams,
+  signal: AbortSignal,
+): AsyncGenerator<DigestEvent, void, unknown> {
   const token = useAuthStore.getState().accessToken;
 
   const response = await fetch('/api/digest', {
@@ -35,6 +42,7 @@ export async function* streamDigest(params: DigestParams, signal: AbortSignal): 
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let currentEvent = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -47,20 +55,38 @@ export async function* streamDigest(params: DigestParams, signal: AbortSignal): 
     buffer = lines.pop() ?? '';
 
     for (const line of lines) {
-      if (line.startsWith('event: chunk')) continue;
+      if (line.startsWith('event: ')) {
+        currentEvent = line.slice(7).trim();
+        continue;
+      }
+      if (line === '') {
+        currentEvent = '';
+        continue;
+      }
       if (line.startsWith('data: ')) {
         const rawData = line.slice(6).trim();
         if (!rawData) continue;
 
+        // Skip malformed JSON lines; other exceptions propagate to the caller
+        let parsed: Record<string, unknown>;
         try {
-          const parsed = JSON.parse(rawData) as { content?: string; message?: string };
-          if (parsed.content !== undefined) {
-            yield parsed.content;
-          }
-          // 'done' and 'error' events handled by caller checking the generator return
+          parsed = JSON.parse(rawData) as Record<string, unknown>;
         } catch {
-          // skip malformed lines
+          continue;
         }
+
+        if (currentEvent === 'ref_map') {
+          const map: Record<number, number> = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            map[parseInt(k, 10)] = v as number;
+          }
+          yield { type: 'ref_map', map };
+        } else if (typeof parsed.content === 'string') {
+          yield { type: 'chunk', content: parsed.content };
+        } else if (typeof parsed.message === 'string') {
+          throw new Error(parsed.message);
+        }
+        currentEvent = '';
       }
     }
   }

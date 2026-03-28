@@ -63,6 +63,12 @@ router.post('/', async (c) => {
   // Newest-first already — reverse to chronological for the prompt
   const items = [...rows].reverse();
 
+  // Build citation index → newsId mapping (sent to client before streaming starts)
+  const refMap: Record<string, number> = {};
+  items.forEach((item, i) => {
+    refMap[String(i + 1)] = item.id;
+  });
+
   const newsText = items
     .map((item, i) => {
       const date = new Date(item.postedAt * 1000).toLocaleDateString('ru-RU');
@@ -78,13 +84,21 @@ Summarize the provided news items into a structured digest.
 - Write in the same language as the majority of the news content
 - Use markdown formatting: headers (##), bullet points, bold for key terms
 - Be concise but informative
-- At the end add a "📌 Key takeaways" section with 3-5 bullet points`;
+- At the end add a "📌 Key takeaways" section with 3-5 bullet points
+- When citing a specific news item, append the citation immediately after the relevant fact using the format [N], where N is the item's sequential number from the list
+- Use exactly one integer per bracket: write [1][2] to cite items 1 and 2 — never write [1,2] or [1, 2]
+- Only valid citation format is [N] with a single integer, nothing else inside the brackets
+- Not every sentence needs a citation — only cite when referring to a concrete fact from a specific item
+- Place citations inside bullet points or sentences, not on a separate line`;
 
   const userPrompt = `Here are ${items.length} news items (newest last):\n\n${newsText}\n\nPlease create a digest.`;
 
   // ── Stream SSE response ───────────────────────────────────────────────────
   return streamSSE(c, async (stream) => {
     try {
+      // Send ref_map first so the client can render chips as chunks arrive
+      await stream.writeSSE({ event: 'ref_map', data: JSON.stringify(refMap) });
+
       const client = createOpenAiClient();
       const completion = await client.chat.completions.create({
         model: DIGEST_DEPLOYMENT,

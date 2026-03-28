@@ -10,6 +10,7 @@ import { AppHeader } from './AppHeader';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
 import { useMatchMedia, BP_XXL } from '../../hooks/breakpoints';
+import { useBossKey } from '../../hooks/useBossKey';
 
 const { Text } = Typography;
 
@@ -78,6 +79,9 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
+
+  // Boss key: Esc Esc to lock all PIN groups
+  useBossKey();
 
   // Targeted: only fires when crossing the 1600 px threshold, not on every AntD breakpoint.
   const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);

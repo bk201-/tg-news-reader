@@ -3,9 +3,10 @@ import { Button, Drawer, Spin, Typography, Alert } from 'antd';
 import { CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import ReactMarkdown from 'react-markdown';
-import { streamDigest, type DigestParams } from '../../api/digest';
 import { message } from 'antd';
+import { streamDigest, type DigestParams } from '../../api/digest';
+import { useUIStore } from '../../store/uiStore';
+import { DigestBody } from './DigestBody';
 
 const { Text } = Typography;
 
@@ -17,35 +18,6 @@ const useStyles = createStyles(({ css, token }) => ({
     display: flex;
     flex-direction: column;
     gap: 12px;
-  `,
-  markdown: css`
-    font-size: 14px;
-    line-height: 1.7;
-    h2 {
-      font-size: 16px;
-      font-weight: 600;
-      margin: 16px 0 6px;
-      color: ${token.colorText};
-    }
-    h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin: 12px 0 4px;
-      color: ${token.colorText};
-    }
-    ul {
-      padding-left: 20px;
-      margin: 4px 0;
-    }
-    li {
-      margin: 3px 0;
-    }
-    strong {
-      color: ${token.colorText};
-    }
-    p {
-      margin: 6px 0;
-    }
   `,
   spinner: css`
     display: flex;
@@ -61,6 +33,10 @@ const useStyles = createStyles(({ css, token }) => ({
     border-top: 1px solid ${token.colorBorderSecondary};
     flex-shrink: 0;
   `,
+  poweredBy: css`
+    font-size: 12px;
+    color: ${token.colorTextSecondary};
+  `,
 }));
 
 interface DigestDrawerProps {
@@ -73,9 +49,11 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
   const [text, setText] = useState('');
+  const [refMap, setRefMap] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { setSelectedNewsId } = useUIStore();
 
   const run = useCallback(async () => {
     abortRef.current?.abort();
@@ -83,12 +61,17 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     abortRef.current = ctrl;
 
     setText('');
+    setRefMap({});
     setError(null);
     setLoading(true);
 
     try {
-      for await (const chunk of streamDigest(params, ctrl.signal)) {
-        setText((prev) => prev + chunk);
+      for await (const event of streamDigest(params, ctrl.signal)) {
+        if (event.type === 'chunk') {
+          setText((prev) => prev + event.content);
+        } else if (event.type === 'ref_map') {
+          setRefMap(event.map);
+        }
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -104,10 +87,19 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     } else {
       abortRef.current?.abort();
       setText('');
+      setRefMap({});
       setError(null);
       setLoading(false);
     }
   }, [open, run]);
+
+  const handleRefClick = useCallback(
+    (newsId: number) => {
+      setSelectedNewsId(newsId);
+      onClose();
+    },
+    [setSelectedNewsId, onClose],
+  );
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
@@ -134,19 +126,13 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
           </div>
         )}
 
-        {text && (
-          <div className={styles.markdown}>
-            <ReactMarkdown>{text}</ReactMarkdown>
-          </div>
-        )}
+        {text && <DigestBody text={text} refMap={refMap} onRefClick={handleRefClick} />}
 
         {!loading && !text && !error && <Text type="secondary">{t('digest.empty')}</Text>}
 
         {text && !loading && (
           <div className={styles.footer}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {t('digest.powered_by')}
-            </Text>
+            <span className={styles.poweredBy}>{t('digest.powered_by')}</span>
             <Button icon={<CopyOutlined />} size="small" onClick={() => void handleCopy()}>
               {t('digest.copy')}
             </Button>
