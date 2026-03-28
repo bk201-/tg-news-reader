@@ -5,7 +5,9 @@ import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { issueAccessToken } from './auth.js';
 
-const router = new Hono();
+type HonoEnv = { Variables: { userId: number; userRole: string; sessionId: string } };
+
+const router = new Hono<HonoEnv>();
 
 // GET /api/groups
 router.get('/', async (c) => {
@@ -92,6 +94,23 @@ router.delete('/:id', async (c) => {
   if (!deleted) return c.json({ error: 'Group not found' }, 404);
 
   return c.json({ success: true });
+});
+
+// POST /api/groups/lock-all — clear all unlocked groups from the current session
+router.post('/lock-all', async (c) => {
+  const sessionId = c.get('sessionId') as string | undefined;
+  if (!sessionId) return c.json({ success: true });
+
+  await db.update(sessions).set({ unlockedGroupIds: '[]' }).where(eq(sessions.id, sessionId));
+
+  const [session] = await db.select({ userId: sessions.userId }).from(sessions).where(eq(sessions.id, sessionId));
+  if (!session) return c.json({ success: true });
+
+  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, session.userId));
+  if (!user) return c.json({ success: true });
+
+  const accessToken = await issueAccessToken(session.userId, user.role, sessionId, []);
+  return c.json({ success: true, accessToken });
 });
 
 // POST /api/groups/:id/verify-pin

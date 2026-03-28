@@ -21,6 +21,7 @@
     "fetch_tooltip": "Fetch news",
     "edit_tooltip": "Edit",
     "delete_tooltip": "Delete",
+    "open_tg_tooltip": "Open channel in Telegram",
     "delete_confirm_title": "Delete channel \"{{name}}\"?",
     "delete_confirm_content": "All news from this channel will be deleted.",
     "form": {
@@ -157,7 +158,8 @@
     "add": "Add",
     "col_name": "Name",
     "col_active": "Active",
-    "col_stats": "7d",
+    "col_hits": "Hits",
+    "stats_7d": "7d: {{count}}",
     "stats_total": "Total: {{count}}",
     "stats_never": "No hits yet",
     "empty": "No filters added",

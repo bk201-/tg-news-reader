@@ -21,6 +21,7 @@
     "fetch_tooltip": "Загрузить новости",
     "edit_tooltip": "Редактировать",
     "delete_tooltip": "Удалить",
+    "open_tg_tooltip": "Открыть канал в Telegram",
     "delete_confirm_title": "Удалить канал \"{{name}}\"?",
     "delete_confirm_content": "Все новости этого канала будут удалены.",
     "form": {
@@ -157,7 +158,8 @@
     "add": "Добавить",
     "col_name": "Название",
     "col_active": "Активен",
-    "col_stats": "7д",
+    "col_hits": "Срабат.",
+    "stats_7d": "7д: {{count}}",
     "stats_total": "Всего: {{count}}",
     "stats_never": "Ещё не срабатывал",
     "empty": "Фильтры не добавлены",

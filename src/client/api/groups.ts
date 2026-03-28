@@ -56,10 +56,18 @@ export function useVerifyGroupPIN() {
         { pin },
       ),
     onSuccess: (data) => {
-      // Update access token — unlockedGroupIds now encoded in JWT and persisted in session
-      if (data.accessToken) {
-        updateToken(data.accessToken);
-      }
+      if (data.accessToken) updateToken(data.accessToken);
+    },
+  });
+}
+
+export function useLockAllGroups() {
+  const updateToken = useAuthStore((s) => s.updateToken);
+  return useMutation({
+    mutationFn: () => api.post<{ success: boolean; accessToken?: string }>('/groups/lock-all', {}),
+    onSuccess: (data) => {
+      // Refresh token so the new empty unlockedGroupIds is encoded and persisted
+      if (data.accessToken) updateToken(data.accessToken);
     },
   });
 }

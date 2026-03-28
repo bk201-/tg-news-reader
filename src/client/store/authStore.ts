@@ -28,6 +28,8 @@ interface AuthStore {
   clearAuth: () => void;
   setCheckingAuth: (v: boolean) => void;
   updateUser: (patch: Partial<AuthUser>) => void;
+  /** Optimistic local-only lock — call before the network request for instant UI response */
+  lockGroupsLocally: () => void;
 }
 
 export const useAuthStore = create<AuthStore>()((set) => ({
@@ -41,4 +43,5 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   clearAuth: () => set({ accessToken: null, user: null, unlockedGroupIds: [], isCheckingAuth: false }),
   setCheckingAuth: (v) => set({ isCheckingAuth: v }),
   updateUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : null })),
+  lockGroupsLocally: () => set({ unlockedGroupIds: [] }),
 }));

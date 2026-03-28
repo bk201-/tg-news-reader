@@ -255,6 +255,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         isMobile={forceAccordion}
         onOpenDigest={() => setDigestOpen(true)}
         showDigest={channel.supportsDigest}
+        channelTelegramId={channel.telegramId}
       />
 
       <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>
