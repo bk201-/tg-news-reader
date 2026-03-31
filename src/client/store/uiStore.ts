@@ -32,6 +32,9 @@ interface UIStore {
   pendingCounts: Record<number, number>;
   setPendingCounts: (counts: Record<number, number>) => void;
   clearPendingCount: (channelId: number) => void;
+  // Mobile header hide-on-scroll
+  headerHidden: boolean;
+  setHeaderHidden: (v: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -78,4 +81,6 @@ export const useUIStore = create<UIStore>()((set) => ({
       delete next[channelId];
       return { pendingCounts: next };
     }),
+  headerHidden: false,
+  setHeaderHidden: (v) => set({ headerHidden: v }),
 }));

@@ -1,9 +1,9 @@
 // Type-only imports — zero runtime cost, used only for TypeScript annotations
 import type { Api, TelegramClient } from 'telegram';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../logger.js';
-import { telegramCircuit } from './telegramCircuitBreaker.js';
+import { telegramCircuit, setReconnectCallback } from './telegramCircuitBreaker.js';
 import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
 
 // Lazy runtime references — gramjs loads TL schema on import (~2.5s), so defer until first use
@@ -40,6 +40,15 @@ export async function getTelegramClient(): Promise<TelegramClient> {
   await client.connect();
   return client;
 }
+
+/** Reset the TG client — forces a fresh reconnect on the next call to getTelegramClient(). */
+export async function resetTelegramClient(): Promise<void> {
+  client = null;
+  await getTelegramClient();
+}
+
+// Register the reconnect callback for auto-recovery on AUTH_KEY_UNREGISTERED
+setReconnectCallback(resetTelegramClient);
 
 export interface TelegramMessage {
   id: number;
@@ -409,10 +418,22 @@ export async function downloadMessageMedia(
 
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
-    if (!result) return null;
-    return `${channelTelegramId}/${filename}`;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
+      if (!result) return null;
+      return `${channelTelegramId}/${filename}`;
+    } catch (err) {
+      // Remove partial file so the next retry downloads a clean copy
+      if (existsSync(filepath)) {
+        try {
+          unlinkSync(filepath);
+        } catch {
+          // best-effort — ignore cleanup errors
+        }
+      }
+      throw err;
+    }
   }, 'downloadMessageMedia');
 }
 

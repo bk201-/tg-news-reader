@@ -211,6 +211,7 @@
     "theme_light": "Light theme",
     "open_sidebar": "Open channels",
     "user_menu_label": "User menu",
+    "session_expired_banner": "Telegram session expired. The server cannot connect to Telegram. Please run npm run tg:auth and redeploy.",
     "user_menu": {
       "manage_2fa": "Manage 2FA",
       "enable_2fa": "Enable 2FA",

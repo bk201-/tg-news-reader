@@ -19,7 +19,7 @@ import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { startWorkerPool } from './services/downloadManager.js';
 import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 import { logger } from './logger.js';
-import { getTelegramCircuitState } from './services/telegramCircuitBreaker.js';
+import { getTelegramCircuitState, getTelegramSessionExpired } from './services/telegramCircuitBreaker.js';
 import { sendAlert } from './services/alertBot.js';
 import { client } from './db/index.js';
 import { runMigration } from './db/migrate.js';
@@ -122,6 +122,7 @@ app.get('/api/health', async (c) => {
   }
 
   const telegramCircuit = getTelegramCircuitState();
+  const sessionExpired = getTelegramSessionExpired();
   const status = !dbOk || telegramCircuit === 'open' ? 'degraded' : 'ok';
 
   return c.json({
@@ -129,7 +130,7 @@ app.get('/api/health', async (c) => {
     timestamp: Date.now(),
     uptime: Math.floor(process.uptime()),
     db: dbOk ? 'ok' : 'error',
-    telegram: { circuit: telegramCircuit },
+    telegram: { circuit: telegramCircuit, sessionExpired },
   });
 });
 

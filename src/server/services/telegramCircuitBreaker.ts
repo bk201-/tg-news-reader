@@ -28,6 +28,29 @@ export function isTransientTelegramError(err: unknown): boolean {
   );
 }
 
+/** Returns true for Telegram "file reference expired" errors. These are NOT circuit-breaker failures. */
+export function isFileReferenceExpiredError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    err.constructor.name === 'FileReferenceExpiredError' ||
+    msg.includes('file_reference_expired') ||
+    msg.includes('file reference') ||
+    msg.includes('fileref')
+  );
+}
+
+// ─── Reconnect callback ───────────────────────────────────────────────────────
+
+// Injected by telegram.ts to avoid circular imports. Called when AUTH_KEY_UNREGISTERED
+// is caught and the circuit attempts an automatic reconnect.
+type ReconnectFn = () => Promise<void>;
+let _reconnectFn: ReconnectFn | null = null;
+
+export function setReconnectCallback(fn: ReconnectFn): void {
+  _reconnectFn = fn;
+}
+
 // ─── Retry helper ─────────────────────────────────────────────────────────────
 
 const MAX_TG_RETRIES = 3;
@@ -69,6 +92,7 @@ class TelegramCircuitBreaker {
   private _state: CircuitState = 'closed';
   private consecutiveFailures = 0;
   private openedAt = 0;
+  private _sessionExpired = false;
 
   constructor(
     private readonly failureThreshold: number,
@@ -83,8 +107,13 @@ class TelegramCircuitBreaker {
     return this._state;
   }
 
+  isSessionExpired(): boolean {
+    return this._sessionExpired;
+  }
+
   private recordSuccess(): void {
     this.consecutiveFailures = 0;
+    this._sessionExpired = false;
     if (this._state !== 'closed') {
       logger.info({ module: 'telegram' }, 'circuit breaker → closed');
       this._state = 'closed';
@@ -104,6 +133,28 @@ class TelegramCircuitBreaker {
     }
   }
 
+  private async handleAuthKeyUnregistered(): Promise<void> {
+    logger.warn({ module: 'telegram' }, 'AUTH_KEY_UNREGISTERED — attempting automatic reconnect');
+    if (_reconnectFn) {
+      try {
+        await _reconnectFn();
+        logger.info({ module: 'telegram' }, 'Telegram auto-reconnect succeeded — session restored');
+        this._sessionExpired = false;
+        return;
+      } catch (reconnectErr) {
+        logger.warn({ module: 'telegram', err: reconnectErr }, 'Telegram auto-reconnect failed');
+      }
+    }
+    // Reconnect failed (or no callback registered) — mark as expired
+    if (!this._sessionExpired) {
+      this._sessionExpired = true;
+      void sendAlert(
+        'Telegram session expired (AUTH_KEY_UNREGISTERED) — run <code>npm run tg:auth</code> and redeploy',
+        'auth-key-unregistered',
+      );
+    }
+  }
+
   async execute<T>(fn: () => Promise<T>, context: string): Promise<T> {
     const state = this.getState();
     if (state === 'open') {
@@ -117,12 +168,9 @@ class TelegramCircuitBreaker {
       return result;
     } catch (err) {
       if (isTransientTelegramError(err)) this.recordFailure();
-      // Session expired → alert immediately (permanent, not caught by circuit breaker)
+      // Session expired → attempt auto-reconnect, then alert if still failing (permanent)
       if (err instanceof Error && err.message.includes('AUTH_KEY_UNREGISTERED')) {
-        void sendAlert(
-          'Telegram session expired (AUTH_KEY_UNREGISTERED) — run <code>npm run tg:auth</code> and redeploy',
-          'auth-key-unregistered',
-        );
+        await this.handleAuthKeyUnregistered();
       }
       throw err;
     }
@@ -139,4 +187,9 @@ export const telegramCircuit = new TelegramCircuitBreaker(
 /** Expose state for GET /api/health */
 export function getTelegramCircuitState(): CircuitState {
   return telegramCircuit.getState();
+}
+
+/** Expose session-expired flag for GET /api/health */
+export function getTelegramSessionExpired(): boolean {
+  return telegramCircuit.isSessionExpired();
 }

@@ -7,6 +7,7 @@ import { GroupPanel } from '../Channels/GroupPanel';
 import { NewsFeed } from '../News/NewsFeed';
 import { DownloadsPinnedContent } from './DownloadsPinnedContent';
 import { AppHeader } from './AppHeader';
+import { TelegramSessionBanner } from './TelegramSessionBanner';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
 import { useMatchMedia, BP_XXL } from '../../hooks/breakpoints';
@@ -40,7 +41,8 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 16px;
   `,
   splitter: css`
-    height: calc(100vh - 64px);
+    flex: 1;
+    min-height: 0;
   `,
   sidebarPanel: css`
     background: ${token.colorBgContainer};
@@ -69,6 +71,13 @@ const useStyles = createStyles(({ css, token }) => ({
   layout: css`
     min-height: 100vh;
   `,
+  // Wrapper around AppHeader — animates max-height to hide on scroll (mobile only)
+  headerWrap: css`
+    flex-shrink: 0;
+    overflow: hidden;
+    max-height: 64px;
+    transition: max-height 0.25s ease;
+  `,
 }));
 
 export function AppLayout() {
@@ -79,9 +88,20 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
+  const headerWrapRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
   useBossKey();
+
+  // Subscribe to headerHidden without triggering re-renders — directly update DOM
+  useEffect(() => {
+    const unsubscribe = useUIStore.subscribe((state) => {
+      if (headerWrapRef.current) {
+        headerWrapRef.current.style.maxHeight = state.headerHidden ? '0' : '64px';
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   // Targeted: only fires when crossing the 1600 px threshold, not on every AntD breakpoint.
   const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);
@@ -139,7 +159,10 @@ export function AppLayout() {
   // On mobile: sidebar panel collapses to size=0, content moves to Drawer.
   return (
     <Layout className={styles.layout}>
-      <AppHeader />
+      <div ref={headerWrapRef} className={styles.headerWrap}>
+        <AppHeader />
+      </div>
+      <TelegramSessionBanner />
 
       {/* Sidebar Drawer — only opens on mobile */}
       <Drawer
