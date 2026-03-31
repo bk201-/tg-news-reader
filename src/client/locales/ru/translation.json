@@ -211,6 +211,7 @@
     "theme_light": "Светлая тема",
     "open_sidebar": "Открыть каналы",
     "user_menu_label": "Меню пользователя",
+    "session_expired_banner": "Сессия Telegram истекла. Сервер не может подключиться к Telegram. Запустите npm run tg:auth и задеплойте заново.",
     "user_menu": {
       "manage_2fa": "Управление 2FA",
       "enable_2fa": "Включить 2FA",

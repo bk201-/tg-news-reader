@@ -17,17 +17,14 @@ import { DigestDrawer } from './DigestDrawer';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
+import { useScrollHide } from '../../hooks/useScrollHide';
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 64px);
+    height: 100%;
     overflow: hidden;
-    /* Below xxl breakpoint, parent Layout.Content controls height */
-    @media (max-width: 1599px) {
-      height: 100%;
-    }
   `,
   body: css`
     display: flex;
@@ -60,8 +57,16 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
 
-  const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
-    useUIStore();
+  const {
+    selectedNewsId,
+    setSelectedNewsId,
+    showAll,
+    setShowAll,
+    setFilterPanelOpen,
+    newsViewMode,
+    setNewsViewMode,
+    setHeaderHidden,
+  } = useUIStore();
 
   const screens = Grid.useBreakpoint();
   const { styles, cx } = useStyles();
@@ -144,6 +149,17 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
+  // ── Scroll selected into view (ref used by both accordion and useScrollHide) ──
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // ── Scroll-hide header on mobile accordion ────────────────────────────
+  // Reset header visibility when channel changes
+  useEffect(() => {
+    setHeaderHidden(false);
+  }, [channel.id, setHeaderHidden]);
+  // Active only in accordion (mobile) mode — hides AppHeader on scroll down
+  useScrollHide(listRef, forceAccordion);
+
   // ── Auto-fetch on channel open ────────────────────────────────────────
   // Safe now: NewsFeed stays mounted across breakpoint changes (AppLayout uses
   // single Splitter return), so this fires only when the user picks a different channel.
@@ -216,7 +232,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   }, [displayItems]);
 
   // ── Scroll selected into view ─────────────────────────────────────────
-  const listRef = useRef<HTMLDivElement>(null);
   // useLayoutEffect fires before the browser paints — no visible flash of wrong position.
   // el.offsetTop is the item's distance from .accordion top (which has position:relative,
   // so it's the offsetParent). Setting scrollTop = offsetTop puts the header at the top.

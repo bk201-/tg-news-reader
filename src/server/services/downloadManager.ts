@@ -8,12 +8,13 @@ import { DOWNLOAD_TASK_CLEANUP_DELAY_MS, DOWNLOAD_MAX_RETRIES } from '../config.
 import type { DownloadType, DownloadTask } from '../../shared/types.js';
 import { logger } from '../logger.js';
 import { sendAlert } from './alertBot.js';
+import { isFileReferenceExpiredError } from './telegramCircuitBreaker.js';
 
 const WAKEUP_EVENT = 'wakeup';
 
 // ─── Transient error detection ────────────────────────────────────────────────
 
-/** Returns true for errors that are safe to retry (network/timeout/flood). */
+/** Returns true for errors that are safe to retry (network/timeout/flood/stale refs). */
 function isTransientDownloadError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
@@ -30,7 +31,8 @@ function isTransientDownloadError(err: unknown): boolean {
     msg.includes('circuit breaker') ||
     code === 'ECONNRESET' ||
     code === 'ETIMEDOUT' ||
-    code === 'ENOTFOUND'
+    code === 'ENOTFOUND' ||
+    isFileReferenceExpiredError(err) // stale Telegram file refs — re-fetch on next attempt
   );
 }
 

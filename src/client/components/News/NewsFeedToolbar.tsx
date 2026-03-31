@@ -31,6 +31,11 @@ const useStyles = createStyles(({ css, token }) => ({
     background: ${token.colorBgContainer};
     border-bottom: 1px solid ${token.colorBorderSecondary};
   `,
+  toolbarCompact: css`
+    padding: 6px 10px;
+    gap: 4px;
+    flex-wrap: nowrap;
+  `,
   divider: css`
     width: 1px;
     height: 1.4em;
@@ -43,8 +48,28 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 13px;
     padding: 2px 8px;
   `,
+  hashTagCompact: css`
+    font-size: 12px;
+    padding: 0 6px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
   stats: css`
     font-size: 12px;
+  `,
+  statsCompact: css`
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  `,
+  periodCompact: css`
+    /* shrink segmented so it doesn't overflow on narrow screens */
+    & .ant-segmented-item-label {
+      padding: 0 4px;
+      font-size: 11px;
+    }
   `,
 }));
 
@@ -100,7 +125,7 @@ export function NewsFeedToolbar({
   channelTelegramId,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
-  const { styles } = useStyles();
+  const { styles, cx } = useStyles();
 
   const periodOptions = [
     { value: '1', label: t('news.period.1d') },
@@ -118,6 +143,91 @@ export function NewsFeedToolbar({
     },
   ];
 
+  // ── Compact mobile toolbar (B/C) ─────────────────────────────────────
+  if (isMobile) {
+    const compactStats = [
+      unreadCount > 0 && t('news.toolbar.unread', { count: unreadCount }),
+      t('news.toolbar.total', { count: totalCount }),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    return (
+      <div className={cx(styles.toolbar, styles.toolbarCompact)}>
+        {/* Left: core action buttons — icon only */}
+        <Space size={2}>
+          <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
+            <Button size="small" icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
+          </Tooltip>
+
+          <Segmented
+            size="small"
+            options={periodOptions}
+            value={fetchPeriod}
+            onChange={onFetchPeriod}
+            disabled={fetchPending}
+            className={styles.periodCompact}
+          />
+
+          {channelTelegramId && (
+            <Tooltip title={t('channels.open_tg_tooltip')}>
+              <Button
+                size="small"
+                icon={<LinkOutlined />}
+                href={`https://t.me/${channelTelegramId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            </Tooltip>
+          )}
+
+          <Tooltip title={t('news.toolbar.show_all_tooltip')}>
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              type={showAll ? 'primary' : 'default'}
+              onClick={onToggleShowAll}
+            />
+          </Tooltip>
+
+          <Tooltip title={t('news.toolbar.mark_all_read_tooltip')}>
+            <Button size="small" icon={<CheckSquareOutlined />} onClick={onMarkAllRead} loading={markAllPending} />
+          </Tooltip>
+
+          <Badge count={activeFilterCount} size="small">
+            <Tooltip title={t('news.toolbar.filter_tooltip')}>
+              <Button size="small" icon={<FilterOutlined />} onClick={onOpenFilters} />
+            </Tooltip>
+          </Badge>
+
+          {showDigest && (
+            <Tooltip title={t('digest.tooltip')}>
+              <Button size="small" icon={<BulbOutlined />} onClick={onOpenDigest} />
+            </Tooltip>
+          )}
+
+          {hashTagFilter && (
+            <Tag
+              color="blue"
+              closeIcon={<CloseCircleOutlined />}
+              onClose={onClearHashTag}
+              className={cx(styles.hashTag, styles.hashTagCompact)}
+            >
+              {hashTagFilter}
+            </Tag>
+          )}
+        </Space>
+
+        {/* Right: compact stats */}
+        <Text type="secondary" className={styles.statsCompact}>
+          {compactStats}
+          {hiddenCount > 0 && ` (−${hiddenCount})`}
+        </Text>
+      </div>
+    );
+  }
+
+  // ── Default desktop toolbar ───────────────────────────────────────────
   return (
     <div className={styles.toolbar}>
       <Space wrap>
@@ -165,27 +275,25 @@ export function NewsFeedToolbar({
             {hashTagFilter}
           </Tag>
         )}
-        {!isMobile && (
-          <>
-            <div className={styles.divider} />
-            <Tooltip title={t('news.toolbar.view_list')}>
-              <Button
-                size="small"
-                icon={<LayoutOutlined />}
-                type={newsViewMode === 'list' ? 'primary' : 'default'}
-                onClick={() => onSetViewMode('list')}
-              />
-            </Tooltip>
-            <Tooltip title={t('news.toolbar.view_accordion')}>
-              <Button
-                size="small"
-                icon={<ProfileOutlined />}
-                type={newsViewMode === 'accordion' ? 'primary' : 'default'}
-                onClick={() => onSetViewMode('accordion')}
-              />
-            </Tooltip>
-          </>
-        )}
+        <>
+          <div className={styles.divider} />
+          <Tooltip title={t('news.toolbar.view_list')}>
+            <Button
+              size="small"
+              icon={<LayoutOutlined />}
+              type={newsViewMode === 'list' ? 'primary' : 'default'}
+              onClick={() => onSetViewMode('list')}
+            />
+          </Tooltip>
+          <Tooltip title={t('news.toolbar.view_accordion')}>
+            <Button
+              size="small"
+              icon={<ProfileOutlined />}
+              type={newsViewMode === 'accordion' ? 'primary' : 'default'}
+              onClick={() => onSetViewMode('accordion')}
+            />
+          </Tooltip>
+        </>
       </Space>
 
       <Space size={12} className={styles.stats}>
