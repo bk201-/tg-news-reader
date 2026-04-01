@@ -15,7 +15,7 @@ import type { DownloadTask } from '@shared/types.ts';
 
 const { Text } = Typography;
 
-const useStyles = createStyles(({ css }) => ({
+const useStyles = createStyles(({ css, token }) => ({
   empty: css`
     padding: 32px 0;
     text-align: center;
@@ -42,6 +42,16 @@ const useStyles = createStyles(({ css }) => ({
     display: block;
     margin-top: 2px;
   `,
+  sectionDivider: css`
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: ${token.colorTextTertiary};
+    padding: 8px 12px 4px;
+    border-top: 1px solid ${token.colorBorderSecondary};
+    margin-top: 4px;
+  `,
 }));
 
 function TaskStatus({ task }: { task: DownloadTask }) {
@@ -63,20 +73,13 @@ export interface TaskListProps {
   prioritizeDownload: { mutate: (id: number) => void };
 }
 
-export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskListProps) {
-  const { t } = useTranslation();
-  const { styles } = useStyles();
-  if (tasks.length === 0) {
-    return (
-      <div className={styles.empty}>
-        <CloudDownloadOutlined className={styles.emptyIcon} />
-        <div className={styles.emptyText}>
-          <Text type="secondary">{t('downloads.empty')}</Text>
-        </div>
-      </div>
-    );
-  }
-
+function TaskItems({
+  tasks,
+  cancelDownload,
+  prioritizeDownload,
+  styles,
+  t,
+}: TaskListProps & { styles: ReturnType<typeof useStyles>['styles']; t: (key: string) => string }) {
   return (
     <List
       dataSource={tasks}
@@ -130,5 +133,58 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
         </List.Item>
       )}
     />
+  );
+}
+
+export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskListProps) {
+  const { t } = useTranslation();
+  const { styles } = useStyles();
+
+  if (tasks.length === 0) {
+    return (
+      <div className={styles.empty}>
+        <CloudDownloadOutlined className={styles.emptyIcon} />
+        <div className={styles.emptyText}>
+          <Text type="secondary">{t('downloads.empty')}</Text>
+        </div>
+      </div>
+    );
+  }
+
+  const mediaTasks = tasks.filter((task) => task.type === 'media');
+  const articleTasks = tasks.filter((task) => task.type === 'article');
+  const showGroups = mediaTasks.length > 0 && articleTasks.length > 0;
+
+  if (!showGroups) {
+    return (
+      <TaskItems
+        tasks={tasks}
+        cancelDownload={cancelDownload}
+        prioritizeDownload={prioritizeDownload}
+        styles={styles}
+        t={t}
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.sectionDivider}>{t('downloads.section_media')}</div>
+      <TaskItems
+        tasks={mediaTasks}
+        cancelDownload={cancelDownload}
+        prioritizeDownload={prioritizeDownload}
+        styles={styles}
+        t={t}
+      />
+      <div className={styles.sectionDivider}>{t('downloads.section_articles')}</div>
+      <TaskItems
+        tasks={articleTasks}
+        cancelDownload={cancelDownload}
+        prioritizeDownload={prioritizeDownload}
+        styles={styles}
+        t={t}
+      />
+    </>
   );
 }

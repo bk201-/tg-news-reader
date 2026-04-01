@@ -181,6 +181,8 @@
     "status_error": "Error",
     "status_priority": "Priority",
     "status_queued": "Queued",
+    "section_media": "Media",
+    "section_articles": "Articles",
     "boost_tooltip": "Boost priority",
     "cancel_tooltip": "Cancel",
     "no_text": "(no text)"
@@ -235,6 +237,8 @@
     "tooltip": "Generate AI digest of current news",
     "title": "AI Digest",
     "generating": "Generating digest…",
+    "prefetching": "Loading articles ({{done}} / {{total}})…",
+    "prefetching_errors": "{{errors}} failed, will use preview text",
     "empty": "No digest yet. Click the button to generate.",
     "copy": "Copy",
     "copied": "Copied to clipboard",

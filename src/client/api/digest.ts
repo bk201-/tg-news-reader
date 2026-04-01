@@ -7,7 +7,10 @@ export interface DigestParams {
   until?: string;
 }
 
-export type DigestEvent = { type: 'chunk'; content: string } | { type: 'ref_map'; map: Record<number, number> };
+export type DigestEvent =
+  | { type: 'chunk'; content: string }
+  | { type: 'ref_map'; map: Record<number, number> }
+  | { type: 'prefetch_progress'; done: number; total: number; errors: number };
 
 /**
  * Streams a digest from POST /api/digest.
@@ -79,6 +82,13 @@ export async function* streamDigest(
             map[parseInt(k, 10)] = v as number;
           }
           yield { type: 'ref_map', map };
+        } else if (currentEvent === 'prefetch_progress') {
+          yield {
+            type: 'prefetch_progress',
+            done: parsed.done as number,
+            total: parsed.total as number,
+            errors: parsed.errors as number,
+          };
         } else if (typeof parsed.content === 'string') {
           yield { type: 'chunk', content: parsed.content };
         } else if (typeof parsed.message === 'string') {

@@ -27,6 +27,9 @@ export const client = createClient({ url: clientUrl, authToken });
 // busy_timeout: makes the SQLite driver wait up to 5 s for the write lock before
 // throwing SQLITE_BUSY — avoids spurious task failures during peak writes.
 // foreign_keys: enforce referential integrity.
-// All three are no-ops on remote Turso (accepted silently).
-await client.executeMultiple('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
+// Skip on Turso (remote libsql): executeMultiple with PRAGMAs returns HTTP 400;
+// WAL/busy_timeout/foreign_keys are managed server-side on Turso anyway.
+if (!process.env.DATABASE_URL) {
+  await client.executeMultiple('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
+}
 export const db = drizzle(client, { schema });

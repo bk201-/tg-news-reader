@@ -48,6 +48,11 @@ export const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'g
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
 /** Max news items to include in a single digest request. */
 export const DIGEST_MAX_ITEMS = parseInt(process.env.DIGEST_MAX_ITEMS ?? '200', 10);
+/** Max chars per item when fullContent is available. Env: DIGEST_ARTICLE_CONTENT_LIMIT */
+export const DIGEST_ARTICLE_CONTENT_LIMIT = parseInt(process.env.DIGEST_ARTICLE_CONTENT_LIMIT ?? '1500', 10);
+/** Max ms to wait for article prefetch before proceeding. Env: DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC */
+export const DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS =
+  parseInt(process.env.DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC ?? '30', 10) * 1_000;
 
 if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-secret-change-in-production') {
   throw new Error('JWT_SECRET env variable must be set in production!');
