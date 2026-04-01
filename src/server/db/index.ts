@@ -21,6 +21,12 @@ if (process.env.DATABASE_URL) {
 }
 
 export const client = createClient({ url: clientUrl, authToken });
-// PRAGMA foreign_keys only works for local SQLite (no-op on remote, but harmless)
-await client.execute('PRAGMA foreign_keys = ON');
+// WAL mode: allows concurrent readers + 1 writer, drastically reduces SQLITE_BUSY
+// under load (10 worker threads writing simultaneously). Persists in the DB file,
+// so only needs to be set once, but it's safe to run on every startup.
+// busy_timeout: makes the SQLite driver wait up to 5 s for the write lock before
+// throwing SQLITE_BUSY — avoids spurious task failures during peak writes.
+// foreign_keys: enforce referential integrity.
+// All three are no-ops on remote Turso (accepted silently).
+await client.executeMultiple('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
 export const db = drizzle(client, { schema });

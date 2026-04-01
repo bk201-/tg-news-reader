@@ -1,7 +1,10 @@
 import { logger } from '../logger.js';
 
-// Lazy runtime references — jsdom adds ~2s to cold start but is only needed
-// when the user clicks "Load article", so defer until first actual use.
+// jsdom + Readability are lazy-loaded on first use, not at import time.
+// This keeps worker thread startup fast: if the worker never receives an article
+// task, it never pays the ~2s / ~100MB jsdom load cost.
+// Each worker thread has its own module scope, so these cached references
+// are per-thread — no shared state between workers.
 let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null;
 let ReadabilityClass: (typeof import('@mozilla/readability'))['Readability'] | null = null;
 
@@ -13,7 +16,7 @@ async function getLibs() {
   ReadabilityClass = Readability;
   logger.info(
     { module: 'readability', ms: Math.round(performance.now() - t) },
-    `jsdom loaded lazily in ${Math.round(performance.now() - t)}ms`,
+    `jsdom loaded in ${Math.round(performance.now() - t)}ms`,
   );
   return { JSDOM, Readability };
 }
@@ -58,8 +61,6 @@ export function buildFullContent(extracted: ExtractedContent): string {
 }
 
 export async function extractContentFromUrl(url: string): Promise<ExtractedContent> {
-  const { JSDOM, Readability } = await getLibs();
-
   const response = await fetch(url, {
     headers: {
       'User-Agent':
@@ -75,12 +76,22 @@ export async function extractContentFromUrl(url: string): Promise<ExtractedConte
   }
 
   const html = await response.text();
+  return parseHtml(html, url);
+}
+
+/**
+ * Parse pre-fetched HTML with jsdom + Readability.
+ * CPU-bound — designed to be called from a download worker thread so the
+ * main event loop is not blocked.
+ */
+export async function parseHtml(html: string, url: string): Promise<ExtractedContent> {
+  const { JSDOM, Readability } = await getLibs();
+
   const dom = new JSDOM(html, { url });
   const reader = new Readability(dom.window.document);
   const article = reader.parse();
 
   if (!article) {
-    // Fallback: try to extract body text
     const bodyText = dom.window.document.body?.textContent || '';
     return {
       content: '',

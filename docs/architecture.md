@@ -175,12 +175,39 @@ CREATE TABLE downloads (
 );
 ```
 
-### Details
+### Worker pool architecture
+
+`downloadManager.ts` is a **coordinator** (main thread); actual work runs in `worker_threads`:
+
+```
+Main thread (DownloadCoordinator)
+  ├── polls DB for pending tasks
+  ├── dispatches { type:'task', payload } to an available worker
+  ├── routes tg:* IPC messages → telegramBridge (gramjs lives in main thread)
+  └── emits SSE events via downloadProgressEmitter
+
+Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
+  ├── 'article' task: fetch HTML → parseHtml() with jsdom + Readability (CPU-bound,
+  │    does NOT block main event loop) → writes fullContent to DB via own libsql connection
+  └── 'media' task:   sends tg:downloadMedia IPC → awaits tg:result/tg:error reply
+                       → writes localMediaPath(s) to DB
+```
+
+**File-reference freshness** (`telegramBridge.ts`): every `tg:downloadMedia` IPC call starts with `fetchMessageById(channelTelegramId, msgId)` to get a fresh `rawMedia` object before calling `downloadMedia()`. Telegram file references have a TTL; re-fetching on every attempt (not just on retry) means stale references are never used and the "file reference expired" error cannot occur.
+
+**Dev vs prod worker entry-point:**
+- **Dev**: `downloadWorkerShim.mjs` — plain `.mjs` that calls `register('tsx/esm')` then dynamically imports `downloadWorker.ts`; the only reliable way to activate tsx hooks in `worker_threads` with Node.js 22.12+.
+- **Prod**: `downloadWorker.js` (compiled) — loaded directly, no loader needed.
+
+**jsdom / Readability loading**: lazy-loaded on first article task per worker (avoids ~2 s / ~100 MB startup cost for media-only workers); each thread has its own module scope — no shared state.
+
+### Public API
 
 - `enqueueTask(newsId, type, url?, priority=0)` — INSERT with `onConflictDoUpdate`, resets failed → pending, keeps MAX(priority)
-- `startWorkerPool(n)` — N workers, crash recovery on startup (processing → pending)
+- `startWorkerPool(n)` — called in `server/index.ts`; resets `processing → pending` on startup (crash recovery)
 - Priorities: 0 = background (size limits apply), 10 = user-initiated (size limits bypassed)
-- Auto-cleanup of done tasks after `DOWNLOAD_TASK_CLEANUP_DELAY_SEC` sec (default 30)
+- Pool circuit breaker: ≥ ⌈N × ratio⌉ crashes in sliding window → `logger.fatal` + `sendAlert` + `process.exit(1)`
+- Auto-cleanup of done tasks after `DOWNLOAD_TASK_CLEANUP_DELAY_MS` ms (default 30 s)
 - SSE: `GET /api/downloads/stream` — `init` + `task_update` events
 
 ---
@@ -300,6 +327,10 @@ Response: SSE stream (text/event-stream)
 - If news count > 200 — takes the latest 200
 - UI: "Digest ✨" button in toolbar, streams into `<Drawer>` with `react-markdown`
 
+### Source link chips
+
+The digest prompt instructs the model to annotate each mentioned news item with `[N]` references (1-based index). The `<Drawer>` renders these as clickable Ant Design `<Tag>` chips — clicking calls `setSelectedNewsId(items[N-1].id)` to navigate directly to the source item in the feed.
+
 ---
 
 ## 20. Client-side gramjs download (deferred)
@@ -317,3 +348,89 @@ Session sharing: sharing the main session is simpler but less secure. Decide at 
 - **File System Access API**: `showDirectoryPicker()` → user picks folder
 - Browsers: Chrome/Edge ✅, Safari 15.2+ ✅, **Firefox ❌**
 - Depends on item 20 (at least partially)
+
+---
+
+## 22. Filters — hit_count sorting
+
+`filters` table has a `hit_count INTEGER NOT NULL DEFAULT 0` column incremented each time a filter matches a news item during fetch. The Filters panel (`src/client/components/Filters/`) displays a **Hits** column sorted descending by default so the most active filters surface to the top. No extra API changes — `GET /api/filters` returns `hit_count` and sorting is done client-side via the Ant Design `Table` `defaultSortOrder`.
+
+---
+
+## 23. Channel t.me links
+
+Both `ChannelItem` (sidebar) and `NewsFeedToolbar` show an external-link icon button that opens `https://t.me/{channel.telegramId}` in a new tab. The URL is constructed from the `telegramId` field already present on every channel object — no extra API fields required.
+
+---
+
+## 24. Boss key (double Esc)
+
+Double-pressing `Escape` within 500 ms immediately re-locks **all** PIN-protected groups for the current session:
+
+- Listener registered in `AppLayout` (or a top-level hook) on `keydown` with `{ capture: true }`.
+- First `Escape` within the window records `lastEscTime`; second `Escape` within 500 ms calls `authStore.lockAllGroups()`.
+- `lockAllGroups()` calls `POST /api/auth/sessions/lock-groups` which clears `unlocked_group_ids` in the DB session and returns a new access token with an empty `unlockedGroupIds` list.
+- `authStore.updateToken()` replaces the in-memory access token; Zustand `unlockedGroupIds` resets to `[]`.
+- Groups whose PIN was not verified become inaccessible again until re-entered.
+
+---
+
+## 25. Error pages
+
+### React crash boundary (`AppErrorBoundary` + `ErrorPage`)
+
+`src/client/components/AppErrorBoundary.tsx` wraps the entire React tree in `main.tsx`. On an unhandled render error it shows `ErrorPage` — a centered card with a floating emoji animation, the error message, and a **Retry** button that calls `window.location.reload()`. The boundary also logs the error via the client logger (`logger.error`).
+
+### Server HTML error pages (Hono)
+
+`src/server/index.ts` registers:
+
+```ts
+app.notFound((c) => c.html(errorHtml('404', 'Page not found'), 404));
+app.onError((err, c) => c.html(errorHtml('500', err.message, stack), 500));
+```
+
+`errorHtml()` is a template literal that:
+- Respects `prefers-color-scheme` (dark/light) via a `<style>` media query
+- Shows the stack trace only when `NODE_ENV !== 'production'`
+- Returns a minimal styled HTML page (no external dependencies)
+
+---
+
+## 26. Telegram session expiry (AUTH_KEY_UNREGISTERED)
+
+Three-layer response when gramjs throws `AUTH_KEY_UNREGISTERED`:
+
+### Layer 1 — Auto-reconnect (server, `telegramCircuitBreaker.ts`)
+
+`handleAuthKeyUnregistered()` runs before marking the session as expired:
+
+```
+1. Calls _reconnectFn() — injected by telegram.ts via setReconnectCallback()
+2. _reconnectFn() = () => getTelegramClient()  →  new TelegramClient + client.connect()
+3. On success: _sessionExpired stays false, circuit stays closed
+4. On failure: _sessionExpired = true  →  sendAlert() + GET /api/health returns sessionExpired: true
+```
+
+`_reconnectFn` is a plain `() => Promise<void>` injected at startup to avoid a circular import (`telegram.ts` → `telegramCircuitBreaker.ts` → `telegram.ts`).
+
+### Layer 2 — Push alert (server, `alertBot.ts`)
+
+When auto-reconnect fails, `sendAlert('Telegram session expired …', 'auth-key-unregistered')` fires (5-min dedup). The message includes the remediation command.
+
+### Layer 3 — In-app banner (client)
+
+`TelegramSessionBanner` (`src/client/components/Layout/TelegramSessionBanner.tsx`) is placed in `AppLayout` directly below `AppHeader`:
+
+```tsx
+<AppHeader />
+<TelegramSessionBanner />   {/* null unless sessionExpired */}
+```
+
+- Uses `useHealthStatus()` from `src/client/api/health.ts` — polls `GET /api/health` every **60 s** via TanStack Query
+- Health response shape: `{ status, db, telegram: { circuit, sessionExpired } }`
+- Renders `<Alert type="error" banner showIcon>` with i18n key `header.session_expired_banner` only when `data.telegram.sessionExpired === true`
+- Disappears automatically once `sessionExpired` goes back to `false` (e.g. after redeploy)
+
+---
+

@@ -48,6 +48,10 @@ const useStyles = createStyles(({ css, token }) => ({
     flex: 1;
     overflow-y: auto;
     padding: 8px 0;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   `,
   loading: css`
     padding: 16px;

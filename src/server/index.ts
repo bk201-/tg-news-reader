@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { type ContentfulStatusCode } from 'hono/utils/http-status';
 import { secureHeaders } from 'hono/secure-headers';
 import channelsRouter from './routes/channels.js';
 import newsRouter from './routes/news.js';
@@ -23,6 +24,7 @@ import { getTelegramCircuitState, getTelegramSessionExpired } from './services/t
 import { sendAlert } from './services/alertBot.js';
 import { client } from './db/index.js';
 import { runMigration } from './db/migrate.js';
+import { renderErrorHtml } from './services/errorHtml.js';
 
 // All imports loaded — log how long module initialisation took
 // (gramjs TL schema + crypto is the dominant cost, typically 5–8 s)
@@ -132,6 +134,28 @@ app.get('/api/health', async (c) => {
     db: dbOk ? 'ok' : 'error',
     telegram: { circuit: telegramCircuit, sessionExpired },
   });
+});
+
+// ─── Global error handlers ────────────────────────────────────────────────────
+
+// 404 — unknown route
+app.notFound((c) => {
+  // API consumers get JSON; browser requests get a styled HTML page
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ error: 'Not Found' }, 404);
+  }
+  return c.html(renderErrorHtml(404), 404);
+});
+
+// 500 — uncaught handler error
+app.onError((err, c) => {
+  const status = ((err as { status?: number }).status ?? 500) as ContentfulStatusCode;
+  logger.error({ module: 'http', path: c.req.path, status, err }, `Unhandled error: ${err.message}`);
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ error: err.message || 'Internal Server Error' }, status);
+  }
+  const detail = isDev ? err.stack : undefined;
+  return c.html(renderErrorHtml(status, detail), status);
 });
 
 // Serve static files in production

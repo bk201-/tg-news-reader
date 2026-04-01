@@ -1,44 +1,8 @@
 import { logger } from '../logger.js';
 import { sendAlert } from './alertBot.js';
+import { withRetry, isTransientTelegramError, TELEGRAM_POLICY } from '../utils/retry.js';
 
-// ─── Transient error detection ────────────────────────────────────────────────
-
-/** Extract wait duration from gramjs FloodWaitError (has a `seconds` property). */
-function getFloodWaitSeconds(err: unknown): number {
-  if (!(err instanceof Error)) return 0;
-  if (err.constructor.name === 'FloodWaitError') {
-    return (err as unknown as { seconds?: number }).seconds ?? 30;
-  }
-  return 0;
-}
-
-export function isTransientTelegramError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return (
-    err.constructor.name === 'FloodWaitError' ||
-    msg.includes('timeout') ||
-    msg.includes('flood') ||
-    msg.includes('econnreset') ||
-    msg.includes('etimedout') ||
-    msg.includes('disconnected') ||
-    msg.includes('connection') ||
-    msg.includes('network error') ||
-    msg.includes('socket')
-  );
-}
-
-/** Returns true for Telegram "file reference expired" errors. These are NOT circuit-breaker failures. */
-export function isFileReferenceExpiredError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return (
-    err.constructor.name === 'FileReferenceExpiredError' ||
-    msg.includes('file_reference_expired') ||
-    msg.includes('file reference') ||
-    msg.includes('fileref')
-  );
-}
+export { isTransientTelegramError };
 
 // ─── Reconnect callback ───────────────────────────────────────────────────────
 
@@ -49,39 +13,6 @@ let _reconnectFn: ReconnectFn | null = null;
 
 export function setReconnectCallback(fn: ReconnectFn): void {
   _reconnectFn = fn;
-}
-
-// ─── Retry helper ─────────────────────────────────────────────────────────────
-
-const MAX_TG_RETRIES = 3;
-const BASE_RETRY_DELAY_MS = 2_000;
-const MAX_RETRY_DELAY_MS = 16_000;
-
-async function withRetry<T>(fn: () => Promise<T>, context: string): Promise<T> {
-  let lastErr: unknown;
-
-  for (let attempt = 0; attempt < MAX_TG_RETRIES; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (attempt === MAX_TG_RETRIES - 1) break; // exhausted
-      if (!isTransientTelegramError(err)) throw err; // permanent — don't retry
-
-      // FloodWait: respect Telegram's mandatory wait time
-      const floodSec = getFloodWaitSeconds(err);
-      const delay =
-        floodSec > 0 ? floodSec * 1_000 : Math.min(BASE_RETRY_DELAY_MS * Math.pow(2, attempt), MAX_RETRY_DELAY_MS);
-
-      logger.warn(
-        { module: 'telegram', context, attempt: attempt + 1, delayMs: delay },
-        `transient Telegram error — retrying in ${delay}ms`,
-      );
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-
-  throw lastErr;
 }
 
 // ─── Circuit Breaker ──────────────────────────────────────────────────────────
@@ -163,7 +94,7 @@ class TelegramCircuitBreaker {
     }
 
     try {
-      const result = await withRetry(fn, context);
+      const result = await withRetry(fn, TELEGRAM_POLICY, context);
       this.recordSuccess();
       return result;
     } catch (err) {

@@ -26,6 +26,10 @@ const useStyles = createStyles(({ css, token }) => ({
     padding: 8px 0;
     overflow-y: auto;
     gap: 4px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   `,
   addBtn: css`
     width: 36px !important;

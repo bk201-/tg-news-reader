@@ -69,7 +69,8 @@ const useStyles = createStyles(({ css, token }) => ({
     overflow: hidden;
   `,
   layout: css`
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
   `,
   // Wrapper around AppHeader — animates max-height to hide on scroll (mobile only)
   headerWrap: css`
