@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Spin, Typography, Alert } from 'antd';
+import { Button, Drawer, Progress, Spin, Typography, Alert } from 'antd';
 import { CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,21 @@ const useStyles = createStyles(({ css, token }) => ({
     align-items: center;
     gap: 8px;
     color: ${token.colorTextSecondary};
+  `,
+  prefetchWrap: css`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 0 8px;
+  `,
+  prefetchLabel: css`
+    font-size: 13px;
+    color: ${token.colorTextSecondary};
+  `,
+  prefetchError: css`
+    font-size: 12px;
+    color: ${token.colorError};
   `,
   footer: css`
     display: flex;
@@ -52,6 +67,11 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
   const [refMap, setRefMap] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefetchProgress, setPrefetchProgress] = useState<{
+    done: number;
+    total: number;
+    errors: number;
+  } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const { setSelectedNewsId } = useUIStore();
 
@@ -63,14 +83,18 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     setText('');
     setRefMap({});
     setError(null);
+    setPrefetchProgress(null);
     setLoading(true);
 
     try {
       for await (const event of streamDigest(params, ctrl.signal)) {
         if (event.type === 'chunk') {
+          setPrefetchProgress(null); // clear circle on first chunk
           setText((prev) => prev + event.content);
         } else if (event.type === 'ref_map') {
           setRefMap(event.map);
+        } else if (event.type === 'prefetch_progress') {
+          setPrefetchProgress({ done: event.done, total: event.total, errors: event.errors });
         }
       }
     } catch (err) {
@@ -89,6 +113,7 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
       setText('');
       setRefMap({});
       setError(null);
+      setPrefetchProgress(null);
       setLoading(false);
     }
   }, [open, run]);
@@ -106,6 +131,8 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     void message.success(t('digest.copied'));
   };
 
+  const isPrefetching = loading && prefetchProgress !== null;
+
   return (
     <Drawer
       title={t('digest.title')}
@@ -119,7 +146,28 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
       <div className={styles.body}>
         {error && <Alert type="error" message={error} showIcon />}
 
-        {loading && (
+        {isPrefetching && (
+          <div className={styles.prefetchWrap}>
+            <Progress
+              type="circle"
+              size={80}
+              percent={Math.round(((prefetchProgress.done + prefetchProgress.errors) / prefetchProgress.total) * 100)}
+            />
+            <Text className={styles.prefetchLabel}>
+              {t('digest.prefetching', {
+                done: prefetchProgress.done,
+                total: prefetchProgress.total,
+              })}
+            </Text>
+            {prefetchProgress.errors > 0 && (
+              <Text className={styles.prefetchError}>
+                {t('digest.prefetching_errors', { errors: prefetchProgress.errors })}
+              </Text>
+            )}
+          </div>
+        )}
+
+        {loading && !isPrefetching && (
           <div className={styles.spinner}>
             <Spin size="small" />
             <Text type="secondary">{t('digest.generating')}</Text>

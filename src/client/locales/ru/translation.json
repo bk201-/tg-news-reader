@@ -181,6 +181,8 @@
     "status_error": "Ошибка",
     "status_priority": "Срочно",
     "status_queued": "В очереди",
+    "section_media": "Медиа",
+    "section_articles": "Статьи",
     "boost_tooltip": "Поднять приоритет",
     "cancel_tooltip": "Отменить",
     "no_text": "(без текста)"
@@ -235,6 +237,8 @@
     "tooltip": "Сгенерировать AI-дайджест текущих новостей",
     "title": "AI Дайджест",
     "generating": "Генерирую дайджест…",
+    "prefetching": "Загружаю статьи ({{done}} / {{total}})…",
+    "prefetching_errors": "{{errors}} не удалось, будет использован превью",
     "empty": "Дайджест пока не создан. Нажмите кнопку для генерации.",
     "copy": "Копировать",
     "copied": "Скопировано в буфер",

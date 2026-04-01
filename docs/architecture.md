@@ -209,10 +209,11 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 - Pool circuit breaker: ≥ ⌈N × ratio⌉ crashes in sliding window → `logger.fatal` + `sendAlert` + `process.exit(1)`
 - Auto-cleanup of done tasks after `DOWNLOAD_TASK_CLEANUP_DELAY_MS` ms (default 30 s)
 - SSE: `GET /api/downloads/stream` — `init` + `task_update` events
+- `DownloadsPanel` / `DownloadsPinnedContent`: when both `media` and `article` tasks are active, the task list renders two sections ("Media" / "Articles") separated by a labelled divider.
 
 ---
 
-## 14. Accordion view mode
+## 16. Azure deployment
 
 - `newsViewMode: 'list' | 'accordion'` in `uiStore` (persisted to localStorage)
 - `effectiveViewMode` in `NewsFeed` — forces accordion on mobile (`< 768px`)
@@ -247,6 +248,10 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 - Base image: `node:22-bookworm-slim` (glibc — compatible with `@libsql/client` and `jsdom`)
 - Multi-stage Dockerfile: builder → runner (prodDeps only + `dist/`)
 - Full env vars reference: [docs/azure.md](azure.md)
+
+### Turso note
+
+`db/index.ts` runs `PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;` **only when `DATABASE_URL` is not set** (i.e. local SQLite). On Turso, `client.executeMultiple` with PRAGMA statements returns HTTP 400 — these settings are managed server-side on Turso anyway.
 
 ---
 
@@ -323,9 +328,29 @@ Body: { channelIds?: number[], groupId?: number | null, since?: string, until?: 
 Response: SSE stream (text/event-stream)
 ```
 
-- Sends only `text` (no `fullContent`, no media)
 - If news count > 200 — takes the latest 200
 - UI: "Digest ✨" button in toolbar, streams into `<Drawer>` with `react-markdown`
+
+### Content enrichment for `news_link` channels
+
+The digest route joins `channels` and selects `fullContent`, `links`, `canLoadArticle`, `channelType` alongside each news row. Prompt content per item uses `COALESCE(fullContent, text)`:
+
+- Items with `fullContent` already populated → up to `DIGEST_ARTICLE_CONTENT_LIMIT` chars (env, default 1500)
+- Items without `fullContent` → `text` capped at 500 chars (legacy behaviour)
+
+### Article prefetch phase (Phase 1)
+
+For `news_link` items where `fullContent IS NULL` and `canLoadArticle = 1`, the digest route runs a prefetch phase **before** starting the AI call:
+
+1. Enqueues an `article` download task at `priority=10` for each such item via `enqueueTask()` — these tasks appear in `DownloadsPanel` automatically.
+2. Emits `prefetch_progress { done, total, errors }` SSE events every 500 ms while polling `downloads` + `news` tables.
+3. Exits when all tasks settle (`remaining = 0`) or `DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC` elapses (env, default 30 s).
+4. Re-fetches `fullContent` for all prefetch items; remaining failures fall back to `text`.
+5. Only then begins Phase 2 (AI generation): `ref_map → chunk* → done`.
+
+Client: `DigestDrawer` shows an Ant Design `<Progress type="circle" />` (80 px) during Phase 1 with live `done / total` counter and an error hint when `errors > 0`. Clears on first `chunk` event, transitions to streaming text.
+
+Config: `DIGEST_ARTICLE_CONTENT_LIMIT` (default 1500), `DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC` (default 30).
 
 ### Source link chips
 
