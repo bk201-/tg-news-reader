@@ -18,6 +18,10 @@ const useStyles = createStyles(({ css, token }) => ({
     display: flex;
     flex-direction: column;
     align-items: center;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   `,
   contentInline: css`
     flex: none;

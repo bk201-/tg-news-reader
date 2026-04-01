@@ -13,6 +13,10 @@ const useStyles = createStyles(({ css, token }) => ({
     overflow-y: auto;
     background: ${token.colorBgContainer};
     border-right: 1px solid ${token.colorBorderSecondary};
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
   `,
   loadingWrap: css`
     display: flex;

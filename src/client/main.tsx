@@ -7,6 +7,7 @@ import ruRU from 'antd/locale/ru_RU';
 import enUS from 'antd/locale/en_US';
 import { AppLayout } from './components/Layout/AppLayout';
 import { AuthGate } from './components/Auth/AuthGate';
+import { AppErrorBoundary } from './components/common/AppErrorBoundary';
 import { useUIStore } from './store/uiStore';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
@@ -87,9 +88,11 @@ function ThemedApp() {
     >
       <StyleProvider>
         <AntApp>
-          <AuthGate>
-            <AppLayout />
-          </AuthGate>
+          <AppErrorBoundary>
+            <AuthGate>
+              <AppLayout />
+            </AuthGate>
+          </AppErrorBoundary>
         </AntApp>
       </StyleProvider>
     </ConfigProvider>

@@ -1,21 +1,8 @@
 # TG News Reader — Roadmap
 
-> Дата: март 2026  
+> Дата: апрель 2026  
 > Живой документ — возвращаемся при планировании каждого шага.  
 > Детали реализации: [docs/architecture.md](docs/architecture.md) · Решения и история: [docs/decisions.md](docs/decisions.md) · Azure ops: [docs/azure.md](docs/azure.md) · Git workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
-
----
-
-## ✅ Выполнено (сегодня)
-
-| Задача |
-|--------|
-| Сортировка фильтров по `hit_count` — колонка Hits, сортировка по убыванию |
-| Ссылки на каналы — кнопка `https://t.me/{telegramId}` в `ChannelItem` и `NewsFeedToolbar` |
-| Boss key — двойной `Esc` мгновенно блокирует PIN-группы |
-| Дайджест со ссылками на источники — `[N]` чипы → `setSelectedNewsId` |
-
-Полный список реализованных фич: [docs/architecture.md](docs/architecture.md) · история решений: [docs/decisions.md](docs/decisions.md)
 
 ---
 
@@ -23,19 +10,8 @@
 
 | Задача | Описание | Сложность |
 |--------|----------|-----------|
-| Перенести jsdom/Readability в worker_threads | `downloadManager.ts` запускает парсинг в главном потоке. `new JSDOM(html)` + `Readability.parse()` — синхронный CPU-bound, блокирует event loop ~100–200 мс на статью. Решение: Worker thread, передавать HTML строкой, получать `fullContent`. | ⭐⭐⭐⭐ |
-| Дайджест для `news_link` каналов | Дайджест берёт `news.text` — для `news_link` это только превью. Нужно загрузить `fullContent` перед генерацией (download manager, priority=10), потом `COALESCE(full_content, text)`. Зависит от worker_threads выше. | ⭐⭐⭐ |
+| Дайджест для `news_link` каналов | Дайджест берёт `news.text` — для `news_link` это только превью. Нужно загрузить `fullContent` перед генерацией (download manager, priority=10), потом `COALESCE(full_content, text)`. | ⭐⭐⭐ |
 | Индексы SQLite на `channel_id + is_read` | Уже есть, но проверить при росте данных. | ⭐ |
-
----
-
-## 🔥 Хотфиксы
-
-| Статус | Задача | Описание | Сложность |
-|--------|--------|----------|-----------|
-| ⬜ | Превью не обновляется при частичной 429 | Telegram вернул 429 в середине скачки: `localMediaPath` обновился, `thumbnailPath` — нет. Нужен дополнительный UPDATE для thumbnail. | ⭐⭐ |
-| ⬜ | Выгорание ссылок (Telegram file references) | Ссылки на медиафайлы имеют TTL. При скачке устаревшей ссылки — ошибка. Нужен повторный `fetchMessageById` перед ретраем. | ⭐⭐⭐ |
-| ⬜ | Слетает Telegram сессия (AUTH_KEY_UNREGISTERED) | (A) уведомление через alertBot + баннер в AppHeader; (B) автоматический рефреш через `tg.connect()` без полного `tg:auth`. | ⭐⭐⭐⭐ |
 
 ---
 

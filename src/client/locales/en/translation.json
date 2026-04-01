@@ -226,6 +226,10 @@
       "logout": "Sign out"
     }
   },
+  "error": {
+    "crash_title": "Something went sideways",
+    "crash_description": "An unexpected error crashed the app. Try reloading — it's probably fine."
+  },
   "digest": {
     "button": "Digest ✨",
     "tooltip": "Generate AI digest of current news",
