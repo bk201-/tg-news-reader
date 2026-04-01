@@ -67,6 +67,8 @@ export interface NewsItem {
   textInPanel?: number;
   /** 1 = "Load article" button available (news_link items with a link but no fullContent yet) */
   canLoadArticle?: number;
+  /** Format of fullContent: 'markdown' for newly extracted articles, 'text' for legacy plain-text */
+  fullContentFormat?: 'text' | 'markdown';
 }
 
 export interface Filter {

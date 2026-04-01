@@ -33,9 +33,13 @@ router.post('/news/:id', async (c) => {
   const url = links[0];
   try {
     const extracted = await extractContentFromUrl(url);
-    const content = buildFullContent(extracted);
-    const [updated] = await db.update(news).set({ fullContent: content }).where(eq(news.id, id)).returning();
-    return c.json({ ...updated, fullContent: content });
+    const { content, format } = buildFullContent(extracted);
+    const [updated] = await db
+      .update(news)
+      .set({ fullContent: content, fullContentFormat: format })
+      .where(eq(news.id, id))
+      .returning();
+    return c.json({ ...updated, fullContent: content, fullContentFormat: format });
   } catch (err: unknown) {
     const error = err as { message?: string };
     return c.json({ error: error.message || 'Failed to extract content' }, 500);

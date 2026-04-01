@@ -147,6 +147,7 @@ router.get('/', async (c) => {
     mediaSize: r.mediaSize || undefined,
     textInPanel: r.textInPanel ?? 0,
     canLoadArticle: r.canLoadArticle ?? 0,
+    fullContentFormat: r.fullContentFormat ?? 'text',
   }));
 
   return c.json({ items, filteredOut });

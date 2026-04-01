@@ -192,10 +192,10 @@ async function processArticleTask(newsId: number, url: string): Promise<void> {
 
   // CPU-bound: runs in this worker thread — does NOT block the main event loop
   const extracted = await parseHtml(html, url);
-  const content = buildFullContent(extracted);
+  const { content, format } = buildFullContent(extracted);
 
   if (content) {
-    await db.update(news).set({ fullContent: content }).where(eq(news.id, newsId));
+    await db.update(news).set({ fullContent: content, fullContentFormat: format }).where(eq(news.id, newsId));
   }
 }
 
