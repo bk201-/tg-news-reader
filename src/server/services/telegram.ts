@@ -119,18 +119,26 @@ function richTextToString(rt: Api.TypeRichText): string {
 function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
   const parts: string[] = [];
   for (const block of blocks) {
-    if (
-      block instanceof _Api.PageBlockTitle ||
-      block instanceof _Api.PageBlockSubtitle ||
-      block instanceof _Api.PageBlockHeader ||
-      block instanceof _Api.PageBlockSubheader ||
-      block instanceof _Api.PageBlockKicker ||
-      block instanceof _Api.PageBlockParagraph ||
-      block instanceof _Api.PageBlockPreformatted ||
-      block instanceof _Api.PageBlockFooter
-    ) {
+    if (block instanceof _Api.PageBlockTitle) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(`# ${text.trim()}`);
+    } else if (block instanceof _Api.PageBlockSubtitle || block instanceof _Api.PageBlockKicker) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(`*${text.trim()}*`);
+    } else if (block instanceof _Api.PageBlockHeader) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(`## ${text.trim()}`);
+    } else if (block instanceof _Api.PageBlockSubheader) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push(`### ${text.trim()}`);
+    } else if (block instanceof _Api.PageBlockParagraph || block instanceof _Api.PageBlockFooter) {
       const text = richTextToString(block.text);
       if (text.trim()) parts.push(text.trim());
+    } else if (block instanceof _Api.PageBlockPreformatted) {
+      const text = richTextToString(block.text);
+      if (text.trim()) parts.push('```\n' + text.trim() + '\n```');
+    } else if (block instanceof _Api.PageBlockDivider) {
+      parts.push('---');
     } else if (block instanceof _Api.PageBlockBlockquote || block instanceof _Api.PageBlockPullquote) {
       const text = richTextToString(block.text);
       if (text.trim()) parts.push(`> ${text.trim()}`);
@@ -138,25 +146,26 @@ function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
       for (const item of block.items) {
         if (item instanceof _Api.PageListItemText) {
           const text = richTextToString(item.text);
-          if (text.trim()) parts.push(`• ${text.trim()}`);
+          if (text.trim()) parts.push(`- ${text.trim()}`);
         } else if (item instanceof _Api.PageListItemBlocks) {
           const subText = extractInstantViewText(item.blocks);
-          if (subText.trim()) parts.push(`• ${subText.trim()}`);
+          if (subText.trim()) parts.push(`- ${subText.trim()}`);
         }
       }
     } else if (block instanceof _Api.PageBlockOrderedList) {
+      let idx = 1;
       for (const item of block.items) {
         if (item instanceof _Api.PageListOrderedItemText) {
           const text = richTextToString(item.text);
-          if (text.trim()) parts.push(`${item.num} ${text.trim()}`);
+          if (text.trim()) parts.push(`${idx++}. ${text.trim()}`);
         } else if (item instanceof _Api.PageListOrderedItemBlocks) {
           const subText = extractInstantViewText(item.blocks);
-          if (subText.trim()) parts.push(subText.trim());
+          if (subText.trim()) parts.push(`${idx++}. ${subText.trim()}`);
         }
       }
     } else if (block instanceof _Api.PageBlockDetails) {
       const title = richTextToString(block.title);
-      if (title.trim()) parts.push(title.trim());
+      if (title.trim()) parts.push(`### ${title.trim()}`);
       const subText = extractInstantViewText(block.blocks);
       if (subText.trim()) parts.push(subText.trim());
     }

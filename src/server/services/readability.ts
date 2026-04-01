@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import TurndownService from 'turndown';
 
 // jsdom + Readability are lazy-loaded on first use, not at import time.
 // This keeps worker thread startup fast: if the worker never receives an article
@@ -23,11 +24,17 @@ async function getLibs() {
 
 export interface ExtractedContent {
   title?: string;
-  content: string;
+  content: string; // plain text (cleaned)
+  rawHtml?: string; // raw HTML from Readability — used for Markdown conversion
   textContent: string;
   excerpt?: string;
   siteName?: string;
   byline?: string;
+}
+
+export interface BuiltContent {
+  content: string;
+  format: 'text' | 'markdown';
 }
 
 /** Removes empty lines, collapses whitespace, strips leftover HTML tags */
@@ -47,17 +54,46 @@ function cleanText(raw: string): string {
     .trim();
 }
 
-/** Prepends the article title to the text, but only if it's not already present */
-export function buildFullContent(extracted: ExtractedContent): string {
+/** Build a TurndownService instance with sensible defaults for news articles. */
+function createTurndown(): TurndownService {
+  const td = new TurndownService({
+    headingStyle: 'atx',
+    bulletListMarker: '-',
+    codeBlockStyle: 'fenced',
+  });
+  // Strip noisy elements Readability sometimes includes
+  td.remove(['figure', 'aside', 'script', 'style', 'noscript', 'button', 'form']);
+  return td;
+}
+
+/**
+ * Build final content from extraction result.
+ * Returns Markdown when raw HTML is available, plain text otherwise.
+ */
+export function buildFullContent(extracted: ExtractedContent): BuiltContent {
+  // Prefer Markdown conversion from raw HTML
+  if (extracted.rawHtml) {
+    const td = createTurndown();
+    let md = td.turndown(extracted.rawHtml).trim();
+    if (!md) {
+      // HTML was present but produced empty Markdown — fall through to text
+    } else {
+      const title = extracted.title?.trim();
+      if (title && !md.slice(0, 300).toLowerCase().includes(title.toLowerCase())) {
+        md = `# ${title}\n\n${md}`;
+      }
+      return { content: md, format: 'markdown' };
+    }
+  }
+
+  // Fallback: plain text
   const text = extracted.textContent || extracted.content;
   const title = extracted.title?.trim();
-
-  if (!title || !text) return text;
-
-  // Check if title already appears near the start of the text (first 300 chars)
-  if (text.slice(0, 300).toLowerCase().includes(title.toLowerCase())) return text;
-
-  return `${title}\n\n${text}`;
+  if (!title || !text) return { content: text, format: 'text' };
+  if (text.slice(0, 300).toLowerCase().includes(title.toLowerCase())) {
+    return { content: text, format: 'text' };
+  }
+  return { content: `${title}\n\n${text}`, format: 'text' };
 }
 
 export async function extractContentFromUrl(url: string): Promise<ExtractedContent> {
@@ -102,6 +138,7 @@ export async function parseHtml(html: string, url: string): Promise<ExtractedCon
   return {
     title: article.title ?? undefined,
     content: cleanText(article.content ?? ''),
+    rawHtml: article.content ?? undefined,
     textContent: cleanText(article.textContent ?? ''),
     excerpt: article.excerpt ?? undefined,
     siteName: article.siteName ?? undefined,

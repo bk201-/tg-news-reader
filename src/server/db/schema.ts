@@ -50,6 +50,9 @@ export const news = sqliteTable('news', {
   isFiltered: integer('is_filtered').notNull().default(0),
   textInPanel: integer('text_in_panel').notNull().default(0),
   canLoadArticle: integer('can_load_article').notNull().default(0),
+  fullContentFormat: text('full_content_format', { enum: ['text', 'markdown'] })
+    .notNull()
+    .default('text'),
 });
 
 export const users = sqliteTable('users', {

@@ -94,6 +94,7 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE news ADD COLUMN is_filtered INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE news ADD COLUMN text_in_panel INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE news ADD COLUMN can_load_article INTEGER NOT NULL DEFAULT 0',
+    "ALTER TABLE news ADD COLUMN full_content_format TEXT NOT NULL DEFAULT 'text'",
   ];
   for (const sql of alterMigrations) {
     try {

@@ -7,8 +7,10 @@ import type { NewsItem } from '@shared/types.ts';
 import { isYouTubeUrl } from './newsUtils';
 import { NewsDetailMedia } from './NewsDetailMedia';
 import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
+import { NewsTextBlock } from './NewsTextBlock';
+import { NewsArticleBody } from './NewsArticleBody';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const useStyles = createStyles(({ css, token }) => ({
   content: css`
@@ -31,24 +33,10 @@ const useStyles = createStyles(({ css, token }) => ({
     width: 100%;
     max-width: 680px;
     min-width: 0;
-    margin-top: 20px;
-  `,
-  fullContent: css`
-    background: ${token.colorBgContainer};
-    border: 1px solid ${token.colorBorderSecondary};
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-top: 8px;
-  `,
-  paragraph: css`
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.8;
-  `,
-  paragraphCompact: css`
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.7;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   `,
   loadBtn: css`
     margin-top: 8px;
@@ -132,6 +120,19 @@ export function NewsDetailBody({
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
 
+  // Determine what to show in the text zone:
+  // - suppress for media channels (textInPanel=1 puts text in the overlay)
+  // - suppress when article is already loaded (article view replaces preview)
+  // - suppress when text is empty and there's no load button (pure media post with no caption)
+  const showTextBlock =
+    item.textInPanel !== 1 &&
+    !(item.canLoadArticle === 1 && item.fullContent) &&
+    (!!item.text || item.canLoadArticle === 1);
+
+  // Article zone: fullContent when canLoadArticle=1, OR secondary content otherwise
+  const articleContent = item.fullContent;
+  const articleFormat = item.fullContentFormat ?? 'text';
+
   return (
     <>
       <div className={cx(styles.content, variant === 'inline' && styles.contentInline)}>
@@ -153,48 +154,42 @@ export function NewsDetailBody({
         />
 
         <div className={styles.textBody}>
-          {item.canLoadArticle === 1 ? (
-            item.fullContent ? (
-              <Paragraph className={styles.paragraph}>{item.fullContent}</Paragraph>
-            ) : (
-              <>
-                <Paragraph className={styles.paragraphCompact}>
-                  {item.text || <Text type="secondary">{t('news.detail.no_text')}</Text>}
-                </Paragraph>
-                {links.filter((l) => !isYouTubeUrl(l)).length > 0 && (
-                  <Button
-                    icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
-                    onClick={onExtractClick}
-                    loading={articleLoading}
-                    disabled={articleQueued}
-                    className={styles.loadBtn}
-                  >
-                    {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
-                  </Button>
-                )}
-                {articleTaskStatus === 'failed' && (
-                  <Text type="danger" className={styles.errorText}>
-                    {t('news.detail.error', { error: articleTaskError })}
-                  </Text>
-                )}
-              </>
-            )
-          ) : item.textInPanel === 1 ? null : (
-            <Paragraph className={styles.paragraphCompact}>
-              {item.text || <Text type="secondary">{t('news.detail.no_text')}</Text>}
-            </Paragraph>
+          {/* Zone 2: post text infoblock */}
+          {showTextBlock && (
+            <NewsTextBlock text={item.text || ''}>
+              {!item.text && <Text type="secondary">{t('news.detail.no_text')}</Text>}
+              {item.canLoadArticle === 1 && !item.fullContent && links.filter((l) => !isYouTubeUrl(l)).length > 0 && (
+                <Button
+                  icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+                  onClick={onExtractClick}
+                  loading={articleLoading}
+                  disabled={articleQueued}
+                  className={styles.loadBtn}
+                >
+                  {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
+                </Button>
+              )}
+              {articleTaskStatus === 'failed' && (
+                <Text type="danger" className={styles.errorText}>
+                  {t('news.detail.error', { error: articleTaskError })}
+                </Text>
+              )}
+            </NewsTextBlock>
           )}
 
-          {item.canLoadArticle !== 1 && item.fullContent && (
+          {/* Zone 3: full article */}
+          {articleContent && item.canLoadArticle === 1 && (
+            <NewsArticleBody content={articleContent} format={articleFormat} />
+          )}
+
+          {item.canLoadArticle !== 1 && articleContent && (
             <>
               <Divider>
                 <Text type="secondary" className={styles.dividerLabel}>
                   {t('news.detail.full_content_divider')}
                 </Text>
               </Divider>
-              <div className={styles.fullContent}>
-                <Paragraph className={styles.paragraph}>{item.fullContent}</Paragraph>
-              </div>
+              <NewsArticleBody content={articleContent} format={articleFormat} />
             </>
           )}
 

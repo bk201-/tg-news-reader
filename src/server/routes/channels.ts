@@ -323,7 +323,9 @@ router.post('/:id/fetch', async (c) => {
           postedAt: msg.date,
           mediaSize: msg.mediaSizeBytes,
           albumMsgIds: msg.albumTelegramIds ? JSON.stringify(msg.albumTelegramIds) : null,
-          ...(msg.instantViewContent ? { fullContent: msg.instantViewContent } : {}),
+          ...(msg.instantViewContent
+            ? { fullContent: msg.instantViewContent, fullContentFormat: 'markdown' as const }
+            : {}),
           textInPanel: flags.textInPanel ? 1 : 0,
           canLoadArticle: flags.canLoadArticle ? 1 : 0,
         })
