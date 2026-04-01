@@ -36,15 +36,19 @@ const useStyles = createStyles(({ css, token }) => ({
     margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
   `,
-  loadBtn: css`
-    margin-top: 8px;
+  loadBtnWrap: css`
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
   `,
   errorText: css`
     font-size: 12px;
-    display: block;
-    margin-top: 4px;
+    color: ${token.colorError};
   `,
   dividerLabel: css`
     font-size: 12px;
@@ -120,14 +124,12 @@ export function NewsDetailBody({
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
 
-  // Determine what to show in the text zone:
-  // - suppress for media channels (textInPanel=1 puts text in the overlay)
-  // - suppress when article is already loaded (article view replaces preview)
-  // - suppress when text is empty and there's no load button (pure media post with no caption)
-  const showTextBlock =
-    item.textInPanel !== 1 &&
-    !(item.canLoadArticle === 1 && item.fullContent) &&
-    (!!item.text || item.canLoadArticle === 1);
+  // Show the text infoblock only when there's actual post text
+  const showTextBlock = item.textInPanel !== 1 && !(item.canLoadArticle === 1 && item.fullContent) && !!item.text;
+
+  // Show the load button below the text block (or standalone) when article is not yet loaded
+  const showLoadBtn =
+    item.canLoadArticle === 1 && !item.fullContent && links.filter((l) => !isYouTubeUrl(l)).length > 0;
 
   // Article zone: fullContent when canLoadArticle=1, OR secondary content otherwise
   const articleContent = item.fullContent;
@@ -155,26 +157,25 @@ export function NewsDetailBody({
 
         <div className={styles.textBody}>
           {/* Zone 2: post text infoblock */}
-          {showTextBlock && (
-            <NewsTextBlock text={item.text || ''}>
-              {!item.text && <Text type="secondary">{t('news.detail.no_text')}</Text>}
-              {item.canLoadArticle === 1 && !item.fullContent && links.filter((l) => !isYouTubeUrl(l)).length > 0 && (
-                <Button
-                  icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
-                  onClick={onExtractClick}
-                  loading={articleLoading}
-                  disabled={articleQueued}
-                  className={styles.loadBtn}
-                >
-                  {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
-                </Button>
-              )}
+          {showTextBlock && <NewsTextBlock text={item.text} />}
+
+          {/* Load article button — below the text card, centered */}
+          {showLoadBtn && (
+            <div className={styles.loadBtnWrap}>
+              <Button
+                icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+                onClick={onExtractClick}
+                loading={articleLoading}
+                disabled={articleQueued}
+              >
+                {articleQueued ? t('news.detail.queued') : t('news.detail.load_article')}
+              </Button>
               {articleTaskStatus === 'failed' && (
                 <Text type="danger" className={styles.errorText}>
                   {t('news.detail.error', { error: articleTaskError })}
                 </Text>
               )}
-            </NewsTextBlock>
+            </div>
           )}
 
           {/* Zone 3: full article */}
