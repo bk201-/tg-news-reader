@@ -120,7 +120,9 @@ src/
                       # News/:     NewsFeed (coordinator), NewsFeedToolbar, NewsFeedList, NewsAccordionList,
                       #            NewsAccordionItem, NewsListItem, NewsDetail (state+hotkeys),
                       #            NewsDetailToolbar, NewsDetailBody (media+text+modal), NewsDetailMedia,
-                      #            NewsDetailTopPanel; hooks: useHashTagSync, useMobileBreakpoint, useNewsHotkeys
+                      #            NewsDetailTopPanel, NewsTextBlock (post-text infoblock card),
+                      #            NewsArticleBody (Markdown/plain-text article renderer);
+                      #            hooks: useHashTagSync, useMobileBreakpoint, useNewsHotkeys
     api/              # React Query hooks + helpers: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts,
                       # mediaProgress.ts, mediaUrl.ts; central fetch client: client.ts
     services/
@@ -136,6 +138,8 @@ src/
   shared/types.ts     # Shared TS interfaces (Channel, Group, NewsItem, Filter, DownloadTask)
                       # NewsItem.albumMsgIds?: number[] — full album size from Telegram (set at fetch time,
                       # persists even before images are downloaded; used to guard Space key in albums)
+                      # NewsItem.fullContentFormat?: 'text'|'markdown' — 'markdown' for newly extracted articles
+                      # (turndown HTML→MD); 'text' for legacy plain-text rows (DB DEFAULT)
 ```
 
 ## DB Migration Pattern

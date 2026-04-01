@@ -19,16 +19,10 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsTextBlockProps {
   text: string;
-  children?: React.ReactNode;
 }
 
 /** Infoblock card that wraps the Telegram post text (item.text). */
-export function NewsTextBlock({ text, children }: NewsTextBlockProps) {
+export function NewsTextBlock({ text }: NewsTextBlockProps) {
   const { styles } = useStyles();
-  return (
-    <div className={styles.block}>
-      {text}
-      {children}
-    </div>
-  );
+  return <div className={styles.block}>{text}</div>;
 }
