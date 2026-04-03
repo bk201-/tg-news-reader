@@ -1,5 +1,6 @@
 import React from 'react';
 import { Spin, Empty } from 'antd';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
@@ -10,9 +11,14 @@ const useStyles = createStyles(({ css, token }) => ({
     width: 380px;
     min-width: 280px;
     flex-shrink: 0;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background: ${token.colorBgContainer};
     border-right: 1px solid ${token.colorBorderSecondary};
+  `,
+  virtuoso: css`
+    flex: 1;
     scrollbar-width: none;
     &::-webkit-scrollbar {
       display: none;
@@ -38,7 +44,7 @@ interface NewsFeedListProps {
   activeFilterCount: number;
   onSelect: (id: number) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
-  listRef: React.RefObject<HTMLDivElement | null>;
+  virtuosoRef: React.RefObject<VirtuosoHandle | null>;
 }
 
 export function NewsFeedList({
@@ -51,7 +57,7 @@ export function NewsFeedList({
   activeFilterCount,
   onSelect,
   onTagClick,
-  listRef,
+  virtuosoRef,
 }: NewsFeedListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -62,24 +68,31 @@ export function NewsFeedList({
       : t('news.list.empty');
 
   return (
-    <div role="listbox" aria-label={t('news.list.list_label')} className={styles.list} ref={listRef}>
+    <div role="listbox" aria-label={t('news.list.list_label')} className={styles.list}>
       {isLoading && (
         <div className={styles.loadingWrap}>
           <Spin size="large" />
         </div>
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
-      {items.map((item) => (
-        <NewsListItem
-          key={item.id}
-          item={item}
-          isSelected={selectedNewsId === item.id}
-          isFiltered={filteredIds.has(item.id)}
-          showAll={showAll}
-          onClick={() => onSelect(item.id)}
-          onTagClick={onTagClick}
+      {!isLoading && items.length > 0 && (
+        <Virtuoso
+          ref={virtuosoRef}
+          className={styles.virtuoso}
+          data={items}
+          overscan={400}
+          itemContent={(_, item) => (
+            <NewsListItem
+              item={item}
+              isSelected={selectedNewsId === item.id}
+              isFiltered={filteredIds.has(item.id)}
+              showAll={showAll}
+              onClick={() => onSelect(item.id)}
+              onTagClick={onTagClick}
+            />
+          )}
         />
-      ))}
+      )}
     </div>
   );
 }

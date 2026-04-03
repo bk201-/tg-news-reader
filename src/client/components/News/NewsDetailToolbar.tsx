@@ -11,6 +11,7 @@ import {
   ExportOutlined,
   CheckOutlined,
   MoreOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -149,6 +150,8 @@ interface NewsDetailToolbarProps {
   onHeaderClick?: () => void;
   /** Tag click handler — if provided tags show a dropdown menu (show / addFilter) */
   onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
+  /** Share button handler — Web Share API on mobile, clipboard fallback on desktop */
+  onShare: () => void;
 }
 
 export function NewsDetailToolbar({
@@ -169,6 +172,7 @@ export function NewsDetailToolbar({
   title,
   onHeaderClick,
   onTagClick,
+  onShare,
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
@@ -232,6 +236,12 @@ export function NewsDetailToolbar({
             {t('news.detail.open')}
           </a>
         ),
+      },
+      {
+        key: 'share',
+        icon: <ShareAltOutlined />,
+        label: t('news.detail.share'),
+        onClick: onShare,
       },
     ];
 
@@ -338,6 +348,11 @@ export function NewsDetailToolbar({
         <Tooltip title={isExternalLink ? t('news.detail.open_tooltip') : t('news.detail.open_tg_tooltip')}>
           <Button icon={<ExportOutlined />} size="small" href={openUrl} target="_blank" rel="noreferrer">
             <span className={styles.ndBtnText}>{t('news.detail.open')}</span>
+          </Button>
+        </Tooltip>
+        <Tooltip title={t('news.detail.share_tooltip')}>
+          <Button icon={<ShareAltOutlined />} size="small" onClick={onShare}>
+            <span className={styles.ndBtnText}>{t('news.detail.share')}</span>
           </Button>
         </Tooltip>
         <Button

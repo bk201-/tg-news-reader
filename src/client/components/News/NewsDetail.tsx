@@ -107,6 +107,15 @@ export function NewsDetail({
       ),
     [extractContent, item.id, message, t],
   );
+  const handleShare = useCallback(async () => {
+    const title = item.text?.split('\n')[0]?.trim().substring(0, 80) || 'News';
+    if (navigator.share) {
+      await navigator.share({ title, url: openUrl });
+    } else {
+      await navigator.clipboard.writeText(openUrl);
+      void message.success(t('news.detail.share_copied'));
+    }
+  }, [openUrl, item.text, message, t]);
 
   // ── Hotkeys + driven state ────────────────────────────────────────────
   // Registered in the CAPTURE phase so this handler always fires before
@@ -132,6 +141,7 @@ export function NewsDetail({
     albumExpectedLength,
     onRefresh: handleRefresh,
     onExtractArticle: handleExtract,
+    onShare: () => void handleShare(),
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────
@@ -175,6 +185,7 @@ export function NewsDetail({
           title={variant === 'inline' ? getNewsTitle(item) : undefined}
           onHeaderClick={onHeaderClick}
           onTagClick={onTagClick}
+          onShare={() => void handleShare()}
         />
       </div>
 
