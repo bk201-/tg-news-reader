@@ -246,7 +246,12 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   );
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
+  // Skip if the channel was fetched within the last 5 minutes — avoids spinning
+  // the button on every channel switch when data is already fresh.
   useEffect(() => {
+    const FRESH_SEC = 5 * 60;
+    const now = Math.floor(Date.now() / 1000);
+    if (channel.lastFetchedAt && now - channel.lastFetchedAt < FRESH_SEC) return;
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);

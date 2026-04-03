@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, count, and, isNull } from 'drizzle-orm';
+import { eq, count, and, isNull, inArray } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
@@ -187,14 +187,6 @@ router.get('/:id/media-progress', (c) => {
   });
 });
 
-// Shared helper — calculates the sinceDate for a channel using stored DB state (no Telegram calls)
-export function getSinceDate(channel: { lastFetchedAt: number | null; lastReadAt: number | null }): Date {
-  if (channel.lastReadAt) return new Date(channel.lastReadAt * 1000);
-  if (channel.lastFetchedAt) return new Date(channel.lastFetchedAt * 1000);
-  // New channel — default to configured days ago
-  return new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
-}
-
 // POST /api/channels/count-unread — counts new messages in Telegram per channel without fetching
 router.post('/count-unread', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { groupId?: number | null };
@@ -263,11 +255,10 @@ router.post('/:id/fetch', async (c) => {
     // Dropdown: specific days (ISO date string)
     sinceDate = new Date(body.since);
   } else {
-    // Default button: try to get freshest readInboxMaxId from Telegram, fallback to stored state
-    const isNewChannel = !channel.lastFetchedAt && !channel.lastReadAt;
-    if (isNewChannel) {
-      sinceDate = new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
-    } else {
+    // Default button
+    if (!channel.lastFetchedAt) {
+      // First-ever fetch for this channel — sync read position from Telegram so we only show
+      // messages the user hasn't read yet (avoids loading the entire channel history).
       const readMaxId = await getReadInboxMaxId(channel.telegramId);
       if (readMaxId) {
         const readMsg = await fetchMessageById(channel.telegramId, readMaxId);
@@ -276,8 +267,15 @@ router.post('/:id/fetch', async (c) => {
           await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channelId));
         }
       }
-      // Fallback to stored state via shared helper
-      if (!sinceDate) sinceDate = getSinceDate(channel);
+      // Fallback: configured days ago
+      if (!sinceDate) {
+        sinceDate = new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
+      }
+    } else {
+      // Subsequent fetches: lastFetchedAt is the DB boundary — everything before it is already stored.
+      // No need to call Telegram for readInboxMaxId; that would only waste an API round-trip and
+      // cause us to re-fetch messages already in DB when lastReadAt < lastFetchedAt.
+      sinceDate = new Date(channel.lastFetchedAt * 1000);
     }
   }
 
@@ -312,18 +310,12 @@ router.post('/:id/fetch', async (c) => {
 
     const strategy = getChannelStrategy(channel.channelType as ChannelType);
 
-    // Insert messages and collect inserted IDs
-    let inserted = 0;
-    const insertedMap = new Map<number, number>(); // telegramMsgId → news.id
-
-    for (const msg of messages) {
-      // Let the strategy decide whether to skip this message entirely
-      if (strategy.shouldSkipMessage(msg)) continue;
-
-      const flags = strategy.getItemFlags(msg);
-      const [row] = await db
-        .insert(news)
-        .values({
+    // Build rows to insert (filter via strategy, derive flags)
+    const valuesToInsert = messages
+      .filter((msg) => !strategy.shouldSkipMessage(msg))
+      .map((msg) => {
+        const flags = strategy.getItemFlags(msg);
+        return {
           channelId,
           telegramMsgId: msg.id,
           text: msg.message,
@@ -338,15 +330,57 @@ router.post('/:id/fetch', async (c) => {
             : {}),
           textInPanel: flags.textInPanel ? 1 : 0,
           canLoadArticle: flags.canLoadArticle ? 1 : 0,
-        })
-        .onConflictDoNothing()
-        .returning({ id: news.id });
+        };
+      });
 
-      if (row) {
-        insertedMap.set(msg.id, row.id);
-        inserted++;
+    // Batch-upsert: pre-split into new vs existing rows so we never need the `excluded`
+    // pseudo-table (avoids WebStorm SQL injection false positives).
+    // onConflictDoUpdate keeps text/links/hashtags in sync when Telegram messages are edited.
+    const BATCH_SIZE = 50;
+
+    // Snapshot which telegramMsgIds already exist before the upsert so we can tell
+    // "inserted" (new row) apart from "updated" (edited message, row already existed).
+    const allMsgIds = valuesToInsert.map((v) => v.telegramMsgId);
+    const existingMsgIds = new Set(
+      allMsgIds.length
+        ? (
+            await db
+              .select({ telegramMsgId: news.telegramMsgId })
+              .from(news)
+              .where(and(eq(news.channelId, channelId), inArray(news.telegramMsgId, allMsgIds)))
+          ).map((r) => r.telegramMsgId)
+        : [],
+    );
+
+    const toInsertValues = valuesToInsert.filter((v) => !existingMsgIds.has(v.telegramMsgId));
+    const toUpdateValues = valuesToInsert.filter((v) => existingMsgIds.has(v.telegramMsgId));
+
+    const insertedMap = new Map<number, number>(); // telegramMsgId → news.id (new rows only)
+    let updatedCount = 0;
+
+    await db.transaction(async (tx) => {
+      // INSERT new rows in chunks — no conflict possible since we pre-filtered
+      for (let i = 0; i < toInsertValues.length; i += BATCH_SIZE) {
+        const chunk = toInsertValues.slice(i, i + BATCH_SIZE);
+        const rows = await tx.insert(news).values(chunk).returning({ id: news.id, telegramMsgId: news.telegramMsgId });
+        for (const row of rows) {
+          insertedMap.set(row.telegramMsgId, row.id);
+        }
       }
-    }
+
+      // UPDATE mutable content fields for existing rows (edited Telegram messages).
+      // Edits are rare in the short fetch window, so individual updates per row are fine.
+      for (const v of toUpdateValues) {
+        await tx
+          .update(news)
+          .set({ text: v.text, links: v.links, hashtags: v.hashtags })
+          .where(and(eq(news.channelId, channelId), eq(news.telegramMsgId, v.telegramMsgId)));
+        updatedCount++;
+      }
+    });
+
+    const inserted = insertedMap.size;
+    const updated = updatedCount;
 
     const now = Math.floor(Date.now() / 1000);
     await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
@@ -370,8 +404,8 @@ router.post('/:id/fetch', async (c) => {
     void strategy.postProcess(args);
 
     logger.info(
-      { module: 'channels', channelId, inserted, total: messages.length, mediaProcessing },
-      `fetch done: ${inserted}/${messages.length} inserted`,
+      { module: 'channels', channelId, inserted, updated, total: messages.length, mediaProcessing },
+      `fetch done: ${inserted} inserted, ${updated} updated / ${messages.length} total`,
     );
 
     return c.json({ inserted, total: messages.length, mediaProcessing });

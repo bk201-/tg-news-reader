@@ -8,7 +8,7 @@
 
 ### Toolbar: period buttons (Segmented)
 
-- `[↻]` — standalone button, always clickable; fetches with `readInboxMaxId` from Telegram (fallback via `getSinceDate`)
+- `[↻]` — standalone button, always clickable; on first fetch syncs read position via `readInboxMaxId` from Telegram; on subsequent fetches uses `lastFetchedAt` (DB boundary)
 - `<Segmented>` with periods `[1d][3d][5d][7d][14d]` + `[↺]` (since last sync)
 - Resets on channel switch; no initial selection — every click triggers a fetch
 
@@ -18,8 +18,9 @@
 - `pendingCounts` in `uiStore` — Telegram messages not yet fetched to DB
 - Badge = `unreadCount + pendingCounts[channelId]`
 - **Refresh** button → `POST /api/channels/count-unread` — counts only, uses `lastFetchedAt`
-- `getSinceDate(channel)` — shared helper for fetch route: `lastReadAt` → `lastFetchedAt` → `-N days`
-- ⚠️ `count-unread` intentionally **does NOT** use `lastReadAt` — otherwise already-fetched unread messages would be double-counted
+- `lastFetchedAt` is the DB boundary: everything before it is already stored; only newer messages need to be fetched
+- `lastReadAt` is the unread display boundary: used only on first-ever channel fetch to align with Telegram's read position
+- ⚠️ `count-unread` uses `lastFetchedAt` directly — using `lastReadAt` would double-count already-fetched unread messages
 
 ### Splitter
 

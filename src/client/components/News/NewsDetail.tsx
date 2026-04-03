@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { App } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem } from '../../../shared/types';
+import type { NewsItem } from '@shared/types.ts';
 import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
 import { useNewsDownloadTask } from '../../api/downloads';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,7 +109,10 @@ export function NewsDetail({
   );
   const handleShare = useCallback(async () => {
     const title = item.text?.split('\n')[0]?.trim().substring(0, 80) || 'News';
-    if (navigator.share) {
+    // Use native Web Share API only on touch devices (mobile/tablet).
+    // On desktop, Chrome 89+ exposes navigator.share too but shows a dialog we don't want.
+    const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    if (navigator.share && isTouchDevice) {
       await navigator.share({ title, url: openUrl });
     } else {
       await navigator.clipboard.writeText(openUrl);
