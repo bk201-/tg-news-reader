@@ -33,3 +33,11 @@ export const useIsMd = () => useMatchMedia(`(min-width: ${BP_MD}px)`);
 export const useIsXl = () => useMatchMedia(`(min-width: ${BP_XL}px)`);
 /** ≥ 1600px (xxl) — full desktop: inline sidebar, pin downloads panel */
 export const useIsXxl = () => useMatchMedia(`(min-width: ${BP_XXL}px)`);
+
+/** Height of AppHeader in px — used for scroll offsets and scroll-margin-top */
+export const MOBILE_HEADER_HEIGHT = 64;
+/**
+ * Combined sticky height on mobile: header (64) + toolbar (~46) + buffer.
+ * Used as scroll-margin-top so that scrollIntoView places items below sticky elements.
+ */
+export const MOBILE_STICKY_HEIGHT = 120;

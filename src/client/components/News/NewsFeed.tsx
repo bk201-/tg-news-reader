@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect, useLayoutEffect, useCallback, useRef, useState } from 'react';
-import { App, Empty } from 'antd';
+import { createPortal } from 'react-dom';
+import { App, Empty, Button } from 'antd';
+import { ArrowDownOutlined, VerticalAlignTopOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
@@ -17,7 +19,8 @@ import { DigestDrawer } from './DigestDrawer';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
-import { useIsXl } from '../../hooks/breakpoints';
+import { useIsXl, BP_XL } from '../../hooks/breakpoints';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
@@ -25,11 +28,36 @@ const useStyles = createStyles(({ css, token }) => ({
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    /* Mobile: parent is the scroll container */
+    @media (max-width: ${BP_XL - 1}px) {
+      height: auto;
+      overflow: visible;
+    }
+  `,
+  // Toolbar wrapper: sticky on mobile so it pins to top after header scrolls away
+  toolbarWrapper: css`
+    flex-shrink: 0;
+    @media (max-width: ${BP_XL - 1}px) {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: ${token.colorBgContainer};
+    }
+  `,
+  // 1px sentinel placed AFTER toolbar — IO watches it to decide when to show the FAB
+  topSentinel: css`
+    height: 1px;
+    flex-shrink: 0;
+    pointer-events: none;
   `,
   body: css`
     display: flex;
     flex: 1;
     overflow: hidden;
+    @media (max-width: ${BP_XL - 1}px) {
+      flex: none;
+      overflow: visible;
+    }
   `,
   bodyAccordion: css`
     flex-direction: column;
@@ -47,13 +75,49 @@ const useStyles = createStyles(({ css, token }) => ({
     justify-content: center;
     flex: 1;
   `,
+  // Scroll-to-top FAB: initially hidden, DOM-mutated when sentinel exits viewport
+  scrollTopBtn: css`
+    position: fixed;
+    bottom: 24px;
+    right: 16px;
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+    box-shadow: ${token.boxShadow};
+  `,
+  // Pull-to-refresh indicator — slides down from the top of the viewport
+  ptrIndicator: css`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 98;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    background: ${token.colorBgElevated};
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+    color: ${token.colorTextSecondary};
+    font-size: 13px;
+    transform: translateY(-100%);
+    pointer-events: none;
+    box-shadow: ${token.boxShadowSecondary};
+  `,
 }));
 
 interface NewsFeedProps {
   channel: Channel;
+  /** Passed from AppLayout in mobile mode — the single scroll container */
+  mobileScrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function NewsFeed({ channel }: NewsFeedProps) {
+export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
 
@@ -61,7 +125,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     useUIStore();
 
   const { styles, cx } = useStyles();
-  // ≥ 1200px → list view available; below → force accordion
   const forceAccordion = !useIsXl();
   const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
 
@@ -78,7 +141,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
 
   const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {}, []);
 
-  // ── Derived values ────────────────────────────────────────────────────
   const selectedItem = useMemo(
     () => newsItems.find((n) => n.id === selectedNewsId) || null,
     [newsItems, selectedNewsId],
@@ -97,7 +159,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
   const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
 
-  // ── Handlers ─────────────────────────────────────────────────────────
   const handleMarkedRead = useCallback(
     (currentId: number) => {
       const currentIndex = displayItems.findIndex((item) => item.id === currentId);
@@ -126,10 +187,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [setHashTagFilter, setShowAll, createFilter, message],
   );
 
-  // ── Digest ────────────────────────────────────────────────────────────
   const [digestOpen, setDigestOpen] = useState(false);
-
-  // ── Fetch period ──────────────────────────────────────────────────────
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
   useEffect(() => {
     setFetchPeriod('');
@@ -139,15 +197,49 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     setFetchPeriod('');
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
-  // ── Scroll ref ────────────────────────────────────────────────────────
+
+  // ── Refs ──────────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null);
+  const scrollTopBtnRef = useRef<HTMLButtonElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const ptrRef = useRef<HTMLDivElement>(null);
+
+  // ── Scroll-to-top FAB visibility via viewport IO on post-toolbar sentinel ─
+  // Fires when the 1px sentinel (placed after the sticky toolbar) exits the viewport.
+  // This means header + toolbar have scrolled off → show the FAB.
+  useEffect(() => {
+    if (!forceAccordion) return;
+    const sentinel = topSentinelRef.current;
+    const btn = scrollTopBtnRef.current;
+    if (!sentinel || !btn) return;
+    const show = () => {
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+      btn.style.transform = 'translateY(0)';
+    };
+    const hide = () => {
+      btn.style.opacity = '0';
+      btn.style.pointerEvents = 'none';
+      btn.style.transform = 'translateY(8px)';
+    };
+    const observer = new IntersectionObserver(([entry]) => (entry.isIntersecting ? hide() : show()), {
+      root: null,
+      threshold: 0,
+    });
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+      hide();
+    };
+  }, [forceAccordion]);
+
+  // ── Pull-to-refresh: attaches to mobile scroll container ──────────────
+  const ptrScrollRef = mobileScrollContainerRef ?? listRef;
+  usePullToRefresh(ptrScrollRef, ptrRef, handleFetchDefault, forceAccordion, t('news.ptr.pull'), t('news.ptr.release'));
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
-  // Safe now: NewsFeed stays mounted across breakpoint changes (AppLayout uses
-  // single Splitter return), so this fires only when the user picks a different channel.
   useEffect(() => {
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
-    // fetchChannel and onFetchSuccess are stable mutation refs — safe to omit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
@@ -167,7 +259,6 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     [channel.id, fetchChannel, onFetchSuccess],
   );
 
-  // ── Keyboard navigation (↑/↓/Space) ──────────────────────────────────
   const handleSpaceKey = useCallback(
     (item: (typeof displayItems)[number]) => {
       if (item.isRead === 0) {
@@ -178,12 +269,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
       } else {
         const idx = displayItems.findIndex((n) => n.id === item.id);
         const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
-        if (next) {
-          setSelectedNewsId(next.id);
-        } else {
-          // No more unread ahead — refresh channel (same as ↻ button)
-          handleFetchDefault();
-        }
+        if (next) setSelectedNewsId(next.id);
+        else handleFetchDefault();
       }
     },
     [displayItems, markRead, handleMarkedRead, setSelectedNewsId, handleFetchDefault],
@@ -196,14 +283,11 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     onOpenFilters: () => setFilterPanelOpen(true),
   });
 
-  // ── Auto-mark read when selected post gets filtered out ───────────────
   useEffect(() => {
     if (showAll || !selectedNewsId) return;
     if (displayItems.some((n) => n.id === selectedNewsId)) return;
     const item = newsItems.find((n) => n.id === selectedNewsId);
     if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1, channelId: item.channelId });
-    // Navigate to the next unread item AFTER the current one (by newsItems order),
-    // falling back to the first unread in displayItems.
     const currentIndex = newsItems.findIndex((n) => n.id === selectedNewsId);
     const nextUnread =
       displayItems.find((n) => newsItems.findIndex((m) => m.id === n.id) > currentIndex && n.isRead === 0) ??
@@ -213,47 +297,61 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayItems]);
 
-  // ── Scroll selected into view ─────────────────────────────────────────
-  // useLayoutEffect fires before the browser paints — no visible flash of wrong position.
-  // el.offsetTop is the item's distance from .accordion top (which has position:relative,
-  // so it's the offsetParent). Setting scrollTop = offsetTop puts the header at the top.
+  // ── Scroll selected item into view ────────────────────────────────────
   useLayoutEffect(() => {
-    if (!selectedNewsId || !listRef.current) return;
-    const el = listRef.current.querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`);
+    if (!selectedNewsId) return;
+    const el = (listRef.current ?? document).querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`);
     if (!el) return;
-    if (effectiveViewMode === 'accordion') {
-      listRef.current.scrollTop = el.offsetTop;
+    if (effectiveViewMode === 'accordion' && forceAccordion) {
+      // Mobile: mobileContainer is the scroll container; scroll-margin-top handles offset
+      el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+    } else if (effectiveViewMode === 'accordion') {
+      // Desktop accordion: inner scroll container
+      if (listRef.current) listRef.current.scrollTop = el.offsetTop;
     } else {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [selectedNewsId, effectiveViewMode]);
+  }, [selectedNewsId, effectiveViewMode, forceAccordion]);
+
+  const scrollToTop = useCallback(() => {
+    (mobileScrollContainerRef?.current ?? listRef.current)?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [mobileScrollContainerRef]);
+
+  // ── Shared toolbar props ──────────────────────────────────────────────
+  const toolbarProps = {
+    fetchPending: fetchChannel.isPending,
+    fetchPeriod,
+    onFetchDefault: handleFetchDefault,
+    onFetchPeriod: handleFetchPeriod,
+    showAll,
+    onToggleShowAll: () => setShowAll(!showAll),
+    markAllPending: markAllRead.isPending,
+    onMarkAllRead: () => markAllRead.mutate(channel.id),
+    activeFilterCount,
+    onOpenFilters: () => setFilterPanelOpen(true),
+    hashTagFilter,
+    onClearHashTag: () => setHashTagFilter(null),
+    shownCount: displayItems.length,
+    hiddenCount: hiddenByFilters,
+    totalCount,
+    unreadCount,
+    newsViewMode,
+    onSetViewMode: setNewsViewMode,
+    isMobile: forceAccordion,
+    onOpenDigest: () => setDigestOpen(true),
+    showDigest: channel.supportsDigest,
+    channelTelegramId: channel.telegramId,
+  };
 
   return (
     <div className={styles.feed}>
-      <NewsFeedToolbar
-        fetchPending={fetchChannel.isPending}
-        fetchPeriod={fetchPeriod}
-        onFetchDefault={handleFetchDefault}
-        onFetchPeriod={handleFetchPeriod}
-        showAll={showAll}
-        onToggleShowAll={() => setShowAll(!showAll)}
-        markAllPending={markAllRead.isPending}
-        onMarkAllRead={() => markAllRead.mutate(channel.id)}
-        activeFilterCount={activeFilterCount}
-        onOpenFilters={() => setFilterPanelOpen(true)}
-        hashTagFilter={hashTagFilter}
-        onClearHashTag={() => setHashTagFilter(null)}
-        shownCount={displayItems.length}
-        hiddenCount={hiddenByFilters}
-        totalCount={totalCount}
-        unreadCount={unreadCount}
-        newsViewMode={newsViewMode}
-        onSetViewMode={setNewsViewMode}
-        isMobile={forceAccordion}
-        onOpenDigest={() => setDigestOpen(true)}
-        showDigest={channel.supportsDigest}
-        channelTelegramId={channel.telegramId}
-      />
+      {/* Toolbar wrapper: sticky top:0 on mobile via CSS @media */}
+      <div className={styles.toolbarWrapper}>
+        <NewsFeedToolbar {...toolbarProps} />
+      </div>
+
+      {/* Sentinel: 1px after toolbar — IO watches this to show/hide scroll-to-top FAB */}
+      {forceAccordion && <div ref={topSentinelRef} className={styles.topSentinel} />}
 
       <div className={cx(styles.body, effectiveViewMode === 'accordion' && styles.bodyAccordion)}>
         {effectiveViewMode === 'accordion' ? (
@@ -303,6 +401,28 @@ export function NewsFeed({ channel }: NewsFeedProps) {
           </>
         )}
       </div>
+
+      {/* PTR + FAB portaled to body — bypasses any transform ancestor */}
+      {forceAccordion &&
+        createPortal(
+          <>
+            <div ref={ptrRef} className={styles.ptrIndicator}>
+              <ArrowDownOutlined data-ptr-icon />
+              <span data-ptr-text>{t('news.ptr.pull')}</span>
+            </div>
+            <Button
+              ref={scrollTopBtnRef}
+              type="primary"
+              shape="circle"
+              size="large"
+              icon={<VerticalAlignTopOutlined />}
+              className={styles.scrollTopBtn}
+              onClick={scrollToTop}
+              aria-label="Scroll to top"
+            />
+          </>,
+          document.body,
+        )}
 
       <FilterPanel channelId={channel.id} />
       <DigestDrawer open={digestOpen} params={{ channelIds: [channel.id] }} onClose={() => setDigestOpen(false)} />

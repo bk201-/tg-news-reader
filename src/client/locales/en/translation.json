@@ -84,6 +84,10 @@
     }
   },
   "news": {
+    "ptr": {
+      "pull": "Pull to refresh",
+      "release": "Release to refresh"
+    },
     "toolbar": {
       "fetch_default_tooltip": "Fetch since last read · [U]",
       "sync_tooltip": "Since last sync",
