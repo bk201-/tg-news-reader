@@ -51,7 +51,6 @@ export function usePullToRefresh(
       indicator.style.transition = 'transform 0.25s ease';
       indicator.style.transform = 'translateY(-100%)';
       isPulling = false;
-      rawDelta = 0;
       // Reset arrow/text after animation
       setTimeout(() => {
         setReady(false);
@@ -63,7 +62,6 @@ export function usePullToRefresh(
       if (el.scrollTop > 0) return;
       startY = e.touches[0].clientY;
       isPulling = false;
-      rawDelta = 0;
       wasReady = false;
     };
 
@@ -78,7 +76,8 @@ export function usePullToRefresh(
         return;
       }
       // Pulling down at scrollTop=0 — take over the gesture
-      e.preventDefault();
+      // Guard: browser marks touchmove as non-cancelable once scroll momentum starts
+      if (e.cancelable) e.preventDefault();
       isPulling = true;
 
       const height = indicator.offsetHeight || 52;

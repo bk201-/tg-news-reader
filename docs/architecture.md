@@ -422,6 +422,37 @@ app.onError((err, c) => c.html(errorHtml('500', err.message, stack), 500));
 
 ---
 
+## 27. Mobile UX: pull-to-refresh & compact toolbar
+
+### Pull-to-refresh (`usePullToRefresh`)
+
+`src/client/hooks/usePullToRefresh.ts` — vanilla touch-event hook, no library:
+
+- Activates only at `scrollTop === 0` to avoid conflicting with native browser PTR
+- `touchmove` registered as **non-passive** so `preventDefault()` can be called when pulling (skipped if already non-cancelable)
+- Direct DOM style mutations on `indicatorRef` — no React re-render during the pull gesture
+- Arrow icon rotates 180° when pull distance crosses `THRESHOLD = 72px`; `DAMPEN = 0.55` gives a springy feel
+- On `touchend`: if threshold crossed → `onRefresh()`; always snaps indicator back with CSS transition
+- Used in `NewsAccordionList` (accordion / mobile mode only, `enabled` prop gates the listeners)
+
+### Compact accordion toolbar (`NewsDetailToolbar` inline variant)
+
+When `variant='inline'` (accordion expanded item), replaces the full button row with a layout that mirrors `NewsListItem` structure:
+
+```
+[☐ checkbox]  [title (2-line clamp)]      [✓ primary] [⋯ dropdown]
+              [date DD.MM.YY HH:mm]                   [#tags]
+```
+
+- **Checkbox** (left, `flex-shrink:0`) — left-hand mark-read, visually identical to collapsed item
+- **`✓` button** (right, primary when unread) — right-hand mark-read
+- **`⋯` Dropdown** — contains: Refresh, Links (if any, checkmark when active), Text (if any, checkmark when active), Load Article (if applicable), Open
+- Date uses `11px / white-space:nowrap` matching `NewsListItem.metaDate` exactly
+- Title uses same 2-line `-webkit-line-clamp` as `NewsListItem.title`
+- Desktop panel variant (`variant='panel'`) is unchanged
+
+---
+
 ## 26. Telegram session expiry (AUTH_KEY_UNREGISTERED)
 
 Three-layer response when gramjs throws `AUTH_KEY_UNREGISTERED`:
