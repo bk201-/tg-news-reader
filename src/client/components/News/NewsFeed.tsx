@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useLayoutEffect, useCallback, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { App, Empty, Button } from 'antd';
 import { ArrowDownOutlined, VerticalAlignTopOutlined } from '@ant-design/icons';
@@ -21,6 +21,7 @@ import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 import { useIsXl, BP_XL } from '../../hooks/breakpoints';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import type { VirtuosoHandle } from 'react-virtuoso';
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
@@ -199,7 +200,8 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [channel.id, fetchChannel, onFetchSuccess]);
 
   // ── Refs ──────────────────────────────────────────────────────────────
-  const listRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const ptrBaseRef = useRef<HTMLElement>(null); // dummy fallback when mobileScrollContainerRef absent
   const scrollTopBtnRef = useRef<HTMLButtonElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const ptrRef = useRef<HTMLDivElement>(null);
@@ -234,8 +236,14 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [forceAccordion]);
 
   // ── Pull-to-refresh: attaches to mobile scroll container ──────────────
-  const ptrScrollRef = mobileScrollContainerRef ?? listRef;
-  usePullToRefresh(ptrScrollRef, ptrRef, handleFetchDefault, forceAccordion, t('news.ptr.pull'), t('news.ptr.release'));
+  usePullToRefresh(
+    mobileScrollContainerRef ?? ptrBaseRef,
+    ptrRef,
+    handleFetchDefault,
+    forceAccordion,
+    t('news.ptr.pull'),
+    t('news.ptr.release'),
+  );
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
   useEffect(() => {
@@ -298,24 +306,21 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [displayItems]);
 
   // ── Scroll selected item into view ────────────────────────────────────
-  useLayoutEffect(() => {
+  // Uses virtuosoRef.scrollToIndex — Virtuoso renders the item if not yet in DOM.
+  useEffect(() => {
     if (!selectedNewsId) return;
-    const el = (listRef.current ?? document).querySelector<HTMLElement>(`[data-news-id="${selectedNewsId}"]`);
-    if (!el) return;
-    if (effectiveViewMode === 'accordion' && forceAccordion) {
-      // Mobile: mobileContainer is the scroll container; scroll-margin-top handles offset
-      el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
-    } else if (effectiveViewMode === 'accordion') {
-      // Desktop accordion: inner scroll container
-      if (listRef.current) listRef.current.scrollTop = el.offsetTop;
-    } else {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [selectedNewsId, effectiveViewMode, forceAccordion]);
+    const index = displayItems.findIndex((n) => n.id === selectedNewsId);
+    if (index === -1) return;
+    virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'center' });
+  }, [selectedNewsId, displayItems]);
 
   const scrollToTop = useCallback(() => {
-    (mobileScrollContainerRef?.current ?? listRef.current)?.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [mobileScrollContainerRef]);
+    if (forceAccordion && mobileScrollContainerRef?.current) {
+      mobileScrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
+    }
+  }, [forceAccordion, mobileScrollContainerRef]);
 
   // ── Shared toolbar props ──────────────────────────────────────────────
   const toolbarProps = {
@@ -367,7 +372,8 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
             onSelect={setSelectedNewsId}
             onTagClick={handleTagClick}
             onMarkedRead={handleMarkedRead}
-            listRef={listRef}
+            virtuosoRef={virtuosoRef}
+            mobileScrollContainerRef={mobileScrollContainerRef}
           />
         ) : (
           <>
@@ -381,7 +387,7 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
               activeFilterCount={activeFilterCount}
               onSelect={setSelectedNewsId}
               onTagClick={handleTagClick}
-              listRef={listRef}
+              virtuosoRef={virtuosoRef}
             />
             <div className={styles.detail}>
               {selectedItem ? (

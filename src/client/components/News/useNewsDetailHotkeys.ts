@@ -13,6 +13,8 @@ interface UseNewsDetailHotkeysOptions {
   onRefresh: () => void;
   /** Called on F (single non-YT link) — queue article extraction */
   onExtractArticle: (url: string) => void;
+  /** Called on S — share / copy link */
+  onShare: () => void;
 }
 
 export interface UseNewsDetailHotkeysResult {
@@ -37,6 +39,7 @@ export interface UseNewsDetailHotkeysResult {
  * L             — toggle links panel
  * T             — toggle text panel
  * F             — fetch/queue article (link_continuation channels)
+ * S             — share / copy link
  * Enter         — open URL in new tab
  * Escape        — close top panel
  * ArrowLeft/Right — navigate album images
@@ -54,6 +57,7 @@ export function useNewsDetailHotkeys({
   albumExpectedLength,
   onRefresh,
   onExtractArticle,
+  onShare,
 }: UseNewsDetailHotkeysOptions): UseNewsDetailHotkeysResult {
   const [topPanel, setTopPanel] = useState<'links' | 'text' | null>(null);
   const [albumIndex, setAlbumIndex] = useState(0);
@@ -115,6 +119,10 @@ export function useNewsDetailHotkeys({
           }
           break;
         }
+        case 'KeyS':
+          e.preventDefault();
+          onShare();
+          break;
         case 'Enter':
           e.preventDefault();
           window.open(openUrl, '_blank', 'noopener,noreferrer');
@@ -169,6 +177,7 @@ export function useNewsDetailHotkeys({
     albumExpectedLength,
     onRefresh,
     onExtractArticle,
+    onShare,
   ]);
 
   return {

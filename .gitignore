@@ -16,6 +16,9 @@ data/
 *.log
 npm-debug.log*
 
+# Performance traces
+Trace-*.json
+
 # OS
 .DS_Store
 Thumbs.db
