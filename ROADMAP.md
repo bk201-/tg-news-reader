@@ -18,7 +18,7 @@
 
 | Задача | Описание | Сложность |
 |--------|----------|-----------|
-| Иконка приложения (favicon / PWA) | favicon.ico + 192×192 и 512×512 PNG для PWA manifest. | ⭐ |
+| ~~Иконка приложения (favicon / PWA)~~ | ✅ favicon.ico + apple-touch-icon + 192×512 PNG + `site.webmanifest` с `name/short_name/theme_color`. | ⭐ |
 | ~~Pull-to-refresh на мобильных~~ | ✅ `usePullToRefresh` hook на scroll-контейнере аккордеона; кастомный индикатор, не конфликтует с браузерным PTR. | ⭐⭐⭐ |
 | ~~Минимизировать хедеры на мобильных~~ | ✅ (A) `NewsFeedToolbar` → `MoreOutlined` dropdown на мобилках; (B) `NewsDetailToolbar` inline-вариант: чекбокс слева + `✓` + `⋯` справа, структура зеркалит `NewsListItem`. | ⭐⭐⭐ |
 | Сквозной медиа-просмотр | Лайтбокс по клику на фото: навигация по всем новостям канала, ←→/Esc. Медиа-каналы: авто-прочитано. | ⭐⭐⭐⭐ |
