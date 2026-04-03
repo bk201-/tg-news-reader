@@ -102,6 +102,16 @@ router.post('/', async (c) => {
   }
 });
 
+// PATCH /api/channels/reorder
+router.patch('/reorder', async (c) => {
+  const body = await c.req.json<{ items: { id: number; sortOrder: number }[] }>();
+  if (!Array.isArray(body.items)) return c.json({ error: 'items is required' }, 400);
+  for (const item of body.items) {
+    await db.update(channels).set({ sortOrder: item.sortOrder }).where(eq(channels.id, item.id));
+  }
+  return c.json({ ok: true });
+});
+
 // PUT /api/channels/:id
 router.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'), 10);

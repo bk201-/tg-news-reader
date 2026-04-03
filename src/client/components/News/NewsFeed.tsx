@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useLayoutEffect, useCallback, useRef, useState } from 'react';
-import { App, Empty, Grid } from 'antd';
+import { App, Empty } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
@@ -17,7 +17,7 @@ import { DigestDrawer } from './DigestDrawer';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
-import { useScrollHide } from '../../hooks/useScrollHide';
+import { useIsXl } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
@@ -57,21 +57,12 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
 
-  const {
-    selectedNewsId,
-    setSelectedNewsId,
-    showAll,
-    setShowAll,
-    setFilterPanelOpen,
-    newsViewMode,
-    setNewsViewMode,
-    setHeaderHidden,
-  } = useUIStore();
+  const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
+    useUIStore();
 
-  const screens = Grid.useBreakpoint();
   const { styles, cx } = useStyles();
-  // screens.xl = true when ≥ 1200px → list view available; below → force accordion
-  const forceAccordion = !screens.xl;
+  // ≥ 1200px → list view available; below → force accordion
+  const forceAccordion = !useIsXl();
   const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
 
   const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
@@ -148,17 +139,8 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     setFetchPeriod('');
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
   }, [channel.id, fetchChannel, onFetchSuccess]);
-
-  // ── Scroll selected into view (ref used by both accordion and useScrollHide) ──
+  // ── Scroll ref ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null);
-
-  // ── Scroll-hide header on mobile accordion ────────────────────────────
-  // Reset header visibility when channel changes
-  useEffect(() => {
-    setHeaderHidden(false);
-  }, [channel.id, setHeaderHidden]);
-  // Active only in accordion (mobile) mode — hides AppHeader on scroll down
-  useScrollHide(listRef, forceAccordion);
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
   // Safe now: NewsFeed stays mounted across breakpoint changes (AppLayout uses

@@ -104,6 +104,7 @@ src/
       index.ts        # libsql client + drizzle instance; reads DATABASE_URL+TURSO_AUTH_TOKEN for Turso when set, falls back to file:data/db.sqlite locally
     middleware/       # auth.ts (JWT verify), cors.ts, rateLimit.ts (production only, 120 req/min)
     routes/           # channels.ts, news.ts, filters.ts, groups.ts, media.ts, content.ts, downloads.ts, auth.ts, digest.ts
+                      # channels.ts: PATCH /reorder bulk-updates sort_order; groups.ts: PATCH /reorder same
     services/         # telegram.ts (gramjs), readability.ts, channelStrategies.ts,
                       # downloadManager.ts, downloadProgress.ts, mediaProgress.ts
                       # telegramCircuitBreaker.ts (retry + circuit breaker for all Telegram calls)
@@ -113,6 +114,7 @@ src/
   client/
     components/       # Auth/ (AuthGate, LoginPage), Channels/, News/, Filters/, Layout/
                       # Channels/: ChannelSidebar, ChannelItem, ChannelFormModal, ChannelFetchModal,
+                      #            SortModal (drag-and-drop on desktop, ↑↓ buttons on mobile < 768px),
                       #            GroupPanel (coordinator), GroupItem, GroupFormModal, GroupPinModal
                       # Layout/:   AppLayout (shell + URL sync), AppHeader (header + user menu + lang switcher),
                       #            TotpSetupModal (2FA flow), DownloadsPanel (badge + Drawer + SSE),
@@ -125,6 +127,7 @@ src/
                       #            hooks: useHashTagSync, useMobileBreakpoint, useNewsHotkeys
     api/              # React Query hooks + helpers: channels.ts, news.ts, groups.ts, filters.ts, downloads.ts,
                       # mediaProgress.ts, mediaUrl.ts; central fetch client: client.ts
+                      # channels.ts: useReorderChannels(); groups.ts: useReorderGroups()
     services/
       serviceWorker.ts  # SW registration (prod-only) + messaging helpers (getSwStats, clearSwCache)
     store/

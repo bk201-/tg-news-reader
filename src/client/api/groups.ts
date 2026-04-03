@@ -61,6 +61,15 @@ export function useVerifyGroupPIN() {
   });
 }
 
+export function useReorderGroups() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: { id: number; sortOrder: number }[]) =>
+      api.patch<{ ok: boolean }>('/groups/reorder', { items }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: groupKeys.all }),
+  });
+}
+
 export function useLockAllGroups() {
   const updateToken = useAuthStore((s) => s.updateToken);
   return useMutation({

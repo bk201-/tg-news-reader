@@ -13,6 +13,8 @@
     "refresh": "Refresh",
     "refresh_tooltip": "Count unread in Telegram",
     "add": "Add",
+    "sort_tooltip": "Reorder channels",
+    "sort_title": "Reorder channels",
     "select_channel": "Select a channel from the list on the left"
   },
   "channels": {
@@ -57,6 +59,8 @@
     "general_tooltip": "General (no group)",
     "panel_label": "Groups",
     "new_group_tooltip": "New group",
+    "sort_tooltip": "Reorder groups",
+    "sort_title": "Reorder groups",
     "delete_confirm_title": "Delete group \"{{name}}\"?",
     "delete_confirm_content": "Channels in this group will be moved to General.",
     "context_edit": "Edit",
@@ -95,7 +99,9 @@
       "shown": "Shown: {{count}}",
       "hidden": "Hidden: {{count}}",
       "total": "Total: {{count}}",
-      "unread": "Unread: {{count}}"
+      "unread": "Unread: {{count}}",
+      "fetch_period": "Fetch for period…",
+      "clear_tag": "Clear tag #{{tag}}"
     },
     "period": {
       "1d": "1d",
@@ -146,6 +152,11 @@
       "tag_add_filter": "Add to filters",
       "tag_added_toast": "Tag {{tag}} added to filters",
       "message_fallback": "Message #{{id}}"
+    },
+    "ptr": {
+      "pull": "Pull down to refresh",
+      "release": "Release to refresh",
+      "fetching": "Refreshing…"
     }
   },
   "filters": {

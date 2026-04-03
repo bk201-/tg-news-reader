@@ -137,7 +137,7 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     <Drawer
       title={t('digest.title')}
       placement="right"
-      width={520}
+      size="large"
       open={open}
       onClose={onClose}
       closeIcon={<CloseOutlined />}

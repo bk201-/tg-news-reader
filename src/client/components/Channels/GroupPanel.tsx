@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { Button, Modal, Form, Typography } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { FolderFilled, PlusOutlined } from '@ant-design/icons';
+import { FolderFilled, PlusOutlined, OrderedListOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Group } from '@shared/types.ts';
-import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useVerifyGroupPIN } from '../../api/groups';
+import {
+  useGroups,
+  useCreateGroup,
+  useUpdateGroup,
+  useDeleteGroup,
+  useVerifyGroupPIN,
+  useReorderGroups,
+} from '../../api/groups';
 import { useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
@@ -13,6 +20,7 @@ import { GroupItem, useGroupItemStyles } from './GroupItem';
 import { GroupFormModal, PRESET_COLORS } from './GroupFormModal';
 import type { GroupFormValues } from './GroupFormModal';
 import { GroupPinModal } from './GroupPinModal';
+import { SortModal } from './SortModal';
 
 const { Text } = Typography;
 
@@ -54,6 +62,7 @@ export function GroupPanel() {
   const updateGroup = useUpdateGroup();
   const deleteGroup = useDeleteGroup();
   const verifyPIN = useVerifyGroupPIN();
+  const reorderGroups = useReorderGroups();
 
   const { selectedGroupId, setSelectedGroupId, pendingCounts } = useUIStore();
   const { unlockedGroupIds } = useAuthStore();
@@ -72,6 +81,9 @@ export function GroupPanel() {
   const [pinTarget, setPinTarget] = useState<Group | null>(null);
   const [pinError, setPinError] = useState('');
   const [pinValue, setPinValue] = useState('');
+
+  // ── Sort modal state ──────────────────────────────────────────────────
+  const [sortModalOpen, setSortModalOpen] = useState(false);
 
   // ── Unread counts ─────────────────────────────────────────────────────
   const generalCount = channels
@@ -183,7 +195,7 @@ export function GroupPanel() {
         >
           <div className={itemStyles.iconWrap}>
             <FolderFilled className={styles.generalIcon} />
-            {generalCount > 0 && <span className={itemStyles.badge}>{generalCount > 99 ? '99+' : generalCount}</span>}
+            {generalCount > 0 && <span className={itemStyles.badge}>{generalCount > 999 ? '999+' : generalCount}</span>}
           </div>
           <Text className={cx(itemStyles.label, styles.generalLabel)} ellipsis>
             {t('groups.general')}
@@ -210,6 +222,18 @@ export function GroupPanel() {
         <Button type="dashed" icon={<PlusOutlined />} className={styles.addBtn} onClick={openCreate} size="small" />
       </Tooltip>
 
+      {/* Sort groups button — only shown when there are groups to sort */}
+      {groups.length > 1 && (
+        <Tooltip title={t('groups.sort_tooltip')} placement="right">
+          <Button
+            icon={<OrderedListOutlined />}
+            className={styles.addBtn}
+            onClick={() => setSortModalOpen(true)}
+            size="small"
+          />
+        </Tooltip>
+      )}
+
       <GroupFormModal
         open={modalOpen}
         editingGroup={editingGroup}
@@ -230,6 +254,17 @@ export function GroupPanel() {
         onClose={() => setPinModalOpen(false)}
         onConfirm={(pin?: string) => void handleVerifyPIN(pin)}
         onPinChange={handlePinChange}
+      />
+
+      <SortModal
+        open={sortModalOpen}
+        title={t('groups.sort_title')}
+        items={groups.map((g) => ({ id: g.id, name: g.name, color: g.color }))}
+        loading={reorderGroups.isPending}
+        onClose={() => setSortModalOpen(false)}
+        onSave={(ordered) => {
+          reorderGroups.mutate(ordered, { onSuccess: () => setSortModalOpen(false) });
+        }}
       />
     </nav>
   );

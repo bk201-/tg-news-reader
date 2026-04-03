@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Typography, Button, Dropdown, Modal, App, Grid } from 'antd';
+import { Layout, Typography, Button, Dropdown, Modal, App } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   MoonOutlined,
@@ -21,6 +21,7 @@ import { TotpSetupModal } from './TotpSetupModal';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { useChannels } from '../../api/channels';
+import { useIsXxl } from '../../hooks/breakpoints';
 import { api } from '../../api/client';
 
 const { Header } = Layout;
@@ -90,9 +91,8 @@ export function AppHeader() {
   const { data: channels = [] } = useChannels();
   const { message } = App.useApp();
   const { t, i18n } = useTranslation();
-  const screens = Grid.useBreakpoint();
-  // screens.xxl = true when ≥ 1600px → full desktop, no hamburger needed
-  const sidebarInDrawer = !screens.xxl;
+  // ≥ 1600px → full desktop, no hamburger needed
+  const sidebarInDrawer = !useIsXxl();
   const { styles } = useStyles(sidebarInDrawer);
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;

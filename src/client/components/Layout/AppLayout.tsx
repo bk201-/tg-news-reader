@@ -72,13 +72,6 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
-  // Wrapper around AppHeader — animates max-height to hide on scroll (mobile only)
-  headerWrap: css`
-    flex-shrink: 0;
-    overflow: hidden;
-    max-height: 64px;
-    transition: max-height 0.25s ease;
-  `,
 }));
 
 export function AppLayout() {
@@ -89,20 +82,9 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
-  const headerWrapRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
   useBossKey();
-
-  // Subscribe to headerHidden without triggering re-renders — directly update DOM
-  useEffect(() => {
-    const unsubscribe = useUIStore.subscribe((state) => {
-      if (headerWrapRef.current) {
-        headerWrapRef.current.style.maxHeight = state.headerHidden ? '0' : '64px';
-      }
-    });
-    return unsubscribe;
-  }, []);
 
   // Targeted: only fires when crossing the 1600 px threshold, not on every AntD breakpoint.
   const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);
@@ -160,9 +142,7 @@ export function AppLayout() {
   // On mobile: sidebar panel collapses to size=0, content moves to Drawer.
   return (
     <Layout className={styles.layout}>
-      <div ref={headerWrapRef} className={styles.headerWrap}>
-        <AppHeader />
-      </div>
+      <AppHeader />
       <TelegramSessionBanner />
 
       {/* Sidebar Drawer — only opens on mobile */}
@@ -185,6 +165,7 @@ export function AppLayout() {
 
       <Splitter
         className={styles.splitter}
+        onResize={() => {}}
         onResizeEnd={(sizes) => {
           // Only persist when sidebar is visible (not collapsed to 0)
           if (!sidebarInDrawer) localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])));

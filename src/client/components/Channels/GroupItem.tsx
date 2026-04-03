@@ -128,7 +128,7 @@ export function GroupItem({ group, isActive, isLocked, count, onClick, onEdit, o
           ) : (
             <FolderFilled className={styles.icon} style={{ color: group.color }} />
           )}
-          {count > 0 && <span className={styles.badge}>{count > 99 ? '99+' : count}</span>}
+          {count > 0 && <span className={styles.badge}>{count > 999 ? '999+' : count}</span>}
         </div>
         <Text className={styles.label} ellipsis>
           {group.name}
