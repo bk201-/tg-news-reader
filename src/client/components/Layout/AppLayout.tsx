@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
-import { Layout, Typography, Splitter, Drawer } from 'antd';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Drawer, Layout, Splitter, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
@@ -10,7 +10,7 @@ import { AppHeader } from './AppHeader';
 import { TelegramSessionBanner } from './TelegramSessionBanner';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
-import { useMatchMedia, BP_XXL } from '../../hooks/breakpoints';
+import { BP_XXL, useIsXl, useMatchMedia } from '../../hooks/breakpoints';
 import { useBossKey } from '../../hooks/useBossKey';
 
 const { Text } = Typography;
@@ -49,7 +49,6 @@ const useStyles = createStyles(({ css, token }) => ({
     border-right: 1px solid ${token.colorBorderSecondary};
     overflow: hidden;
   `,
-  // When sidebarInDrawer: collapse sidebar panel to 0 and hide its border
   sidebarPanelHidden: css`
     overflow: hidden;
     border-right: none !important;
@@ -72,12 +71,18 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
-  // Wrapper around AppHeader — animates max-height to hide on scroll (mobile only)
-  headerWrap: css`
-    flex-shrink: 0;
-    overflow: hidden;
-    max-height: 64px;
-    transition: max-height 0.25s ease;
+  // ── Mobile-only: single scroll container ─────────────────────────────────
+  // In accordion mode (< 1200px) the entire page — header, toolbar, news — lives
+  // in ONE overflow-y:auto container. The browser handles scroll naturally:
+  //   - AppHeader scrolls away (normal flow)
+  //   - NewsFeedToolbar has position:sticky top:0 → sticks when header is off-screen
+  //   - No JS needed for any of this
+  mobileContainer: css`
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    background: ${token.colorBgLayout};
   `,
 }));
 
@@ -89,29 +94,20 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
-  const headerWrapRef = useRef<HTMLDivElement>(null);
+
+  // mobile scroll container ref — passed to NewsFeed for PTR and scroll-to-top
+  const mobileContainerRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
   useBossKey();
 
-  // Subscribe to headerHidden without triggering re-renders — directly update DOM
-  useEffect(() => {
-    const unsubscribe = useUIStore.subscribe((state) => {
-      if (headerWrapRef.current) {
-        headerWrapRef.current.style.maxHeight = state.headerHidden ? '0' : '64px';
-      }
-    });
-    return unsubscribe;
-  }, []);
-
-  // Targeted: only fires when crossing the 1600 px threshold, not on every AntD breakpoint.
+  // < 1200px → accordion mode: single-scroll mobile layout
+  const isAccordionMode = !useIsXl();
+  // < 1600px → sidebar in Drawer (desktop only)
   const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);
 
-  // Read localStorage once on mount — Splitter treats defaultSize as a one-time value.
-  // useState lazy initializer avoids re-reading on every render and is safe to use in JSX.
   const [defaultSidebarWidth] = useState(() => parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10));
 
-  // Restore channel from URL once channels are loaded
   useEffect(() => {
     if (initialized.current || channels.length === 0) return;
     initialized.current = true;
@@ -119,7 +115,6 @@ export function AppLayout() {
     if (id && channels.some((c) => c.id === id)) setSelectedChannelId(id);
   }, [channels, setSelectedChannelId]);
 
-  // Sync URL when selected channel changes
   useEffect(() => {
     if (!initialized.current) return;
     if (selectedChannelId) {
@@ -129,8 +124,6 @@ export function AppLayout() {
     }
   }, [selectedChannelId]);
 
-  // Memoized: GroupPanel / ChannelSidebar receive no props from AppLayout,
-  // so this JSX only needs to change when the theme changes (styles).
   const sidebarContent = useMemo(
     () => (
       <div className={styles.sidebarWrap}>
@@ -155,42 +148,55 @@ export function AppLayout() {
     [styles, t],
   );
 
-  // Single return: NewsFeed is always at the same tree position (Splitter.Panel[1] → contentMain),
-  // so it never remounts when sidebarInDrawer changes (breakpoint crossing or drawer toggle).
-  // On mobile: sidebar panel collapses to size=0, content moves to Drawer.
+  // ── Sidebar Drawer — shared between mobile and desktop ──────────────────
+  const sidebarDrawer = (
+    <Drawer
+      open={sidebarInDrawer && sidebarDrawerOpen}
+      onClose={() => setSidebarDrawerOpen(false)}
+      placement="left"
+      size="default"
+      styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
+      title={null}
+      closable={false}
+    >
+      {sidebarInDrawer && sidebarContent}
+    </Drawer>
+  );
+
+  // ── MOBILE (< 1200px): single scroll container ──────────────────────────
+  // AppHeader is in NORMAL FLOW — scrolls away naturally.
+  // NewsFeedToolbar has position:sticky so it sticks when header is gone.
+  // No JS needed for any header/toolbar behaviour.
+  if (isAccordionMode) {
+    return (
+      <Layout className={styles.layout}>
+        {sidebarDrawer}
+        <div ref={mobileContainerRef} className={styles.mobileContainer}>
+          <AppHeader />
+          <TelegramSessionBanner />
+          {selectedChannel ? (
+            <NewsFeed channel={selectedChannel} mobileScrollContainerRef={mobileContainerRef} />
+          ) : (
+            emptyState
+          )}
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── DESKTOP (≥ 1200px): Splitter layout ────────────────────────────────
   return (
     <Layout className={styles.layout}>
-      <div ref={headerWrapRef} className={styles.headerWrap}>
-        <AppHeader />
-      </div>
+      <AppHeader />
       <TelegramSessionBanner />
-
-      {/* Sidebar Drawer — only opens on mobile */}
-      <Drawer
-        open={sidebarInDrawer && sidebarDrawerOpen}
-        onClose={() => setSidebarDrawerOpen(false)}
-        placement="left"
-        size="default"
-        styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
-        title={null}
-        closable={false}
-      >
-        {/* Only render when in-drawer mode: prevents double-mount when the user
-            resizes from mobile→desktop after opening the drawer at least once.
-            Ant Design keeps Drawer children alive after close (destroyOnClose=false
-            by default), so without this guard GroupPanel+ChannelSidebar would be
-            mounted in both the Drawer and the Splitter panel simultaneously. */}
-        {sidebarInDrawer && sidebarContent}
-      </Drawer>
-
+      {sidebarDrawer}
       <Splitter
         className={styles.splitter}
+        onResize={() => {}}
         onResizeEnd={(sizes) => {
-          // Only persist when sidebar is visible (not collapsed to 0)
           if (!sidebarInDrawer) localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])));
         }}
       >
-        {/* Sidebar panel: visible + resizable on desktop, collapsed to 0 on mobile */}
         <Splitter.Panel
           defaultSize={defaultSidebarWidth}
           min={sidebarInDrawer ? 0 : 200}
@@ -202,7 +208,6 @@ export function AppLayout() {
           {!sidebarInDrawer && sidebarContent}
         </Splitter.Panel>
 
-        {/* Content panel: NewsFeed always here — stable tree position → no remount */}
         <Splitter.Panel className={styles.contentPanel}>
           <div className={styles.contentFlex}>
             <div className={styles.contentMain}>

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { Modal, Form, Input, Select, Button, Table, Switch, Tag, Space, Typography, Divider, Tooltip } from 'antd';
+import { Modal, Form, Input, Select, Button, Table, Switch, Tag, Space, Typography, Divider } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Filter } from '@shared/types.ts';

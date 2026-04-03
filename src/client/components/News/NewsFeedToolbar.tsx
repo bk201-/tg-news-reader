@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Space, Typography, Badge, Tag, Segmented } from 'antd';
+import { Button, Space, Typography, Tag, Segmented, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
   FilterOutlined,
@@ -12,6 +13,7 @@ import {
   ProfileOutlined,
   BulbOutlined,
   LinkOutlined,
+  MoreOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -65,11 +67,7 @@ const useStyles = createStyles(({ css, token }) => ({
     flex-shrink: 0;
   `,
   periodCompact: css`
-    /* shrink segmented so it doesn't overflow on narrow screens */
-    & .ant-segmented-item-label {
-      padding: 0 4px;
-      font-size: 11px;
-    }
+    display: none; /* kept for compatibility */
   `,
 }));
 
@@ -109,7 +107,7 @@ export function NewsFeedToolbar({
   onToggleShowAll,
   markAllPending,
   onMarkAllRead,
-  activeFilterCount,
+  activeFilterCount: _activeFilterCount,
   onOpenFilters,
   hashTagFilter,
   onClearHashTag,
@@ -143,86 +141,105 @@ export function NewsFeedToolbar({
     },
   ];
 
-  // ── Compact mobile toolbar (B/C) ─────────────────────────────────────
+  // ── Compact mobile toolbar ───────────────────────────────────────────
   if (isMobile) {
-    const compactStats = [
+    const statParts = [
       unreadCount > 0 && t('news.toolbar.unread', { count: unreadCount }),
       t('news.toolbar.total', { count: totalCount }),
-    ]
-      .filter(Boolean)
-      .join(' · ');
+      hiddenCount > 0 && t('news.toolbar.hidden', { count: hiddenCount }),
+    ].filter(Boolean) as string[];
+
+    const periodItems: MenuProps['items'] = [
+      { key: 'p1', label: t('news.period.1d'), onClick: () => onFetchPeriod('1') },
+      { key: 'p3', label: t('news.period.3d'), onClick: () => onFetchPeriod('3') },
+      { key: 'p5', label: t('news.period.5d'), onClick: () => onFetchPeriod('5') },
+      { key: 'p7', label: t('news.period.7d'), onClick: () => onFetchPeriod('7') },
+      { key: 'p14', label: t('news.period.14d'), onClick: () => onFetchPeriod('14') },
+      { key: 'sync', label: t('news.period.sync_tooltip'), onClick: () => onFetchPeriod('sync') },
+    ];
+
+    const menuItems: MenuProps['items'] = [
+      {
+        key: 'fetch',
+        icon: <SyncOutlined />,
+        label: t('news.toolbar.fetch_default_tooltip').replace(' · [U]', ''),
+        onClick: onFetchDefault,
+      },
+      {
+        key: 'fetch_period',
+        icon: <HistoryOutlined />,
+        label: t('news.toolbar.fetch_period'),
+        children: periodItems,
+      },
+      { type: 'divider' },
+      {
+        key: 'toggle_all',
+        icon: <EyeOutlined />,
+        label: showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all'),
+        onClick: onToggleShowAll,
+      },
+      {
+        key: 'mark_read',
+        icon: <CheckSquareOutlined />,
+        label: t('news.toolbar.mark_all_read'),
+        onClick: onMarkAllRead,
+      },
+      {
+        key: 'filters',
+        icon: <FilterOutlined />,
+        label: t('news.toolbar.filter'),
+        onClick: onOpenFilters,
+      },
+      ...(channelTelegramId
+        ? [
+            {
+              key: 'open_tg',
+              icon: <LinkOutlined />,
+              label: (
+                <a href={`https://t.me/${channelTelegramId}`} target="_blank" rel="noopener noreferrer">
+                  {t('channels.open_tg_tooltip')}
+                </a>
+              ),
+            } as NonNullable<MenuProps['items']>[number],
+          ]
+        : []),
+      ...(showDigest
+        ? [{ key: 'digest', icon: <BulbOutlined />, label: t('digest.button'), onClick: onOpenDigest }]
+        : []),
+      ...(hashTagFilter
+        ? [
+            { type: 'divider' } as NonNullable<MenuProps['items']>[number],
+            {
+              key: 'clear_tag',
+              icon: <CloseCircleOutlined />,
+              label: t('news.toolbar.clear_tag', { tag: hashTagFilter }),
+              onClick: onClearHashTag,
+            } as NonNullable<MenuProps['items']>[number],
+          ]
+        : []),
+    ];
 
     return (
       <div className={cx(styles.toolbar, styles.toolbarCompact)}>
-        {/* Left: core action buttons — icon only */}
-        <Space size={2}>
-          <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
-            <Button size="small" icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
-          </Tooltip>
-
-          <Segmented
-            size="small"
-            options={periodOptions}
-            value={fetchPeriod}
-            onChange={onFetchPeriod}
-            disabled={fetchPending}
-            className={styles.periodCompact}
-          />
-
-          {channelTelegramId && (
-            <Tooltip title={t('channels.open_tg_tooltip')}>
-              <Button
-                size="small"
-                icon={<LinkOutlined />}
-                href={`https://t.me/${channelTelegramId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-            </Tooltip>
-          )}
-
-          <Tooltip title={t('news.toolbar.show_all_tooltip')}>
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              type={showAll ? 'primary' : 'default'}
-              onClick={onToggleShowAll}
-            />
-          </Tooltip>
-
-          <Tooltip title={t('news.toolbar.mark_all_read_tooltip')}>
-            <Button size="small" icon={<CheckSquareOutlined />} onClick={onMarkAllRead} loading={markAllPending} />
-          </Tooltip>
-
-          <Badge count={activeFilterCount} size="small">
-            <Tooltip title={t('news.toolbar.filter_tooltip')}>
-              <Button size="small" icon={<FilterOutlined />} onClick={onOpenFilters} />
-            </Tooltip>
-          </Badge>
-
-          {showDigest && (
-            <Tooltip title={t('digest.tooltip')}>
-              <Button size="small" icon={<BulbOutlined />} onClick={onOpenDigest} />
-            </Tooltip>
-          )}
-
+        <Space size={6}>
           {hashTagFilter && (
             <Tag
               color="blue"
               closeIcon={<CloseCircleOutlined />}
               onClose={onClearHashTag}
-              className={cx(styles.hashTag, styles.hashTagCompact)}
+              className={styles.hashTagCompact}
             >
-              {hashTagFilter}
+              #{hashTagFilter}
             </Tag>
           )}
+          <Text type="secondary" className={styles.statsCompact}>
+            {statParts.join(' · ')}
+          </Text>
         </Space>
 
-        {/* Right: compact stats */}
-        <Text type="secondary" className={styles.statsCompact}>
-          {compactStats}
-          {hiddenCount > 0 && ` (−${hiddenCount})`}
-        </Text>
+        <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+          <Button type="text" icon={<MoreOutlined />} size="middle" />
+        </Dropdown>
       </div>
     );
   }
@@ -256,13 +273,11 @@ export function NewsFeedToolbar({
             {t('news.toolbar.mark_all_read')}
           </Button>
         </Tooltip>
-        <Badge count={activeFilterCount} size="small">
-          <Tooltip title={t('news.toolbar.filter_tooltip')}>
-            <Button icon={<FilterOutlined />} onClick={onOpenFilters}>
-              {t('news.toolbar.filter')}
-            </Button>
-          </Tooltip>
-        </Badge>
+        <Tooltip title={t('news.toolbar.filter_tooltip')}>
+          <Button icon={<FilterOutlined />} onClick={onOpenFilters}>
+            {t('news.toolbar.filter')}
+          </Button>
+        </Tooltip>
         {showDigest && (
           <Tooltip title={t('digest.tooltip')}>
             <Button icon={<BulbOutlined />} onClick={onOpenDigest}>

@@ -110,15 +110,12 @@ const useStyles = createStyles(({ css, token }) => ({
     display: block;
   `,
   download: css`
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 32px 16px;
+    gap: 6px;
     margin-bottom: 12px;
-    border: 1px dashed ${token.colorBorderSecondary};
-    border-radius: 8px;
-    background: ${token.colorFillQuaternary};
   `,
   mediaError: css`
     font-size: 12px;
@@ -231,7 +228,6 @@ export function NewsDetailMedia({
           onClick={onDownload}
           loading={mediaLoading}
           disabled={mediaQueued}
-          size="large"
         >
           {mediaQueued
             ? t('news.detail.queued')

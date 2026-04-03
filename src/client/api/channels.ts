@@ -92,6 +92,15 @@ export function useFetchChannel() {
   });
 }
 
+export function useReorderChannels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: { id: number; sortOrder: number }[]) =>
+      api.patch<{ ok: boolean }>('/channels/reorder', { items }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: channelKeys.all }),
+  });
+}
+
 export interface ChannelLookupResult {
   name: string;
   username: string | null;

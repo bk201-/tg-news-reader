@@ -4,6 +4,7 @@ import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
+import { BP_XL, MOBILE_STICKY_HEIGHT } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
@@ -11,6 +12,13 @@ const useStyles = createStyles(({ css, token }) => ({
     overflow-y: auto;
     position: relative;
     background: ${token.colorBgContainer};
+    overscroll-behavior-y: contain;
+    /* Mobile: parent (mobileContainer) is the scroll container — no inner scroll */
+    @media (max-width: ${BP_XL - 1}px) {
+      flex: none;
+      overflow-y: visible;
+      height: auto;
+    }
   `,
   loadingWrap: css`
     display: flex;
@@ -19,6 +27,12 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
   empty: css`
     margin-top: 48px;
+  `,
+  // Ensure selected items scroll into view below sticky header+toolbar on mobile
+  item: css`
+    @media (max-width: ${BP_XL - 1}px) {
+      scroll-margin-top: ${MOBILE_STICKY_HEIGHT}px;
+    }
   `,
 }));
 
@@ -69,17 +83,18 @@ export function NewsAccordionList({
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {items.map((item) => (
-        <NewsAccordionItem
-          key={item.id}
-          item={item}
-          isSelected={selectedNewsId === item.id}
-          isFiltered={filteredIds.has(item.id)}
-          showAll={showAll}
-          channelTelegramId={channelTelegramId}
-          onSelect={onSelect}
-          onTagClick={onTagClick}
-          onMarkedRead={onMarkedRead}
-        />
+        <div key={item.id} className={styles.item}>
+          <NewsAccordionItem
+            item={item}
+            isSelected={selectedNewsId === item.id}
+            isFiltered={filteredIds.has(item.id)}
+            showAll={showAll}
+            channelTelegramId={channelTelegramId}
+            onSelect={onSelect}
+            onTagClick={onTagClick}
+            onMarkedRead={onMarkedRead}
+          />
+        </div>
       ))}
     </div>
   );

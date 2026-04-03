@@ -13,6 +13,8 @@
     "refresh": "Обновить",
     "refresh_tooltip": "Посчитать непрочитанные в Telegram",
     "add": "Добавить",
+    "sort_tooltip": "Изменить порядок каналов",
+    "sort_title": "Порядок каналов",
     "select_channel": "Выберите канал из списка слева"
   },
   "channels": {
@@ -57,6 +59,8 @@
     "general_tooltip": "Общее (без группы)",
     "panel_label": "Группы",
     "new_group_tooltip": "Новая группа",
+    "sort_tooltip": "Изменить порядок групп",
+    "sort_title": "Порядок групп",
     "delete_confirm_title": "Удалить группу \"{{name}}\"?",
     "delete_confirm_content": "Каналы из группы переместятся в «Общее».",
     "context_edit": "Редактировать",
@@ -80,6 +84,10 @@
     }
   },
   "news": {
+    "ptr": {
+      "pull": "Потяните для обновления",
+      "release": "Отпустите для обновления"
+    },
     "toolbar": {
       "fetch_default_tooltip": "Выгрузить с последнего прочитанного · [U]",
       "sync_tooltip": "С последней синхронизации",
@@ -95,7 +103,9 @@
       "shown": "Показано: {{count}}",
       "hidden": "Скрыто: {{count}}",
       "total": "Всего: {{count}}",
-      "unread": "Непрочит.: {{count}}"
+      "unread": "Непрочит.: {{count}}",
+      "fetch_period": "Загрузить за период…",
+      "clear_tag": "Сбросить тег #{{tag}}"
     },
     "period": {
       "1d": "1д",
@@ -146,6 +156,11 @@
       "tag_add_filter": "Добавить в фильтры",
       "tag_added_toast": "Тег {{tag}} добавлен в фильтры",
       "message_fallback": "Сообщение #{{id}}"
+    },
+    "ptr": {
+      "pull": "Потяните вниз для обновления",
+      "release": "Отпустите для обновления",
+      "fetching": "Обновляю…"
     }
   },
   "filters": {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Badge, Button, Drawer, Space, Spin, Grid } from 'antd';
+import { Badge, Button, Drawer, Space, Spin } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { CloudDownloadOutlined, PushpinOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { TaskList } from './DownloadTaskList';
 import { useDownloads, useDownloadsSSE, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
 import { useUIStore } from '../../store/uiStore';
+import { useIsXxl } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }, pinned: boolean) => ({
   iconBtn: css`
@@ -30,10 +31,10 @@ export function DownloadsPanel() {
   const prioritizeDownload = usePrioritizeDownload();
   const { downloadsPanelPinned, toggleDownloadsPanelPin } = useUIStore();
   const { t } = useTranslation();
-  const screens = Grid.useBreakpoint();
+  const isXxl = useIsXxl();
 
   // Pin only available on full desktop (≥ 1600px / xxl)
-  const effectivePinned = !!screens.xxl && downloadsPanelPinned;
+  const effectivePinned = isXxl && downloadsPanelPinned;
   const { styles } = useStyles(effectivePinned);
 
   // SSE always active — mounted once for the whole app lifetime
@@ -47,7 +48,7 @@ export function DownloadsPanel() {
         {activeCount > 0 && <Spin size="small" />}
         <span>{activeCount > 0 ? t('downloads.title_active', { count: activeCount }) : t('downloads.title')}</span>
       </Space>
-      {!!screens.xxl && (
+      {isXxl && (
         <Tooltip title={t('downloads.pin_tooltip')} placement="left">
           <Button
             size="small"

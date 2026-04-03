@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Space, Typography, Form } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, OrderedListOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
@@ -14,8 +14,10 @@ import {
   useFetchChannel,
   useCountUnreadChannels,
   useChannelLookup,
+  useReorderChannels,
 } from '../../api/channels';
 import { useGroups } from '../../api/groups';
+import { SortModal } from './SortModal';
 import { useUIStore } from '../../store/uiStore';
 import { ChannelItem } from './ChannelItem';
 import { ChannelFormModal } from './ChannelFormModal';
@@ -37,12 +39,6 @@ const useStyles = createStyles(({ css, token }) => ({
     justify-content: space-between;
     padding: 12px;
     border-bottom: 1px solid ${token.colorBorderSecondary};
-    container-type: inline-size;
-  `,
-  btnText: css`
-    @container (max-width: 300px) {
-      display: none;
-    }
   `,
   list: css`
     flex: 1;
@@ -70,6 +66,7 @@ export function ChannelSidebar() {
   const fetchChannel = useFetchChannel();
   const countUnread = useCountUnreadChannels();
   const lookupChannel = useChannelLookup();
+  const reorderChannels = useReorderChannels();
   const { t } = useTranslation();
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
@@ -153,6 +150,9 @@ export function ChannelSidebar() {
   const [fetchTargetId, setFetchTargetId] = useState<number | null>(null);
   const [fetchSince, setFetchSince] = useState<dayjs.Dayjs | null>(null);
 
+  // ── Sort modal state ──────────────────────────────────────────────────
+  const [sortModalOpen, setSortModalOpen] = useState(false);
+
   const openFetchModal = (ch: Channel, e: React.MouseEvent) => {
     e.stopPropagation();
     setFetchTargetId(ch.id);
@@ -185,18 +185,19 @@ export function ChannelSidebar() {
           {t('sidebar.channels')}
         </Text>
         <Space size={4}>
+          <Tooltip title={t('sidebar.add')}>
+            <Button icon={<PlusOutlined />} onClick={openCreate} />
+          </Tooltip>
+          <Tooltip title={t('sidebar.sort_tooltip')}>
+            <Button icon={<OrderedListOutlined />} onClick={() => setSortModalOpen(true)} />
+          </Tooltip>
           <Tooltip title={t('sidebar.refresh_tooltip')}>
             <Button
               icon={<ReloadOutlined />}
               onClick={() => countUnread.mutate(selectedGroupId)}
               loading={countUnread.isPending}
-            >
-              <span className={styles.btnText}>{t('sidebar.refresh')}</span>
-            </Button>
+            />
           </Tooltip>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            <span className={styles.btnText}>{t('sidebar.add')}</span>
-          </Button>
         </Space>
       </div>
 
@@ -237,6 +238,17 @@ export function ChannelSidebar() {
         onChangeSince={setFetchSince}
         onClose={() => setFetchModalOpen(false)}
         onConfirm={handleFetch}
+      />
+
+      <SortModal
+        open={sortModalOpen}
+        title={t('sidebar.sort_title')}
+        items={channels.map((ch) => ({ id: ch.id, name: ch.name }))}
+        loading={reorderChannels.isPending}
+        onClose={() => setSortModalOpen(false)}
+        onSave={(ordered) => {
+          reorderChannels.mutate(ordered, { onSuccess: () => setSortModalOpen(false) });
+        }}
       />
     </nav>
   );

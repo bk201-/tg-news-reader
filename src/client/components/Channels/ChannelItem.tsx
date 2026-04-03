@@ -144,7 +144,7 @@ export function ChannelItem({
             <Button icon={<DeleteOutlined />} size="small" type="text" danger onClick={onDelete} />
           </Tooltip>
         </Space>
-        <Badge count={unreadCount} size="small" />
+        <Badge count={unreadCount} size="small" overflowCount={999} />
       </div>
     </div>
   );

@@ -83,6 +83,8 @@ Session rotated via `npm run tg:auth`; old session terminated manually in Telegr
 - [x] Instant View: parse `cachedPage.blocks` via `richTextToString`; stored in `news.fullContent` on INSERT
 - [x] media_content auto-filter: `mediaType IN ('photo','document')`; text-only hidden, visible via "Show all"
 - [x] Audio messages: `mediaType='audio'`; auto-download disabled; `<audio controls>` when file is downloaded
+- [x] Pull-to-refresh: `usePullToRefresh` vanilla touch hook; non-passive touchmove; direct DOM mutations; DAMPEN=0.55; `NewsAccordionList`
+- [x] Mobile compact toolbar: `NewsDetailToolbar` inline variant — checkbox + ✓ + ⋯ dropdown; mirrors `NewsListItem` layout exactly
 - [x] `NewsHashtags.tsx`: shared component with `e.stopPropagation()`; passed through accordion → detail → toolbar
 - [x] Sticky accordion header: `position: sticky; top: 0; z-index: 10`
 - [x] Filters 80+: `Set<string>` for tags O(T) instead of O(F×T); pagination at 20 rows
