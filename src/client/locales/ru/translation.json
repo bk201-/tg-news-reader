@@ -255,7 +255,8 @@
     "close": "Закрыть [Esc]",
     "prev": "Назад [↑]",
     "next": "Вперёд [↓]",
-    "open_in_telegram": "Открыть в Telegram"
+    "open_in_telegram": "Открыть в Telegram",
+    "share": "Поделиться"
   },
   "digest": {
     "button": "Дайджест ✨",

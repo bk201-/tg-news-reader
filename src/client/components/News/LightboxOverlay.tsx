@@ -10,6 +10,9 @@ import { useLightboxNav } from './useLightboxNav';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
 
+/** History state key pushed when the lightbox opens */
+const HISTORY_KEY = '_lightboxOpen';
+
 const useStyles = createStyles(({ css }) => ({
   overlay: css`
     position: fixed;
@@ -84,6 +87,30 @@ export function LightboxOverlay() {
   const markRead = useMarkRead();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // ── History API: push a state when lightbox opens so the browser back button /
+  // swipe-back gesture dismisses the lightbox instead of navigating away.
+  const closedByBackRef = useRef(false);
+  useEffect(() => {
+    if (!lightbox) return;
+    closedByBackRef.current = false;
+    history.pushState({ [HISTORY_KEY]: true }, '');
+
+    const onPop = () => {
+      closedByBackRef.current = true;
+      closeLightbox();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // Lightbox closed by non-back means (Esc, X, backdrop) — replace in-place,
+      // same reason as sidebar: don't silently consume the user's next Back press.
+      if (!closedByBackRef.current) {
+        history.replaceState(null, '', window.location.href);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!lightbox]);
 
   const channelId = lightbox?.channelId ?? 0;
   const newsId = lightbox?.newsId ?? 0;
@@ -244,6 +271,9 @@ export function LightboxOverlay() {
   const item = currentEntry?.item;
   const albumPaths = item?.localMediaPaths;
 
+  // Current displayed media path (respects album index)
+  const currentMediaPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? firstMediaPath) : firstMediaPath;
+
   return createPortal(
     <div
       ref={overlayRef}
@@ -262,6 +292,7 @@ export function LightboxOverlay() {
         channelName={channel.name}
         channelTelegramId={channel.telegramId}
         positionLabel={nav.positionLabel}
+        currentMediaPath={currentMediaPath}
         onClose={closeLightbox}
       />
 

@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button, Typography } from 'antd';
-import { CloseOutlined, LinkOutlined } from '@ant-design/icons';
+import { CloseOutlined, LinkOutlined, ShareAltOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
+import { mediaUrl } from '../../api/mediaUrl';
 
 interface LightboxToolbarProps {
   item: NewsItem | null | undefined;
   channelName: string;
   channelTelegramId: string;
   positionLabel: string;
+  /** Current displayed media path (used for native file sharing) */
+  currentMediaPath?: string;
   onClose: () => void;
 }
 
@@ -74,14 +77,50 @@ export function LightboxToolbar({
   channelName,
   channelTelegramId,
   positionLabel,
+  currentMediaPath,
   onClose,
 }: LightboxToolbarProps) {
   const { styles } = useStyles();
   const { t } = useTranslation();
+  const [sharing, setSharing] = useState(false);
 
   const openUrl = item ? (item.links?.[0] ?? `https://t.me/${channelTelegramId}/${item.telegramMsgId}`) : undefined;
 
   const date = item ? dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm') : '';
+
+  const canShare = 'share' in navigator;
+
+  const handleShare = useCallback(async () => {
+    if (!currentMediaPath) return;
+    setSharing(true);
+    try {
+      const url = mediaUrl(currentMediaPath);
+      const filename = currentMediaPath.split('/').pop() ?? 'media';
+
+      if (navigator.canShare) {
+        // Fetch file and try native file share
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const file = new File([blob], filename, { type: blob.type });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          return;
+        }
+      }
+
+      // Fallback: share the Telegram post URL
+      if (openUrl) {
+        await navigator.share({ url: openUrl, title: channelName });
+      }
+    } catch (err) {
+      // AbortError = user dismissed the share sheet — not an error
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('[LightboxToolbar] share failed:', err);
+      }
+    } finally {
+      setSharing(false);
+    }
+  }, [currentMediaPath, openUrl, channelName]);
 
   return (
     <div className={styles.toolbar}>
@@ -92,6 +131,17 @@ export function LightboxToolbar({
           {positionLabel && <Text>· {positionLabel}</Text>}
         </div>
       </div>
+
+      {canShare && currentMediaPath && (
+        <Button
+          size="small"
+          icon={sharing ? <LoadingOutlined /> : <ShareAltOutlined />}
+          className={styles.linkBtn}
+          onClick={() => void handleShare()}
+          disabled={sharing}
+          title={t('lightbox.share')}
+        />
+      )}
 
       {openUrl && (
         <Button

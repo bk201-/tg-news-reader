@@ -108,6 +108,54 @@ export function AppLayout() {
 
   const [defaultSidebarWidth] = useState(() => parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10));
 
+  // Stable refs for use inside the popstate handler (avoid stale closure)
+  const selectedChannelRef = useRef(selectedChannelId);
+  selectedChannelRef.current = selectedChannelId;
+  const sidebarDrawerOpenRef = useRef(sidebarDrawerOpen);
+  sidebarDrawerOpenRef.current = sidebarDrawerOpen;
+
+  // ── Mobile navigation guard ────────────────────────────────────────────
+  // Push one synthetic guard entry on mount so the very first Back press lands
+  // inside the app. Each successful intercept re-pushes the guard so the next
+  // Back is also caught.
+  //
+  // Priority: lightbox (LightboxOverlay handles its own entry) → drawer → channel.
+  useEffect(() => {
+    if (!isAccordionMode) return;
+    history.pushState({ _appGuard: true }, '');
+
+    const onPop = () => {
+      // LightboxOverlay pushes its own history entry and has its own popstate
+      // handler — bail so we don't double-close.
+      if (useUIStore.getState().lightbox) return;
+
+      if (sidebarDrawerOpenRef.current) {
+        // Drawer is open → close it
+        setSidebarDrawerOpen(false);
+      } else if (selectedChannelRef.current !== null) {
+        // Channel selected but no drawer → deselect channel and show channel list.
+        // Write all fields in one Zustand call so we never get an intermediate
+        // render with sidebarDrawerOpen:false (which setSelectedChannelId sets).
+        useUIStore.setState({
+          selectedChannelId: null,
+          selectedNewsId: null,
+          hashTagFilter: null,
+          sidebarDrawerOpen: true,
+        });
+      } else {
+        // Nothing to intercept — let the navigation proceed (exit the app).
+        return;
+      }
+
+      // Re-push the guard so the next Back press is also intercepted.
+      history.pushState({ _appGuard: true }, '');
+    };
+
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAccordionMode]);
+
   useEffect(() => {
     if (initialized.current || channels.length === 0) return;
     initialized.current = true;
