@@ -37,7 +37,17 @@ export const useIsXxl = () => useMatchMedia(`(min-width: ${BP_XXL}px)`);
 /** Height of AppHeader in px — used for scroll offsets and scroll-margin-top */
 export const MOBILE_HEADER_HEIGHT = 64;
 /**
- * Combined sticky height on mobile: header (64) + toolbar (~46) + buffer.
+ * Approximate height of the compact mobile NewsFeedToolbar in px.
+ * Used as sticky top-offset in NewsDetail (inline variant) so the detail header
+ * sticks below the toolbar instead of behind it.
+ *
+ * padding-top 6px + button 32px + padding-bottom 6px = 44px content height.
+ * border-bottom 1px is rendered outside (border-box), so rendered height = 45px.
+ * We use 43 here to account for sub-pixel rounding keeping the gap at 0.
+ */
+export const MOBILE_TOOLBAR_HEIGHT = 44;
+/**
+ * Combined sticky height on mobile: header + toolbar + small buffer.
  * Used as scroll-margin-top so that scrollIntoView places items below sticky elements.
  */
-export const MOBILE_STICKY_HEIGHT = 120;
+export const MOBILE_STICKY_HEIGHT = MOBILE_HEADER_HEIGHT + MOBILE_TOOLBAR_HEIGHT + 13; // = 120

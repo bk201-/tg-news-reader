@@ -105,9 +105,10 @@ const useStyles = createStyles(({ css, token }) => ({
     padding: 14px 16px;
     background: ${token.colorBgElevated};
     border-bottom: 1px solid ${token.colorBorderSecondary};
-    color: ${token.colorTextSecondary};
+    color: ${token.colorText};
     font-size: 13px;
     transform: translateY(-100%);
+    opacity: 0;
     pointer-events: none;
     box-shadow: ${token.boxShadowSecondary};
   `,
