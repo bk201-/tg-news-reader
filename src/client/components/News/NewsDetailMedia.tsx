@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { mediaUrl } from '../../api/mediaUrl';
 import { formatBytes } from './newsUtils';
+import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
 
@@ -27,6 +28,7 @@ const useStyles = createStyles(({ css, token }) => ({
     object-fit: contain;
     border-radius: 8px;
     margin: 0 auto;
+    cursor: pointer;
   `,
   audioPlayer: css`
     display: block;
@@ -160,6 +162,7 @@ export function NewsDetailMedia({
 }: NewsDetailMediaProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
+  const openLightbox = useUIStore((s) => s.openLightbox);
 
   if (isAlbum) {
     const paths = item.localMediaPaths!;
@@ -178,6 +181,7 @@ export function NewsDetailMedia({
             src={mediaUrl(paths[albumIndex])}
             alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
             className={styles.mediaFile}
+            onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
           />
           <button
             className={cx(styles.carouselBtn, styles.carouselBtnNext, 'carousel-btn')}
@@ -212,9 +216,23 @@ export function NewsDetailMedia({
             <audio src={mediaUrl(firstMediaPath)} controls className={styles.audioPlayer} />
           </>
         ) : isVideo ? (
-          <video src={mediaUrl(firstMediaPath)} controls muted autoPlay loop className={styles.mediaFile} />
+          <video
+            src={mediaUrl(firstMediaPath)}
+            controls
+            muted
+            autoPlay
+            loop
+            className={styles.mediaFile}
+            onClick={() => openLightbox(item.id, 0, item.channelId)}
+            style={{ cursor: 'pointer' }}
+          />
         ) : (
-          <img src={mediaUrl(firstMediaPath)} alt="media" className={styles.mediaFile} />
+          <img
+            src={mediaUrl(firstMediaPath)}
+            alt="media"
+            className={styles.mediaFile}
+            onClick={() => openLightbox(item.id, 0, item.channelId)}
+          />
         )}
       </div>
     );

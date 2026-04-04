@@ -3,6 +3,12 @@ import { BP_XL } from '../hooks/breakpoints';
 
 export type NewsViewMode = 'list' | 'accordion';
 
+export interface LightboxState {
+  newsId: number;
+  albumIndex: number;
+  channelId: number;
+}
+
 interface UIStore {
   selectedChannelId: number | null;
   setSelectedChannelId: (id: number | null) => void;
@@ -35,6 +41,11 @@ interface UIStore {
   // Mobile header hide-on-scroll
   headerHidden: boolean;
   setHeaderHidden: (v: boolean) => void;
+  // Lightbox
+  lightbox: LightboxState | null;
+  openLightbox: (newsId: number, albumIndex: number, channelId: number) => void;
+  closeLightbox: () => void;
+  setLightboxAlbumIndex: (index: number) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -83,4 +94,10 @@ export const useUIStore = create<UIStore>()((set) => ({
     }),
   headerHidden: false,
   setHeaderHidden: (v) => set({ headerHidden: v }),
+  // Lightbox
+  lightbox: null,
+  openLightbox: (newsId, albumIndex, channelId) => set({ lightbox: { newsId, albumIndex, channelId } }),
+  closeLightbox: () => set({ lightbox: null }),
+  setLightboxAlbumIndex: (index) =>
+    set((state) => (state.lightbox ? { lightbox: { ...state.lightbox, albumIndex: index } } : {})),
 }));

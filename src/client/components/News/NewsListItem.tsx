@@ -8,6 +8,7 @@ import type { NewsItem, Filter } from '@shared/types.ts';
 import { useMarkRead } from '../../api/news';
 import { mediaUrl } from '../../api/mediaUrl';
 import { NewsHashtags } from './NewsHashtags';
+import { useUIStore } from '../../store/uiStore';
 
 const { Text } = Typography;
 
@@ -87,6 +88,10 @@ const useStyles = createStyles(({ css, token }) => ({
     border-radius: 6px;
     overflow: hidden;
     align-self: center;
+    cursor: pointer;
+    &:hover {
+      opacity: 0.85;
+    }
   `,
   thumbDimmed: css`
     opacity: 0.4;
@@ -163,6 +168,7 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
   const markRead = useMarkRead();
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
+  const openLightbox = useUIStore((s) => s.openLightbox);
 
   const title = getTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }));
   const hashtags = item.hashtags || [];
@@ -214,7 +220,15 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
           {title}
         </Text>
         {showThumb && (
-          <div className={cx(styles.thumb, dimmed && styles.thumbDimmed)}>
+          <div
+            className={cx(styles.thumb, dimmed && styles.thumbDimmed)}
+            onClick={(e) => {
+              if (!isAudio && (item.mediaType === 'photo' || item.mediaType === 'document')) {
+                e.stopPropagation();
+                openLightbox(item.id, 0, item.channelId);
+              }
+            }}
+          >
             {isAudio ? (
               <div className={styles.thumbAudio}>
                 <SoundOutlined className={styles.audioIcon} />

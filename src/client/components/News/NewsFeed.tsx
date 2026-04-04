@@ -16,6 +16,7 @@ import { NewsFeedToolbar } from './NewsFeedToolbar';
 import { NewsFeedList } from './NewsFeedList';
 import { NewsAccordionList } from './NewsAccordionList';
 import { DigestDrawer } from './DigestDrawer';
+import { LightboxOverlay } from './LightboxOverlay';
 import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
@@ -437,6 +438,7 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
 
       <FilterPanel channelId={channel.id} />
       <DigestDrawer open={digestOpen} params={{ channelIds: [channel.id] }} onClose={() => setDigestOpen(false)} />
+      <LightboxOverlay />
     </div>
   );
 }
