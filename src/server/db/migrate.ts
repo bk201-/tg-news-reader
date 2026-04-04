@@ -38,6 +38,7 @@ export async function runMigration(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_news_channel_id ON news(channel_id);
     CREATE INDEX IF NOT EXISTS idx_news_is_read ON news(is_read);
     CREATE INDEX IF NOT EXISTS idx_news_posted_at ON news(posted_at);
+    CREATE INDEX IF NOT EXISTS idx_news_channel_is_read ON news(channel_id, is_read);
     CREATE TABLE IF NOT EXISTS filters (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -139,6 +140,9 @@ export async function runMigration(): Promise<void> {
     )
   `);
   await client.execute('CREATE INDEX IF NOT EXISTS idx_filter_stats ON filter_stats(filter_id, date)');
+
+  // Composite index for the common "unread news for channel" query pattern
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_news_channel_is_read ON news(channel_id, is_read)');
 
   logger.info('✅ Database migrated successfully');
 }

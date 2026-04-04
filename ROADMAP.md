@@ -1,40 +1,35 @@
 # TG News Reader — Roadmap
 
-> Дата: апрель 2026  
-> Живой документ — возвращаемся при планировании каждого шага.  
-> Детали реализации: [docs/architecture.md](docs/architecture.md) · Решения и история: [docs/decisions.md](docs/decisions.md) · Azure ops: [docs/azure.md](docs/azure.md) · Git workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
+> Date: April 2026  
+> Living document — revisit when planning each step.  
+> Implementation details: [docs/architecture.md](docs/architecture.md) · Decisions & history: [docs/decisions.md](docs/decisions.md) · Azure ops: [docs/azure.md](docs/azure.md) · Git workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-## ⬜ Технический долг
+## ⬜ Technical Debt
 
-| Задача | Описание | Сложность |
-|--------|----------|-----------|
-| Индексы SQLite на `channel_id + is_read` | Уже есть, но проверить при росте данных. | ⭐ |
-
----
-
-## ⬜ В очереди (новые фичи)
-
-| Задача | Описание | Сложность |
-|--------|----------|-----------|
-| Сквозной медиа-просмотр | Лайтбокс по клику на фото: навигация по всем новостям канала, ←→/Esc. Медиа-каналы: авто-прочитано. | ⭐⭐⭐⭐ |
-| Шаринг новости | Web Share API на мобильных; clipboard fallback на десктопе. | ⭐⭐ |
-| Полная клавиатурная навигация (zero-mouse) | Space листает новости → refresh → автопереход на следующий канал с непрочитанными → по кругу. | ⭐⭐⭐ |
+| Task | Description | Complexity |
+|------|-------------|------------|
 
 ---
 
-## ⬜ Отложено (низкий приоритет)
+## ⬜ Queue (new features)
 
-| Задача | Зависимости | Сложность |
-|--------|-------------|-----------|
-| Менеджер загрузок в папку (File System Access API) | SW кэш | ⭐⭐⭐ |
-| Клиентская скачка gramjs | Деплой | ⭐⭐⭐⭐⭐ |
+| Task | Description | Complexity |
+|------|-------------|------------|
 
 ---
 
-## Открытые вопросы
+## ⬜ Deferred (low priority)
 
-1. **gramjs в браузере**: шарить основную сессию или создавать отдельную?
-2. **better-auth**: пересмотреть если добавим OAuth (Google/GitHub) или Passkeys.
-3. **SW кэш и мобильный**: SW работает, но File System Access API недоступен на мобильных.
+| Task | Description                                                                                                                                         | Complexity |
+|------|-----------------------------------------------------------------------------------------------------------------------------------------------------|------------|
+| Client-side video download | Videos already render in the browser — save to disk via `<a download>` without storing a copy in Azure. Useful for large videos to watch offline. See Open Question #1. | ⭐⭐ |
+| Invites / multi-user | Invite another user via an invite link. Requires: user profile card, password change, roles. Not relevant while single-user. See Open Question #2. | ⭐⭐⭐⭐ |
+
+---
+
+## Open Questions
+
+1. **gramjs in the browser**: should we share the main session or create a separate one? Needed for client-side downloads without intermediate server storage.
+2. **better-auth**: reconsider if we move to invites / OAuth (Google/GitHub) / Passkeys — not before there's a real need for multi-user.
