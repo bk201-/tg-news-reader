@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
 import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
-import { useFetchChannel } from '../../api/channels';
+import { useFetchChannel, useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { applyFilters } from './NewsListItem';
 import { NewsDetail } from './NewsDetail';
@@ -123,14 +123,24 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
 
-  const { selectedNewsId, setSelectedNewsId, showAll, setShowAll, setFilterPanelOpen, newsViewMode, setNewsViewMode } =
-    useUIStore();
+  const {
+    selectedNewsId,
+    setSelectedNewsId,
+    showAll,
+    setShowAll,
+    setFilterPanelOpen,
+    newsViewMode,
+    setNewsViewMode,
+    setSelectedChannelId,
+  } = useUIStore();
 
   const { styles, cx } = useStyles();
   const forceAccordion = !useIsXl();
   const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
 
   const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
+
+  const { data: allChannels = [] } = useChannels();
 
   const { data: newsData, isLoading } = useNews(channel.id, !showAll);
   const newsItems = newsData?.items ?? [];
@@ -141,7 +151,25 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
 
-  const onFetchSuccess = useCallback((_data: { mediaProcessing?: boolean }) => {}, []);
+  // Advance to the next channel with unread items, cycling within the same group.
+  const goToNextChannelWithUnread = useCallback(() => {
+    // All channels in the same group, sorted by sortOrder
+    const sameGroup = allChannels
+      .filter((ch) => (ch.groupId ?? null) === (channel.groupId ?? null))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const currentIdx = sameGroup.findIndex((ch) => ch.id === channel.id);
+    if (currentIdx === -1 || sameGroup.length <= 1) return;
+
+    // Circular search forward for a channel with unread
+    for (let i = 1; i < sameGroup.length; i++) {
+      const ch = sameGroup[(currentIdx + i) % sameGroup.length];
+      if (ch.unreadCount > 0) {
+        setSelectedChannelId(ch.id);
+        return;
+      }
+    }
+  }, [allChannels, channel.id, channel.groupId, setSelectedChannelId]);
 
   const selectedItem = useMemo(
     () => newsItems.find((n) => n.id === selectedNewsId) || null,
@@ -160,6 +188,16 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
   const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
+
+  // Called after fetch completes: if 0 new items and no unread → go to next channel with unread
+  const onFetchSuccess = useCallback(
+    (data: { inserted: number; mediaProcessing?: boolean }) => {
+      if (data.inserted === 0 && unreadCount === 0) {
+        goToNextChannelWithUnread();
+      }
+    },
+    [goToNextChannelWithUnread, unreadCount],
+  );
 
   const handleMarkedRead = useCallback(
     (currentId: number) => {
