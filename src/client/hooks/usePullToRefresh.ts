@@ -1,24 +1,31 @@
 import { useEffect } from 'react';
-import { MOBILE_TOOLBAR_HEIGHT } from './breakpoints';
 
-const THRESHOLD = 60; // px raw delta — release to refresh
-const ACTIVATE = 12; // px raw delta before PTR takes over (lets browser handle small gestures)
-const DAMPEN = 0.5; // pull distance multiplier
+// How far the finger must travel (raw px) before PTR takes over the gesture.
+// Keeps accidental brushes and system-chrome swipes from activating PTR.
+const ACTIVATE = 20; // px
+
+// How far the finger must travel (raw px) before releasing triggers a refresh.
+// At DAMPEN=0.5 this means the indicator must have slid to its maximum visible
+// position before we consider the intent confirmed.
+const THRESHOLD = 90; // px  (= indicator-height(~48px) / DAMPEN(0.5) ≈ 96px, round down)
+
+// Indicator moves at half the speed of the finger (makes the motion feel "weighty").
+const DAMPEN = 0.5;
 
 /**
  * Adds pull-to-refresh on the accordion scroll container.
  *
- * Design:
- *  - Activates only when scrollTop === 0 (at the very top)
- *  - touchstart is NON-passive so the browser treats subsequent touchmove
- *    events as cancelable; without this, iOS / Chrome mark touchmove as
- *    non-cancelable once they start a scroll, breaking preventDefault()
- *  - touchmove calls preventDefault() when we take over the gesture, which
- *    prevents the native rubber-band / overscroll from moving the content
- *  - Animates `indicatorRef` via direct style mutations (no React re-render)
- *  - Arrow icon rotates when pull distance crosses THRESHOLD
- *  - Text switches between pullText / releaseText via data-ptr-text attribute
- *  - On touchend: if pulled far enough → onRefresh(); always snap indicator back
+ * Position model (simple):
+ *   indicator: position:fixed; top:0   (starts hidden above viewport)
+ *   hidden  → translateY(-height)      top edge at -height, fully off-screen
+ *   visible → translateY(0)            top edge at 0, overlays AppHeader
+ *                                      (same behaviour as native iOS/Android PTR)
+ *
+ * Pull travel:
+ *   pull = min(delta * DAMPEN, height)
+ *   transform = translateY(pull - height)
+ *   At pull=0       → translateY(-height)  hidden
+ *   At pull=height  → translateY(0)        fully visible
  *
  * Only active when `enabled` (accordion / mobile mode).
  */
@@ -36,9 +43,14 @@ export function usePullToRefresh(
     const indicator = indicatorRef.current;
     if (!el || !indicator) return;
 
+    // Set initial hidden position (translateY to -height).
+    // We can't hard-code this in CSS because height is measured at runtime.
+    const initHeight = indicator.offsetHeight || 48;
+    indicator.style.transform = `translateY(${-initHeight}px)`;
+
     let startY = 0;
     let isPulling = false;
-    let wasReady = false; // crossed threshold at some point during this pull
+    let wasReady = false;
 
     const arrow = indicator.querySelector<HTMLElement>('[data-ptr-icon]');
     const text = indicator.querySelector<HTMLElement>('[data-ptr-text]');
@@ -53,24 +65,24 @@ export function usePullToRefresh(
     };
 
     const snapBack = () => {
-      indicator.style.transition = 'transform 0.5s ease, opacity 0.5s ease';
-      indicator.style.transform = 'translateY(-100%)';
+      indicator.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+      // Return to hidden position: translateY(-height)
+      const height = indicator.offsetHeight || 48;
+      indicator.style.transform = `translateY(${-height}px)`;
       indicator.style.opacity = '0';
       isPulling = false;
-      // Reset arrow/text after animation
       setTimeout(() => {
         setReady(false);
         if (arrow) arrow.style.transition = '';
         indicator.style.opacity = '';
-      }, 520);
+      }, 420);
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (el.scrollTop > 1) return; // tolerance for sub-pixel scrollTop values
+      if (el.scrollTop > 1) return;
       startY = e.touches[0].clientY;
       isPulling = false;
       wasReady = false;
-      // Don't preventDefault here — we only take over in touchmove when delta > 0
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -83,27 +95,33 @@ export function usePullToRefresh(
         if (isPulling) snapBack();
         return;
       }
-      // Wait until finger moved at least ACTIVATE px before taking over.
-      // This lets the browser handle short downward flicks (e.g. show system nav bar)
-      // without PTR interfering.
-      if (delta < ACTIVATE) return;
-      // Pulling down at scrollTop=0 — take over the gesture.
-      // e.cancelable is true because touchstart was registered as non-passive.
+
+      // ── Critical: prevent on the VERY FIRST downward touchmove ──────────
+      // Chrome/Edge commit the touch sequence to "native scroll" if the first
+      // touchmove doesn't call preventDefault(). After that, all subsequent
+      // events become non-cancelable regardless of passive flags.
+      // Calling preventDefault() here (before ACTIVATE) keeps the sequence
+      // cancelable. We only do this when scrollTop=0 + delta>0 (overscroll zone),
+      // so normal downward scrolling (scrollTop>1) and upward scrolling (delta≤0)
+      // are never affected — the browser can still update its address/nav bars.
       if (e.cancelable) e.preventDefault();
+
+      if (delta < ACTIVATE) return; // not far enough yet — gesture claimed but no visual
+
       isPulling = true;
 
-      const height = indicator.offsetHeight || 52;
-      // Cap pull at full indicator height so it's fully visible, with toolbar offset
-      const maxPull = height + MOBILE_TOOLBAR_HEIGHT;
-      const pull = Math.min(delta * DAMPEN, maxPull);
+      const height = indicator.offsetHeight || 48;
 
-      // Fade in smoothly: opacity ramps from 0 → 1 over the first 70% of travel
-      const opacity = Math.min(pull / (height * 0.7), 1).toFixed(2);
+      // pull: how far the indicator has moved from its hidden position.
+      // Capped at `height` — at that point the indicator is fully in view.
+      const pull = Math.min(delta * DAMPEN, height);
 
+      // translateY: -height (hidden above viewport) → 0 (fully visible at top)
       indicator.style.transition = 'none';
-      indicator.style.opacity = opacity;
-      // Offset by toolbar height so indicator appears below sticky toolbar
-      indicator.style.transform = `translateY(calc(-100% + ${pull}px))`;
+      indicator.style.transform = `translateY(${pull - height}px)`;
+
+      // Opacity ramps 0 → 1 as indicator slides in
+      indicator.style.opacity = Math.min(pull / height, 1).toFixed(2);
 
       const nowReady = delta >= THRESHOLD;
       if (nowReady !== wasReady) setReady(nowReady);
@@ -116,11 +134,12 @@ export function usePullToRefresh(
       if (shouldRefresh) onRefresh();
     };
 
-    // touchstart stays PASSIVE so the browser can freely handle native gestures
-    // (scroll-to-reveal address bar, system bars, etc.). preventDefault() is called
-    // in touchmove only when cancelable — overscroll-behavior:contain on the scroll
-    // container already suppresses native rubber-band on modern browsers.
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    // touchstart: NON-passive so the browser marks subsequent touchmove events as
+    // cancelable. We never call preventDefault() here — native scrolling and
+    // browser chrome (Edge bottom bar, iOS swipe-back) are unaffected.
+    // This is the critical flag: with passive:true, e.cancelable is always false
+    // in touchmove and our preventDefault() calls are silently ignored.
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
     el.addEventListener('touchcancel', onTouchEnd, { passive: true });

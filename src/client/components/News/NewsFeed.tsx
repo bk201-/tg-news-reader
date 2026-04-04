@@ -91,13 +91,14 @@ const useStyles = createStyles(({ css, token }) => ({
       transform 0.2s ease;
     box-shadow: ${token.boxShadow};
   `,
-  // Pull-to-refresh indicator — slides down from the top of the viewport
+  // Pull-to-refresh indicator — slides down from above the viewport.
+  // Initial transform is set programmatically by usePullToRefresh (translateY(-height)).
   ptrIndicator: css`
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 98;
+    z-index: 1001;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -107,7 +108,6 @@ const useStyles = createStyles(({ css, token }) => ({
     border-bottom: 1px solid ${token.colorBorderSecondary};
     color: ${token.colorText};
     font-size: 13px;
-    transform: translateY(-100%);
     opacity: 0;
     pointer-events: none;
     box-shadow: ${token.boxShadowSecondary};
