@@ -237,9 +237,13 @@ export function NewsFeedToolbar({
           </Text>
         </Space>
 
-        <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-          <Button type="text" icon={<MoreOutlined />} size="middle" />
-        </Dropdown>
+        <Space size={4}>
+          {/* Always-visible fetch button so loading state is obvious on mobile */}
+          <Button type="text" icon={<SyncOutlined />} size="middle" loading={fetchPending} onClick={onFetchDefault} />
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button type="text" icon={<MoreOutlined />} size="middle" />
+          </Dropdown>
+        </Space>
       </div>
     );
   }

@@ -1,7 +1,15 @@
 import React from 'react';
-import { Button, Space, Badge, Typography } from 'antd';
+import { Button, Badge, Typography, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { ReloadOutlined, EditOutlined, DeleteOutlined, WarningOutlined, LinkOutlined } from '@ant-design/icons';
+import {
+  ReloadOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  WarningOutlined,
+  LinkOutlined,
+  MoreOutlined,
+} from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
@@ -19,23 +27,16 @@ const useStyles = createStyles(({ css, token }) => ({
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s;
-    --actions-opacity: 0;
     &:hover {
       background: ${token.colorFillTertiary};
-      --actions-opacity: 1;
     }
     &:focus-visible {
       outline: 2px solid ${token.colorPrimary};
       outline-offset: -2px;
-      --actions-opacity: 1;
-    }
-    &:focus-within {
-      --actions-opacity: 1;
     }
   `,
   itemActive: css`
     background: ${token.colorPrimaryBg};
-    --actions-opacity: 1;
   `,
   info: css`
     display: flex;
@@ -44,11 +45,6 @@ const useStyles = createStyles(({ css, token }) => ({
     flex: 1;
     min-width: 0;
     overflow: hidden;
-  `,
-  actions: css`
-    flex-shrink: 0;
-    opacity: var(--actions-opacity, 0);
-    transition: opacity 0.15s;
   `,
   rightSide: css`
     display: flex;
@@ -71,9 +67,9 @@ interface ChannelItemProps {
   isFetchingThis: boolean;
   unreadCount: number;
   onSelect: () => void;
-  onFetch: (e: React.MouseEvent) => void;
-  onEdit: (e: React.MouseEvent) => void;
-  onDelete: (e: React.MouseEvent) => void;
+  onFetch: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 export function ChannelItem({
@@ -88,6 +84,47 @@ export function ChannelItem({
 }: ChannelItemProps) {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
+
+  const menuItems: MenuProps['items'] = [
+    {
+      key: 'open',
+      icon: <LinkOutlined />,
+      label: (
+        <a href={`https://t.me/${ch.telegramId}`} target="_blank" rel="noopener noreferrer">
+          {t('channels.open_tg_tooltip')}
+        </a>
+      ),
+    },
+    {
+      key: 'fetch',
+      icon: <ReloadOutlined spin={isFetchingThis} />,
+      label: t('channels.fetch_tooltip'),
+      disabled: isFetchingThis,
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        onFetch();
+      },
+    },
+    {
+      key: 'edit',
+      icon: <EditOutlined />,
+      label: t('channels.edit_tooltip'),
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        onEdit();
+      },
+    },
+    {
+      key: 'delete',
+      icon: <DeleteOutlined />,
+      label: t('channels.delete_tooltip'),
+      danger: true,
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        onDelete();
+      },
+    },
+  ];
 
   return (
     <div
@@ -122,29 +159,10 @@ export function ChannelItem({
         )}
       </div>
       <div className={styles.rightSide}>
-        <Space className={styles.actions} size={4}>
-          <Tooltip title={t('channels.open_tg_tooltip')}>
-            <Button
-              icon={<LinkOutlined />}
-              size="small"
-              type="text"
-              href={`https://t.me/${ch.telegramId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </Tooltip>
-          <Tooltip title={t('channels.fetch_tooltip')}>
-            <Button icon={<ReloadOutlined />} size="small" type="text" loading={isFetchingThis} onClick={onFetch} />
-          </Tooltip>
-          <Tooltip title={t('channels.edit_tooltip')}>
-            <Button icon={<EditOutlined />} size="small" type="text" onClick={onEdit} />
-          </Tooltip>
-          <Tooltip title={t('channels.delete_tooltip')}>
-            <Button icon={<DeleteOutlined />} size="small" type="text" danger onClick={onDelete} />
-          </Tooltip>
-        </Space>
         <Badge count={unreadCount} size="small" overflowCount={999} />
+        <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+          <Button icon={<MoreOutlined />} size="small" type="text" onClick={(e) => e.stopPropagation()} />
+        </Dropdown>
       </div>
     </div>
   );

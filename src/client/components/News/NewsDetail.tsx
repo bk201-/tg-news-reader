@@ -11,6 +11,7 @@ import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailBody } from './NewsDetailBody';
 import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   detail: css`
@@ -37,6 +38,11 @@ const useStyles = createStyles(({ css, token }) => ({
     /* Stays sticky within the accordion scroll container so action buttons remain visible */
     position: sticky;
     top: 0;
+    /* On mobile the NewsFeedToolbar is sticky at top:0 with a fixed height,
+       so the detail header must sit exactly below it. */
+    @media (max-width: ${BP_XL - 1}px) {
+      top: ${MOBILE_TOOLBAR_HEIGHT}px;
+    }
     z-index: 10;
     background: ${token.colorBgContainer};
   `,
@@ -108,17 +114,18 @@ export function NewsDetail({
     [extractContent, item.id, message, t],
   );
   const handleShare = useCallback(async () => {
-    const title = item.text?.split('\n')[0]?.trim().substring(0, 80) || 'News';
-    // Use native Web Share API only on touch devices (mobile/tablet).
-    // On desktop, Chrome 89+ exposes navigator.share too but shows a dialog we don't want.
+    const title = getNewsTitle(item); // first line of text, or "Сообщение #msgId"
+    // Include a short snippet as body so the share sheet / receiving app shows context.
+    // Trim to 200 chars — enough for a preview, not overwhelming.
+    const textSnippet = item.text?.trim().substring(0, 200);
     const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
     if (navigator.share && isTouchDevice) {
-      await navigator.share({ title, url: openUrl });
+      await navigator.share({ title, text: textSnippet, url: openUrl });
     } else {
       await navigator.clipboard.writeText(openUrl);
       void message.success(t('news.detail.share_copied'));
     }
-  }, [openUrl, item.text, message, t]);
+  }, [openUrl, item, message, t]);
 
   // ── Hotkeys + driven state ────────────────────────────────────────────
   // Registered in the CAPTURE phase so this handler always fires before

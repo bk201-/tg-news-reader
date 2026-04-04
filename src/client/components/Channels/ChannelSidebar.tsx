@@ -91,8 +91,7 @@ export function ChannelSidebar() {
     setModalOpen(true);
   };
 
-  const openEdit = (ch: Channel, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEdit = (ch: Channel) => {
     setEditingChannel(ch);
     form.setFieldsValue({
       telegramId: ch.telegramId,
@@ -153,8 +152,7 @@ export function ChannelSidebar() {
   // ── Sort modal state ──────────────────────────────────────────────────
   const [sortModalOpen, setSortModalOpen] = useState(false);
 
-  const openFetchModal = (ch: Channel, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openFetchModal = (ch: Channel) => {
     setFetchTargetId(ch.id);
     setFetchSince(ch.lastFetchedAt ? dayjs.unix(ch.lastFetchedAt) : null);
     setFetchModalOpen(true);
@@ -166,8 +164,7 @@ export function ChannelSidebar() {
     setFetchModalOpen(false);
   };
 
-  const handleDelete = (ch: Channel, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = (ch: Channel) => {
     Modal.confirm({
       title: t('channels.delete_confirm_title', { name: ch.name }),
       content: t('channels.delete_confirm_content'),
@@ -211,9 +208,9 @@ export function ChannelSidebar() {
             isFetchingThis={fetchChannel.isPending && fetchTargetId === ch.id}
             unreadCount={(ch.unreadCount || 0) + (pendingCounts[ch.id] || 0)}
             onSelect={() => setSelectedChannelId(ch.id)}
-            onFetch={(e) => openFetchModal(ch, e)}
-            onEdit={(e) => openEdit(ch, e)}
-            onDelete={(e) => handleDelete(ch, e)}
+            onFetch={() => openFetchModal(ch)}
+            onEdit={() => openEdit(ch)}
+            onDelete={() => handleDelete(ch)}
           />
         ))}
       </div>
