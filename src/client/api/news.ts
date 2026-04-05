@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { NewsItem, Channel } from '@shared/types.ts';
-import { useUIStore } from '../store/uiStore';
 
 export const newsKeys = {
   byChannel: (channelId: number, filtered = false) => ['news', channelId, filtered ? 'filtered' : 'all'] as const,
@@ -44,13 +43,10 @@ export function useMarkRead() {
 
 export function useMarkAllRead() {
   const qc = useQueryClient();
-  const clearPendingCount = useUIStore((s) => s.clearPendingCount);
   return useMutation({
     mutationFn: (channelId?: number) => api.post('/news/read-all', { channelId }),
     onSuccess: (_data, channelId) => {
-      // Clear pending badge count for this channel (or all channels)
       if (channelId !== undefined) {
-        clearPendingCount(channelId);
         qc.setQueriesData<NewsResponse>({ queryKey: ['news', channelId] }, (old) =>
           old ? { ...old, items: old.items.map((n) => ({ ...n, isRead: 1 })) } : old,
         );
@@ -58,13 +54,10 @@ export function useMarkAllRead() {
           old ? old.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)) : old,
         );
       } else {
-        // All channels at once — collect IDs first, then update caches
-        const allChannelIds = qc.getQueryData<Channel[]>(['channels'])?.map((ch) => ch.id) ?? [];
         qc.setQueriesData<NewsResponse>({ queryKey: ['news'] }, (old) =>
           old ? { ...old, items: old.items.map((n) => ({ ...n, isRead: 1 })) } : old,
         );
         qc.setQueryData<Channel[]>(['channels'], (old) => (old ? old.map((ch) => ({ ...ch, unreadCount: 0 })) : old));
-        allChannelIds.forEach((id) => clearPendingCount(id));
       }
     },
   });

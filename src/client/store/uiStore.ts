@@ -34,10 +34,6 @@ interface UIStore {
   // News view mode: 2-pane list or accordion
   newsViewMode: NewsViewMode;
   setNewsViewMode: (mode: NewsViewMode) => void;
-  // Pending counts from Telegram (messages not yet fetched, per channel)
-  pendingCounts: Record<number, number>;
-  setPendingCounts: (counts: Record<number, number>) => void;
-  clearPendingCount: (channelId: number) => void;
   // Mobile header hide-on-scroll
   headerHidden: boolean;
   setHeaderHidden: (v: boolean) => void;
@@ -84,14 +80,6 @@ export const useUIStore = create<UIStore>()((set) => ({
     localStorage.setItem('newsViewMode', mode);
     set({ newsViewMode: mode });
   },
-  pendingCounts: {},
-  setPendingCounts: (counts) => set((state) => ({ pendingCounts: { ...state.pendingCounts, ...counts } })),
-  clearPendingCount: (channelId) =>
-    set((state) => {
-      const next = { ...state.pendingCounts };
-      delete next[channelId];
-      return { pendingCounts: next };
-    }),
   headerHidden: false,
   setHeaderHidden: (v) => set({ headerHidden: v }),
   // Lightbox

@@ -7,12 +7,11 @@ import type { TooltipProps } from 'antd';
  * This wrapper renders children directly on such devices, keeping the full
  * Tooltip behaviour on mouse-driven screens.
  *
- * Detection is done once at module load via matchMedia — pointer type never
- * changes at runtime, so no reactivity is needed.
+ * Checked on every render (not cached at module load) so that Chrome DevTools
+ * device emulation toggle is reflected immediately without a page reload.
  */
-const isCoarsePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-
 export function MaybeTooltip({ children, ...props }: TooltipProps) {
+  const isCoarsePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   if (isCoarsePointer) return <>{children}</>;
   return <Tooltip {...props}>{children}</Tooltip>;
 }

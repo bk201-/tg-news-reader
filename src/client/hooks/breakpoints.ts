@@ -2,19 +2,86 @@ import { useState, useEffect } from 'react';
 
 /** Ant Design breakpoints — mirrors Grid.useBreakpoint() thresholds.
  *  In CSS: use these numbers for media query px values. */
-export const BP_SM = 576; // screens.sm:  ≥ 576px
-export const BP_MD = 768; // screens.md:  ≥ 768px
-export const BP_LG = 992; // screens.lg:  ≥ 992px
-export const BP_XL = 1200; // screens.xl:  ≥ 1200px → list view available
-export const BP_XXL = 1600; // screens.xxl: ≥ 1600px → full desktop (Splitter visible)
+export const BP_SM = 576;
+export const BP_MD = 768;
+export const BP_LG = 992;
+export const BP_XL = 1200;
+export const BP_XXL = 1600;
+
+// ── Height constants ──────────────────────────────────────────────────
+export const MOBILE_HEADER_HEIGHT = 64;
+export const MOBILE_TOOLBAR_HEIGHT = 44;
+export const MOBILE_STICKY_HEIGHT = MOBILE_HEADER_HEIGHT + MOBILE_TOOLBAR_HEIGHT + 13; // = 120
+
+// ── Singleton breakpoint store ────────────────────────────────────────
+// A single set of 5 matchMedia listeners broadcasts to all React subscribers.
+// Previously each useMatchMedia() call created its own listener per component instance.
+
+export interface BreakpointState {
+  isSm: boolean;
+  isMd: boolean;
+  isLg: boolean;
+  isXl: boolean;
+  isXxl: boolean;
+}
+
+type BpListener = (state: BreakpointState) => void;
+
+function readBreakpoints(): BreakpointState {
+  return {
+    isSm: window.matchMedia(`(min-width: ${BP_SM}px)`).matches,
+    isMd: window.matchMedia(`(min-width: ${BP_MD}px)`).matches,
+    isLg: window.matchMedia(`(min-width: ${BP_LG}px)`).matches,
+    isXl: window.matchMedia(`(min-width: ${BP_XL}px)`).matches,
+    isXxl: window.matchMedia(`(min-width: ${BP_XXL}px)`).matches,
+  };
+}
+
+function createBreakpointStore() {
+  let current = readBreakpoints();
+  const listeners = new Set<BpListener>();
+
+  const notify = () => {
+    current = readBreakpoints();
+    listeners.forEach((l) => l(current));
+  };
+
+  // One `change` handler per breakpoint threshold — fires only at the crossing point.
+  [BP_SM, BP_MD, BP_LG, BP_XL, BP_XXL].forEach((bp) => {
+    window.matchMedia(`(min-width: ${bp}px)`).addEventListener('change', notify);
+  });
+
+  return {
+    get: () => current,
+    subscribe: (listener: BpListener): (() => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
+// Instantiated once at module load — shared across the entire app lifetime.
+const bpStore = createBreakpointStore();
+
+// ── React hooks ───────────────────────────────────────────────────────
+
+/** Returns the full breakpoint state object. Re-renders only when a breakpoint threshold is crossed. */
+export function useBreakpoints(): BreakpointState {
+  const [state, setState] = useState(() => bpStore.get());
+  useEffect(() => bpStore.subscribe(setState), []);
+  return state;
+}
+
+/** ≥ 768px (md) — touch vs pointer, SortModal drag */
+export const useIsMd = () => useBreakpoints().isMd;
+/** ≥ 1200px (xl) — list view available, below forces accordion */
+export const useIsXl = () => useBreakpoints().isXl;
+/** ≥ 1600px (xxl) — full desktop: inline sidebar, pin downloads panel */
+export const useIsXxl = () => useBreakpoints().isXxl;
 
 /**
- * Subscribes to a single CSS media query and returns whether it currently matches.
- * More efficient than Grid.useBreakpoint() — only fires on the exact query crossing,
- * not on every Ant Design breakpoint transition.
- *
- * @example
- *   const isXxl = useMatchMedia(`(min-width: ${BP_XXL}px)`);
+ * @deprecated Use useBreakpoints() or useIsXl() etc. instead.
+ * Kept for backwards-compat — subscribes to a single arbitrary CSS media query.
  */
 export function useMatchMedia(query: string): boolean {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -26,28 +93,3 @@ export function useMatchMedia(query: string): boolean {
   }, [query]);
   return matches;
 }
-
-/** ≥ 768px (md) — touch vs pointer, SortModal drag */
-export const useIsMd = () => useMatchMedia(`(min-width: ${BP_MD}px)`);
-/** ≥ 1200px (xl) — list view available, below forces accordion */
-export const useIsXl = () => useMatchMedia(`(min-width: ${BP_XL}px)`);
-/** ≥ 1600px (xxl) — full desktop: inline sidebar, pin downloads panel */
-export const useIsXxl = () => useMatchMedia(`(min-width: ${BP_XXL}px)`);
-
-/** Height of AppHeader in px — used for scroll offsets and scroll-margin-top */
-export const MOBILE_HEADER_HEIGHT = 64;
-/**
- * Approximate height of the compact mobile NewsFeedToolbar in px.
- * Used as sticky top-offset in NewsDetail (inline variant) so the detail header
- * sticks below the toolbar instead of behind it.
- *
- * padding-top 6px + button 32px + padding-bottom 6px = 44px content height.
- * border-bottom 1px is rendered outside (border-box), so rendered height = 45px.
- * We use 43 here to account for sub-pixel rounding keeping the gap at 0.
- */
-export const MOBILE_TOOLBAR_HEIGHT = 44;
-/**
- * Combined sticky height on mobile: header + toolbar + small buffer.
- * Used as scroll-margin-top so that scrollIntoView places items below sticky elements.
- */
-export const MOBILE_STICKY_HEIGHT = MOBILE_HEADER_HEIGHT + MOBILE_TOOLBAR_HEIGHT + 13; // = 120

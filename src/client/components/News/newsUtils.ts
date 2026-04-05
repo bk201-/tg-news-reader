@@ -1,21 +1,23 @@
 import type { NewsItem } from '@shared/types.ts';
 
-/** Full title from first line of text, no truncation (for accordion header). */
-export function getNewsTitle(item: NewsItem): string {
+/** Full title from first line of text, no truncation (for accordion header).
+ *  Pass a translated `fallback` string when the item has no text (e.g. t('news.list.message_fallback', { id })). */
+export function getNewsTitle(item: NewsItem, fallback?: string): string {
   const text = item.text || '';
   const firstLine = text.split('\n')[0]?.trim() || '';
-  return firstLine || `Сообщение #${item.telegramMsgId}`;
+  return firstLine || fallback || `Message #${item.telegramMsgId}`;
 }
 
-/** Extract a short readable label from a URL (domain without www). */
-export function getLinkLabel(url: string, index: number): string {
+/** Extract a short readable label from a URL (domain without www).
+ *  Pass a translated `fallback` string for the error case (e.g. t('news.detail.link_fallback', { n: index + 1 })). */
+export function getLinkLabel(url: string, index: number, fallback?: string): string {
   try {
     const { hostname, pathname } = new URL(url);
     const host = hostname.replace(/^www\./, '');
     if (host === 't.me' && pathname.length > 1) return `t.me${pathname.split('/').slice(0, 2).join('/')}`;
     return host;
   } catch {
-    return `Ссылка ${index + 1}`;
+    return fallback ?? `Link ${index + 1}`;
   }
 }
 
@@ -43,5 +45,5 @@ export function getYouTubeEmbedId(url: string): string | null {
 }
 
 export function formatBytes(bytes: number): string {
-  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} МБ` : `${(bytes / 1024).toFixed(0)} КБ`;
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
 }

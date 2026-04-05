@@ -114,18 +114,15 @@ export function NewsDetail({
     [extractContent, item.id, message, t],
   );
   const handleShare = useCallback(async () => {
-    const title = getNewsTitle(item); // first line of text, or "Сообщение #msgId"
-    // Include a short snippet as body so the share sheet / receiving app shows context.
-    // Trim to 200 chars — enough for a preview, not overwhelming.
-    const textSnippet = item.text?.trim().substring(0, 200);
     const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
     if (navigator.share && isTouchDevice) {
-      await navigator.share({ title, text: textSnippet, url: openUrl });
+      // No title — it gets prepended by the OS share sheet and looks ugly ("News https://t.me/…")
+      await navigator.share({ url: openUrl });
     } else {
       await navigator.clipboard.writeText(openUrl);
       void message.success(t('news.detail.share_copied'));
     }
-  }, [openUrl, item, message, t]);
+  }, [openUrl, message, t]);
 
   // ── Hotkeys + driven state ────────────────────────────────────────────
   // Registered in the CAPTURE phase so this handler always fires before
@@ -192,7 +189,11 @@ export function NewsDetail({
           openUrl={openUrl}
           isExternalLink={isExternalLink}
           variant={variant}
-          title={variant === 'inline' ? getNewsTitle(item) : undefined}
+          title={
+            variant === 'inline'
+              ? getNewsTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }))
+              : undefined
+          }
           onHeaderClick={onHeaderClick}
           onTagClick={onTagClick}
           onShare={() => void handleShare()}
