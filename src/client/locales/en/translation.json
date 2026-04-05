@@ -147,7 +147,8 @@
       "article_queued_toast": "Article queued for download",
       "media_queued_toast": "Media queued for download",
       "select_link_title": "Select link to download",
-      "text_panel_title": "Post text"
+      "text_panel_title": "Post text",
+      "link_fallback": "Link {{n}}"
     },
     "list": {
       "list_label": "News list",

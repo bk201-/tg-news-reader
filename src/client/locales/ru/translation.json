@@ -147,7 +147,8 @@
       "article_queued_toast": "Статья поставлена в очередь загрузки",
       "media_queued_toast": "Медиа поставлено в очередь загрузки",
       "select_link_title": "Выберите ссылку для загрузки",
-      "text_panel_title": "Текст новости"
+      "text_panel_title": "Текст новости",
+      "link_fallback": "Ссылка {{n}}"
     },
     "list": {
       "list_label": "Список новостей",

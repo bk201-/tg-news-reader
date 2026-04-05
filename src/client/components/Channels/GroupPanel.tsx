@@ -64,7 +64,7 @@ export function GroupPanel() {
   const verifyPIN = useVerifyGroupPIN();
   const reorderGroups = useReorderGroups();
 
-  const { selectedGroupId, setSelectedGroupId, pendingCounts } = useUIStore();
+  const { selectedGroupId, setSelectedGroupId } = useUIStore();
   const { unlockedGroupIds } = useAuthStore();
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
@@ -86,13 +86,9 @@ export function GroupPanel() {
   const [sortModalOpen, setSortModalOpen] = useState(false);
 
   // ── Unread counts ─────────────────────────────────────────────────────
-  const generalCount = channels
-    .filter((ch) => !ch.groupId)
-    .reduce((s, ch) => s + (ch.unreadCount || 0) + (pendingCounts[ch.id] || 0), 0);
+  const generalCount = channels.filter((ch) => !ch.groupId).reduce((s, ch) => s + (ch.unreadCount || 0), 0);
   const groupCounts = groups.reduce<Record<number, number>>((acc, g) => {
-    acc[g.id] = channels
-      .filter((ch) => ch.groupId === g.id)
-      .reduce((s, ch) => s + (ch.unreadCount || 0) + (pendingCounts[ch.id] || 0), 0);
+    acc[g.id] = channels.filter((ch) => ch.groupId === g.id).reduce((s, ch) => s + (ch.unreadCount || 0), 0);
     return acc;
   }, {});
 

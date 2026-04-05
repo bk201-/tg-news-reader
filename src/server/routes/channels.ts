@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, count, and, isNull, inArray } from 'drizzle-orm';
+import { eq, count, and, inArray } from 'drizzle-orm';
 import { rmSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
@@ -185,53 +185,6 @@ router.get('/:id/media-progress', (c) => {
 
     cleanupFns.forEach((fn) => fn());
   });
-});
-
-// POST /api/channels/count-unread — counts new messages in Telegram per channel without fetching
-router.post('/count-unread', async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { groupId?: number | null };
-
-  // Filter to the requested group: null = "Общее" (no group), number = specific group, undefined = all
-  let channelList;
-  if (body.groupId === undefined) {
-    channelList = await db.select().from(channels);
-  } else if (body.groupId === null) {
-    channelList = await db.select().from(channels).where(isNull(channels.groupId));
-  } else {
-    channelList = await db.select().from(channels).where(eq(channels.groupId, body.groupId));
-  }
-  const counts: Record<number, number> = {};
-
-  for (const channel of channelList) {
-    try {
-      // Use lastFetchedAt (not lastReadAt) so we only count messages that are NOT yet in the DB.
-      // getSinceDate() uses lastReadAt first, which would double-count already-fetched unread messages.
-      const sinceDate = channel.lastFetchedAt
-        ? new Date(channel.lastFetchedAt * 1000)
-        : new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
-      const messages = await fetchChannelMessages(channel.telegramId, { sinceDate, limit: 200 });
-      counts[channel.id] = messages.length;
-      // Reset unavailable flag if channel is reachable again
-      if (channel.isUnavailable) {
-        await db.update(channels).set({ isUnavailable: 0 }).where(eq(channels.id, channel.id));
-      }
-    } catch (err) {
-      const msg = String(err instanceof Error ? err.message : err).toLowerCase();
-      const isGone =
-        msg.includes('username_not_occupied') ||
-        msg.includes('channel_invalid') ||
-        msg.includes('username_invalid') ||
-        msg.includes('could not find the input entity') ||
-        msg.includes('no user has') ||
-        msg.includes('channelprivate');
-      if (isGone) {
-        await db.update(channels).set({ isUnavailable: 1 }).where(eq(channels.id, channel.id));
-      }
-      counts[channel.id] = 0;
-    }
-  }
-
-  return c.json(counts);
 });
 
 // POST /api/channels/:id/fetch

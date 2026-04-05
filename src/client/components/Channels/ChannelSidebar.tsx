@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Modal, Button, Space, Typography, Form } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PlusOutlined, ReloadOutlined, OrderedListOutlined } from '@ant-design/icons';
@@ -12,9 +12,9 @@ import {
   useUpdateChannel,
   useDeleteChannel,
   useFetchChannel,
-  useCountUnreadChannels,
   useChannelLookup,
   useReorderChannels,
+  channelKeys,
 } from '../../api/channels';
 import { useGroups } from '../../api/groups';
 import { SortModal } from './SortModal';
@@ -24,6 +24,7 @@ import { ChannelFormModal } from './ChannelFormModal';
 import { ChannelFetchModal } from './ChannelFetchModal';
 import { useChannelHotkeys } from './useChannelHotkeys';
 import { ApiError } from '../../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { Text } = Typography;
 
@@ -64,19 +65,32 @@ export function ChannelSidebar() {
   const updateChannel = useUpdateChannel();
   const deleteChannel = useDeleteChannel();
   const fetchChannel = useFetchChannel();
-  const countUnread = useCountUnreadChannels();
   const lookupChannel = useChannelLookup();
   const reorderChannels = useReorderChannels();
   const { t } = useTranslation();
 
-  const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
+  const { selectedChannelId, setSelectedChannelId, selectedGroupId } = useUIStore();
   const { styles } = useStyles();
+  const qc = useQueryClient();
 
   useChannelHotkeys();
 
   const channels = allChannels.filter((ch) =>
     selectedGroupId === null ? !ch.groupId : ch.groupId === selectedGroupId,
   );
+
+  // ── Refresh all channels in the current group ─────────────────────────
+  const [isFetchingAll, setIsFetchingAll] = useState(false);
+  const handleRefreshAll = useCallback(async () => {
+    setIsFetchingAll(true);
+    try {
+      await Promise.allSettled(channels.map((ch) => fetchChannel.mutateAsync({ id: ch.id })));
+      // Refresh channel list from DB to get accurate unread counts
+      void qc.invalidateQueries({ queryKey: channelKeys.all });
+    } finally {
+      setIsFetchingAll(false);
+    }
+  }, [channels, fetchChannel, qc]);
 
   // ── Form modal state ──────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
@@ -189,11 +203,7 @@ export function ChannelSidebar() {
             <Button icon={<OrderedListOutlined />} onClick={() => setSortModalOpen(true)} />
           </Tooltip>
           <Tooltip title={t('sidebar.refresh_tooltip')}>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => countUnread.mutate(selectedGroupId)}
-              loading={countUnread.isPending}
-            />
+            <Button icon={<ReloadOutlined />} onClick={() => void handleRefreshAll()} loading={isFetchingAll} />
           </Tooltip>
         </Space>
       </div>
@@ -206,7 +216,7 @@ export function ChannelSidebar() {
             channel={ch}
             isSelected={selectedChannelId === ch.id}
             isFetchingThis={fetchChannel.isPending && fetchTargetId === ch.id}
-            unreadCount={(ch.unreadCount || 0) + (pendingCounts[ch.id] || 0)}
+            unreadCount={ch.unreadCount || 0}
             onSelect={() => setSelectedChannelId(ch.id)}
             onFetch={() => openFetchModal(ch)}
             onEdit={() => openEdit(ch)}

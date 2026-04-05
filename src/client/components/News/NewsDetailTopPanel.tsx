@@ -126,7 +126,7 @@ export function NewsDetailTopPanel({ panel, links, text, onClose }: NewsDetailTo
                 <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={styles.linkRow}>
                   <span className={styles.linkLabel}>
                     <LinkOutlined className={styles.linkIcon} />
-                    {getLinkLabel(link, i)}
+                    {getLinkLabel(link, i, t('news.detail.link_fallback', { n: i + 1 }))}
                   </span>
                   <span className={styles.linkUrl}>{link}</span>
                 </a>
