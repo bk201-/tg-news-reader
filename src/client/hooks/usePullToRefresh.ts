@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 
 // How far the finger must travel (raw px) before PTR takes over the gesture.
 // Keeps accidental brushes and system-chrome swipes from activating PTR.
-const ACTIVATE = 20; // px
+// 40px (was 20px) — a quick tap-and-flick often has an initial downward bounce
+// of 20-30px before the upward motion starts; 40px avoids false triggers.
+const ACTIVATE = 40; // px
 
 // How far the finger must travel (raw px) before releasing triggers a refresh.
 // At DAMPEN=0.5 this means the indicator must have slid to its maximum visible
@@ -51,6 +53,10 @@ export function usePullToRefresh(
     let startY = 0;
     let isPulling = false;
     let wasReady = false;
+    // True until the gesture goes upward (delta <= 0) for the first time.
+    // PTR must not activate if the user changed direction — that means it's a
+    // scroll gesture that started with a small downward bounce, not a real pull.
+    let gestureDownward = true;
 
     const arrow = indicator.querySelector<HTMLElement>('[data-ptr-icon]');
     const text = indicator.querySelector<HTMLElement>('[data-ptr-text]');
@@ -83,6 +89,7 @@ export function usePullToRefresh(
       startY = e.touches[0].clientY;
       isPulling = false;
       wasReady = false;
+      gestureDownward = true; // reset: new gesture starts fresh
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -92,19 +99,17 @@ export function usePullToRefresh(
       }
       const delta = e.touches[0].clientY - startY;
       if (delta <= 0) {
+        gestureDownward = false; // gesture went upward — not a PTR pull
         if (isPulling) snapBack();
         return;
       }
 
-      // Don't intercept until the finger has travelled ACTIVATE px.
-      // Calling preventDefault() before this threshold would cancel the browser's
-      // momentum (inertia) tracking for quick flicks, making a tap-and-flick feel
-      // unresponsive — the user has to drag slowly instead of swiping naturally.
-      // Trade-off: on Chrome the browser may have already committed to native scroll
-      // by the time we reach ACTIVATE, so the PTR indicator only shows for
-      // deliberate slow pulls. iOS Safari cancels the scroll sequence later and
-      // handles PTR correctly.
-      if (delta < ACTIVATE) return;
+      // Don't intercept until the finger has travelled ACTIVATE px AND the
+      // gesture has been purely downward the whole time.
+      // `!gestureDownward` catches the common case of a scroll flick that starts
+      // with a small downward bounce (≥ ACTIVATE px) before moving upward —
+      // without this check, the bounce triggers PTR and blocks the scroll.
+      if (delta < ACTIVATE || !gestureDownward) return;
 
       if (e.cancelable) e.preventDefault();
 
