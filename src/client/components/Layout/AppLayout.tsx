@@ -71,17 +71,20 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
+  // Mobile layout: no fixed height / overflow — body is the scroll container.
+  // window.scrollY changes as user scrolls → Edge/Safari hide their browser chrome.
+  layoutMobile: css`
+    min-height: 100dvh;
+  `,
   // ── Mobile-only: single scroll container ─────────────────────────────────
   // In accordion mode (< 1200px) the entire page — header, toolbar, news — lives
-  // in ONE overflow-y:auto container. The browser handles scroll naturally:
-  //   - AppHeader scrolls away (normal flow)
+  // in normal document flow. Body scrolls naturally:
+  //   - AppHeader scrolls away
   //   - NewsFeedToolbar has position:sticky top:0 → sticks when header is off-screen
-  //   - No JS needed for any of this
+  //   - window.scrollY changes → mobile browser chrome (Edge/Safari) hides/shows
   mobileContainer: css`
-    height: 100vh;
-    overflow-y: auto;
+    min-height: 100dvh;
     overflow-x: hidden;
-    overscroll-behavior-y: contain;
     background: ${token.colorBgLayout};
   `,
 }));
@@ -217,7 +220,7 @@ export function AppLayout() {
   // No JS needed for any header/toolbar behaviour.
   if (isAccordionMode) {
     return (
-      <Layout className={styles.layout}>
+      <Layout className={styles.layoutMobile}>
         {sidebarDrawer}
         <div ref={mobileContainerRef} className={styles.mobileContainer}>
           <AppHeader />

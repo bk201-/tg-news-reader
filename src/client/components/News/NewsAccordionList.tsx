@@ -78,17 +78,20 @@ export function NewsAccordionList({
   const { t } = useTranslation();
   const { styles } = useStyles();
 
-  // Capture the mobile scroll parent after mount (AppLayout commits before NewsFeed renders
-  // on channel-switch re-renders, so current is already set; state ensures Virtuoso re-mounts
-  // correctly if it was somehow null on first pass).
-  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(
-    () => mobileScrollContainerRef?.current ?? undefined,
+  // On mobile the scroll container is document.body (body-scroll model so that
+  // mobile browser chrome hides/shows as the user scrolls).
+  // customScrollParent is set only when mobileScrollContainerRef is provided
+  // (i.e. we're in accordion/mobile mode); undefined on desktop lets Virtuoso
+  // manage its own internal scroll.
+  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(() =>
+    mobileScrollContainerRef ? document.body : undefined,
   );
   useEffect(() => {
-    const el = mobileScrollContainerRef?.current;
-    if (el && el !== customScrollParent) setCustomScrollParent(el);
+    if (mobileScrollContainerRef && customScrollParent !== document.body) {
+      setCustomScrollParent(document.body);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mobileScrollContainerRef]);
+  }, [!!mobileScrollContainerRef]);
 
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
