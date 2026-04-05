@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { FlagRU, FlagUS } from '../Flags';
 import { clearSwCache } from '../../services/serviceWorker';
 import { DownloadsPanel } from './DownloadsPanel';
+import { LogsPanel } from './LogsPanel';
 import { TotpSetupModal } from './TotpSetupModal';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
@@ -223,6 +224,7 @@ export function AppHeader() {
         )}
         <div className={styles.actions}>
           <DownloadsPanel />
+          <LogsPanel />
           <Tooltip title={isDarkTheme ? t('header.theme_light') : t('header.theme_dark')}>
             <Button
               type="text"

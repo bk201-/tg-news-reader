@@ -5,6 +5,45 @@
 
 ---
 
+## Persistent storage (Azure Files)
+
+Media files are stored in `/app/data` inside the container. This path is mounted to an Azure Files share so files survive redeployments and container restarts.
+
+| Resource | Value |
+|---|---|
+| Storage Account | `personalapps` (shared) |
+| File Share | `tgr-media` |
+| Storage link name | `tgr-media` (registered in Container Apps Env) |
+| Volume name | `data-volume` |
+| Mount path | `/app/data` |
+
+The volume and mount were set up once via `az containerapp update --yaml`. Subsequent `az containerapp update --image` calls (used in CI) **preserve** `volumeMounts` — confirmed empirically. No extra CI step needed.
+
+If the mount ever needs to be re-applied (e.g. after the Container App is recreated from scratch):
+
+```bash
+cat > /tmp/ca-volume.yaml <<'EOF'
+properties:
+  template:
+    containers:
+    - name: tg-news-reader
+      image: <current-image-uri>
+      volumeMounts:
+      - mountPath: /app/data
+        volumeName: data-volume
+    volumes:
+    - name: data-volume
+      storageType: AzureFile
+      storageName: tgr-media
+EOF
+az containerapp update \
+  --name tg-news-reader \
+  --resource-group personal-apps-rg \
+  --yaml /tmp/ca-volume.yaml
+```
+
+---
+
 ## Current Container App configuration
 
 | Parameter | Value | Updated |
