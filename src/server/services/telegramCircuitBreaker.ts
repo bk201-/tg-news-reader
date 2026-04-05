@@ -64,8 +64,8 @@ class TelegramCircuitBreaker {
     }
   }
 
-  private async handleAuthKeyUnregistered(): Promise<void> {
-    logger.warn({ module: 'telegram' }, 'AUTH_KEY_UNREGISTERED — attempting automatic reconnect');
+  private async handleAuthKeyInvalid(reason: string): Promise<void> {
+    logger.warn({ module: 'telegram', reason }, `${reason} — attempting automatic reconnect`);
     if (_reconnectFn) {
       try {
         await _reconnectFn();
@@ -80,8 +80,8 @@ class TelegramCircuitBreaker {
     if (!this._sessionExpired) {
       this._sessionExpired = true;
       void sendAlert(
-        'Telegram session expired (AUTH_KEY_UNREGISTERED) — run <code>npm run tg:auth</code> and redeploy',
-        'auth-key-unregistered',
+        `Telegram session invalidated (${reason}) — run <code>npm run tg:auth</code> and redeploy`,
+        'auth-key-invalid',
       );
     }
   }
@@ -99,9 +99,13 @@ class TelegramCircuitBreaker {
       return result;
     } catch (err) {
       if (isTransientTelegramError(err)) this.recordFailure();
-      // Session expired → attempt auto-reconnect, then alert if still failing (permanent)
-      if (err instanceof Error && err.message.includes('AUTH_KEY_UNREGISTERED')) {
-        await this.handleAuthKeyUnregistered();
+      // Session invalidated → attempt auto-reconnect, then alert if still failing (permanent)
+      if (err instanceof Error) {
+        if (err.message.includes('AUTH_KEY_UNREGISTERED')) {
+          await this.handleAuthKeyInvalid('AUTH_KEY_UNREGISTERED');
+        } else if (err.message.includes('AUTH_KEY_DUPLICATED')) {
+          await this.handleAuthKeyInvalid('AUTH_KEY_DUPLICATED');
+        }
       }
       throw err;
     }

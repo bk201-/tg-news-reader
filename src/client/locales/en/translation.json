@@ -259,6 +259,15 @@
     "open_in_telegram": "Open in Telegram",
     "share": "Share"
   },
+  "logs": {
+    "button_tooltip": "Server logs",
+    "title": "Server Logs",
+    "refresh": "Refresh",
+    "scroll_bottom": "Scroll to bottom",
+    "empty": "No log entries for the selected time range and level.",
+    "entry_count": "{{count}} entries",
+    "buffer_size": "buffer: {{count}}"
+  },
   "digest": {
     "button": "Digest ✨",
     "tooltip": "Generate AI digest of current news",

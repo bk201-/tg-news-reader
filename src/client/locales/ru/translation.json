@@ -259,6 +259,15 @@
     "open_in_telegram": "Открыть в Telegram",
     "share": "Поделиться"
   },
+  "logs": {
+    "button_tooltip": "Логи сервера",
+    "title": "Логи сервера",
+    "refresh": "Обновить",
+    "scroll_bottom": "Прокрутить вниз",
+    "empty": "Нет записей за выбранный период и уровень.",
+    "entry_count": "{{count}} записей",
+    "buffer_size": "буфер: {{count}}"
+  },
   "digest": {
     "button": "Дайджест ✨",
     "tooltip": "Сгенерировать AI-дайджест текущих новостей",

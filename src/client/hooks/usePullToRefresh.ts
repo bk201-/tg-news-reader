@@ -96,17 +96,17 @@ export function usePullToRefresh(
         return;
       }
 
-      // ── Critical: prevent on the VERY FIRST downward touchmove ──────────
-      // Chrome/Edge commit the touch sequence to "native scroll" if the first
-      // touchmove doesn't call preventDefault(). After that, all subsequent
-      // events become non-cancelable regardless of passive flags.
-      // Calling preventDefault() here (before ACTIVATE) keeps the sequence
-      // cancelable. We only do this when scrollTop=0 + delta>0 (overscroll zone),
-      // so normal downward scrolling (scrollTop>1) and upward scrolling (delta≤0)
-      // are never affected — the browser can still update its address/nav bars.
-      if (e.cancelable) e.preventDefault();
+      // Don't intercept until the finger has travelled ACTIVATE px.
+      // Calling preventDefault() before this threshold would cancel the browser's
+      // momentum (inertia) tracking for quick flicks, making a tap-and-flick feel
+      // unresponsive — the user has to drag slowly instead of swiping naturally.
+      // Trade-off: on Chrome the browser may have already committed to native scroll
+      // by the time we reach ACTIVATE, so the PTR indicator only shows for
+      // deliberate slow pulls. iOS Safari cancels the scroll sequence later and
+      // handles PTR correctly.
+      if (delta < ACTIVATE) return;
 
-      if (delta < ACTIVATE) return; // not far enough yet — gesture claimed but no visual
+      if (e.cancelable) e.preventDefault();
 
       isPulling = true;
 
@@ -134,11 +134,11 @@ export function usePullToRefresh(
       if (shouldRefresh) onRefresh();
     };
 
-    // touchstart: NON-passive so the browser marks subsequent touchmove events as
-    // cancelable. We never call preventDefault() here — native scrolling and
-    // browser chrome (Edge bottom bar, iOS swipe-back) are unaffected.
-    // This is the critical flag: with passive:true, e.cancelable is always false
-    // in touchmove and our preventDefault() calls are silently ignored.
+    // touchstart: NON-passive so that touchmove events are cancelable.
+    // We never call preventDefault() in touchstart itself; we do it in
+    // touchmove only after the ACTIVATE threshold is crossed. This preserves
+    // native momentum/inertia scrolling for quick flicks while still allowing
+    // PTR to intercept deliberate slow pulls.
     el.addEventListener('touchstart', onTouchStart, { passive: false });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
