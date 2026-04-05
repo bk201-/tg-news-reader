@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Button } from 'antd';
+import { LoadingOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
-import { LoadingOutlined } from '@ant-design/icons';
 import { mediaUrl } from '../../api/mediaUrl';
 
 interface LightboxMediaProps {
@@ -9,11 +10,14 @@ interface LightboxMediaProps {
   isAlbum: boolean;
   albumIndex: number;
   albumPaths: string[] | undefined;
-  /** Passed up to allow seek on keyboard events */
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** Called when user wants to queue a download for the missing media */
+  onDownload?: () => void;
+  /** Called when the image failed to load (e.g. expired URL) */
+  onRetry?: () => void;
 }
 
-const useStyles = createStyles(({ css }) => ({
+const useStyles = createStyles(({ css, token }) => ({
   wrap: css`
     display: flex;
     align-items: center;
@@ -21,6 +25,7 @@ const useStyles = createStyles(({ css }) => ({
     flex: 1;
     min-height: 0;
     user-select: none;
+    position: relative;
   `,
   img: css`
     max-width: 100%;
@@ -41,11 +46,42 @@ const useStyles = createStyles(({ css }) => ({
     font-size: 40px;
     color: rgba(255, 255, 255, 0.45);
   `,
+  // Overlay shown OVER the existing image while the next one loads –
+  // the previous image stays visible underneath so there's no blank flash.
+  loadingOverlay: css`
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 4px;
+    pointer-events: none;
+  `,
+  errorOverlay: css`
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: ${token.colorTextSecondary};
+    font-size: 13px;
+  `,
 }));
 
-export function LightboxMedia({ path, isVideo, isAlbum, albumIndex, albumPaths, videoRef }: LightboxMediaProps) {
+export function LightboxMedia({
+  path,
+  isVideo,
+  isAlbum,
+  albumIndex,
+  albumPaths,
+  videoRef,
+  onDownload,
+  onRetry,
+}: LightboxMediaProps) {
   const { styles } = useStyles();
-
   // Set initial volume on mount / path change
   useEffect(() => {
     if (videoRef.current) {
@@ -53,23 +89,45 @@ export function LightboxMedia({ path, isVideo, isAlbum, albumIndex, albumPaths, 
     }
   }, [path, videoRef]);
 
+  const displayPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? path) : path;
+
+  // Track loading/error per src — reset when displayPath changes without useEffect
+  // (React "adjust state during render" pattern to avoid cascading-render lint error).
+  const [trackedPath, setTrackedPath] = useState(displayPath);
+  const [imgLoading, setImgLoading] = useState(!!displayPath);
+  const [imgError, setImgError] = useState(false);
+  if (trackedPath !== displayPath) {
+    setTrackedPath(displayPath);
+    setImgLoading(!!displayPath);
+    setImgError(false);
+  }
+
+  // No path at all — media not downloaded yet
   if (!path) {
     return (
       <div className={styles.wrap}>
-        <LoadingOutlined className={styles.spinner} />
+        {onDownload ? (
+          <div className={styles.errorOverlay} style={{ position: 'static' }}>
+            <LoadingOutlined className={styles.spinner} />
+            <Button icon={<DownloadOutlined />} onClick={onDownload} ghost>
+              Download
+            </Button>
+          </div>
+        ) : (
+          <LoadingOutlined className={styles.spinner} />
+        )}
       </div>
     );
   }
 
-  const displayPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? path) : path;
-
   return (
     <div className={styles.wrap}>
       {isVideo ? (
+        // Video must remount when source changes so the browser reloads it
         <video
           ref={videoRef}
           key={displayPath}
-          src={mediaUrl(displayPath)}
+          src={mediaUrl(displayPath!)}
           className={styles.video}
           autoPlay
           loop
@@ -77,7 +135,42 @@ export function LightboxMedia({ path, isVideo, isAlbum, albumIndex, albumPaths, 
           playsInline
         />
       ) : (
-        <img key={displayPath} src={mediaUrl(displayPath)} alt="" className={styles.img} draggable={false} />
+        <>
+          {/* img intentionally has NO key — reusing the same DOM node lets the
+              previous image stay visible while the new src is decoding (Issue 12) */}
+          <img
+            src={mediaUrl(displayPath!)}
+            alt=""
+            className={styles.img}
+            draggable={false}
+            onLoadStart={() => {
+              setImgLoading(true);
+              setImgError(false);
+            }}
+            onLoad={() => setImgLoading(false)}
+            onError={() => {
+              setImgLoading(false);
+              setImgError(true);
+            }}
+          />
+          {/* Spinner overlay while loading — previous image stays visible beneath */}
+          {imgLoading && !imgError && (
+            <div className={styles.loadingOverlay}>
+              <LoadingOutlined className={styles.spinner} />
+            </div>
+          )}
+          {/* Error state — broken / expired URL */}
+          {imgError && (
+            <div className={styles.errorOverlay}>
+              <span>Failed to load</span>
+              {onRetry && (
+                <Button icon={<ReloadOutlined />} onClick={onRetry} ghost size="small">
+                  Retry
+                </Button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

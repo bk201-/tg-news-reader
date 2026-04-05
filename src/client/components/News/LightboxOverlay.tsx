@@ -3,12 +3,15 @@ import { createPortal } from 'react-dom';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '../../store/uiStore';
-import { useChannels } from '../../api/channels';
+import { useChannels, channelKeys } from '../../api/channels';
 import { useMarkRead } from '../../api/news';
+import { useDownloadMedia } from '../../api/news';
 import { useLightboxNav } from './useLightboxNav';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
+import { mediaUrl } from '../../api/mediaUrl';
 
 /** History state key pushed when the lightbox opens */
 const HISTORY_KEY = '_lightboxOpen';
@@ -23,50 +26,45 @@ const useStyles = createStyles(({ css }) => ({
     flex-direction: column;
     outline: none;
   `,
-  navBtn: css`
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 18px;
-    cursor: pointer;
-    transition:
-      background 0.15s,
-      color 0.15s;
-    outline: none;
-    padding: 0;
-    &:hover {
-      background: rgba(255, 255, 255, 0.22);
-      color: #fff;
-    }
-    &:disabled {
-      opacity: 0.2;
-      cursor: default;
-    }
-  `,
-  navPrev: css`
-    left: 16px;
-  `,
-  navNext: css`
-    right: 16px;
-  `,
+  // ── Media row: [navPrev][media][navNext] — no absolute positioning ───
+  // Buttons are flex siblings of the media, so they never overlap it.
   mediaArea: css`
     flex: 1;
     min-height: 0;
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    position: relative;
-    padding: 0 72px;
+  `,
+  navBtn: css`
+    flex-shrink: 0;
+    width: 56px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 20px;
+    cursor: pointer;
+    transition:
+      color 0.15s,
+      background 0.15s;
+    outline: none;
+    padding: 0;
+    @container (max-width: 360px) {
+      width: 36px;
+      font-size: 16px;
+    }
+    &:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.07);
+    }
+    &:disabled {
+      opacity: 0.15;
+      cursor: default;
+    }
   `,
   counter: css`
     flex-shrink: 0;
@@ -79,17 +77,23 @@ const useStyles = createStyles(({ css }) => ({
 }));
 
 export function LightboxOverlay() {
-  const { styles, cx } = useStyles();
+  const { styles } = useStyles();
   const { t } = useTranslation();
+  const qc = useQueryClient();
 
   const { lightbox, closeLightbox, openLightbox, setLightboxAlbumIndex } = useUIStore();
   const { data: channels = [] } = useChannels();
   const markRead = useMarkRead();
+  const downloadMedia = useDownloadMedia();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // ── History API: push a state when lightbox opens so the browser back button /
-  // swipe-back gesture dismisses the lightbox instead of navigating away.
+  // ── Album index memory (Issue 10) ────────────────────────────────────
+  // Remembers the last-viewed album image index per newsId so that navigating
+  // back to a previously viewed item restores position instead of jumping to 0.
+  const albumHistory = useRef<Map<number, number>>(new Map());
+
+  // ── History API ───────────────────────────────────────────────────────
   const closedByBackRef = useRef(false);
   useEffect(() => {
     if (!lightbox) return;
@@ -103,8 +107,6 @@ export function LightboxOverlay() {
     window.addEventListener('popstate', onPop);
     return () => {
       window.removeEventListener('popstate', onPop);
-      // Lightbox closed by non-back means (Esc, X, backdrop) — replace in-place,
-      // same reason as sidebar: don't silently consume the user's next Back press.
       if (!closedByBackRef.current) {
         history.replaceState(null, '', window.location.href);
       }
@@ -118,11 +120,17 @@ export function LightboxOverlay() {
 
   const channel = channels.find((c) => c.id === channelId);
 
+  // Track albumIndex per newsId
+  useEffect(() => {
+    if (newsId) albumHistory.current.set(newsId, albumIndex);
+  }, [newsId, albumIndex]);
+
   const navigate = useCallback(
     (nextNewsId: number, nextAlbumIndex: number) => {
-      openLightbox(nextNewsId, nextAlbumIndex, channelId);
+      // Restore last-viewed album position if navigating back to a known item
+      const restoredIndex = nextAlbumIndex !== 0 ? nextAlbumIndex : (albumHistory.current.get(nextNewsId) ?? 0);
+      openLightbox(nextNewsId, restoredIndex, channelId);
 
-      // Auto-mark as read for media channels
       const ch = channels.find((c) => c.id === channelId);
       if (ch?.channelType === 'media' || ch?.channelType === 'blog') {
         markRead.mutate({ id: nextNewsId, isRead: 1, channelId });
@@ -132,6 +140,18 @@ export function LightboxOverlay() {
   );
 
   const nav = useLightboxNav(channelId, newsId, albumIndex, navigate);
+
+  // ── Prefetch adjacent images (Issue 8) ───────────────────────────────
+  useEffect(() => {
+    const { entries, cursor } = nav;
+    [entries[cursor - 1], entries[cursor + 1]].forEach((e) => {
+      const p = e?.item.localMediaPaths?.[0] ?? e?.item.localMediaPath;
+      if (p) {
+        const img = new Image();
+        img.src = mediaUrl(p);
+      }
+    });
+  }, [nav]);
 
   // Auto-mark as read on open (media channels)
   useEffect(() => {
@@ -144,48 +164,37 @@ export function LightboxOverlay() {
 
   // Focus overlay so keyboard events are received
   useEffect(() => {
-    if (lightbox) {
-      overlayRef.current?.focus();
-    }
+    if (lightbox) overlayRef.current?.focus();
   }, [lightbox]);
 
-  // Keyboard handler
+  // ── Keyboard handler ──────────────────────────────────────────────────
   useEffect(() => {
     if (!lightbox) return;
-
     const onKey = (e: KeyboardEvent) => {
-      // Always capture when lightbox is open
       switch (e.key) {
         case 'Escape':
           e.preventDefault();
           e.stopImmediatePropagation();
           closeLightbox();
           break;
-
         case 'ArrowUp':
           e.preventDefault();
           e.stopImmediatePropagation();
           nav.go(-1);
           break;
-
         case 'ArrowDown':
           e.preventDefault();
           e.stopImmediatePropagation();
           nav.go(1);
           break;
-
         case 'ArrowLeft':
           e.preventDefault();
           e.stopImmediatePropagation();
           if (nav.isVideo) {
             if (videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
-          } else if (nav.isAlbum) {
-            nav.goToAlbumImage(-1);
-          } else {
-            nav.go(-1);
-          }
+          } else if (nav.isAlbum) nav.goToAlbumImage(-1);
+          else nav.go(-1);
           break;
-
         case 'ArrowRight':
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -195,13 +204,9 @@ export function LightboxOverlay() {
                 videoRef.current.duration || Infinity,
                 videoRef.current.currentTime + 10,
               );
-          } else if (nav.isAlbum) {
-            nav.goToAlbumImage(1);
-          } else {
-            nav.go(1);
-          }
+          } else if (nav.isAlbum) nav.goToAlbumImage(1);
+          else nav.go(1);
           break;
-
         case ' ':
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -210,45 +215,31 @@ export function LightboxOverlay() {
               if (videoRef.current.paused) void videoRef.current.play();
               else videoRef.current.pause();
             }
-          } else {
-            nav.go(1);
-          }
+          } else nav.go(1);
           break;
       }
     };
-
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [lightbox, closeLightbox, nav]);
 
-  // Scroll / wheel handler — accumulates deltaY to handle trackpad smoothly.
-  // A single trackpad swipe fires many small events; we only navigate once the
-  // accumulated delta crosses a threshold, then reset and ignore further events
-  // until the gesture pauses (no wheel events for 150ms).
+  // ── Wheel handler ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!lightbox) return;
-
-    const THRESHOLD = 80; // px accumulated before navigating
-    const RESET_DELAY = 150; // ms without events → reset accumulator
-
+    const THRESHOLD = 80;
+    const RESET_DELAY = 150;
     let accumulated = 0;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
-    let navigated = false; // block further nav after threshold crossed until reset
-
+    let navigated = false;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-
       accumulated += e.deltaY;
-
-      // Reset timer: after RESET_DELAY ms of silence, allow next gesture
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => {
         accumulated = 0;
         navigated = false;
       }, RESET_DELAY);
-
       if (navigated) return;
-
       if (accumulated > THRESHOLD) {
         navigated = true;
         nav.go(1);
@@ -257,11 +248,40 @@ export function LightboxOverlay() {
         nav.go(-1);
       }
     };
-
     window.addEventListener('wheel', onWheel, { capture: true, passive: false });
     return () => {
       window.removeEventListener('wheel', onWheel, { capture: true });
       if (resetTimer) clearTimeout(resetTimer);
+    };
+  }, [lightbox, nav]);
+
+  // ── Touch swipe handler (Issue 6) ────────────────────────────────────
+  useEffect(() => {
+    if (!lightbox) return;
+    const SWIPE_THRESHOLD = 50;
+    let startX = 0;
+    let startY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD) {
+        // Horizontal swipe — album image or next/prev item
+        if (nav.isAlbum) nav.goToAlbumImage(dx < 0 ? 1 : -1);
+        else nav.go(dx < 0 ? 1 : -1);
+      } else if (Math.abs(dy) > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+        // Vertical swipe — navigate items
+        nav.go(dy < 0 ? 1 : -1);
+      }
+    };
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
     };
   }, [lightbox, nav]);
 
@@ -270,9 +290,17 @@ export function LightboxOverlay() {
   const { currentEntry, isVideo, isAlbum, albumLength, firstMediaPath } = nav;
   const item = currentEntry?.item;
   const albumPaths = item?.localMediaPaths;
-
-  // Current displayed media path (respects album index)
   const currentMediaPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? firstMediaPath) : firstMediaPath;
+
+  const handleDownload = () => {
+    if (item) downloadMedia.mutate(item.id);
+  };
+
+  const handleRetry = () => {
+    // Invalidate news cache to refresh signed URLs, then re-open at same position
+    void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    void qc.invalidateQueries({ queryKey: channelKeys.all });
+  };
 
   return createPortal(
     <div
@@ -283,7 +311,6 @@ export function LightboxOverlay() {
       aria-modal="true"
       aria-label={t('lightbox.title')}
       onClick={(e) => {
-        // Close when clicking the backdrop (not on toolbar/buttons)
         if (e.target === e.currentTarget) closeLightbox();
       }}
     >
@@ -296,10 +323,10 @@ export function LightboxOverlay() {
         onClose={closeLightbox}
       />
 
+      {/* Issue 11: flex-row layout — buttons are siblings, never overlap image */}
       <div className={styles.mediaArea}>
-        {/* Prev button */}
         <button
-          className={cx(styles.navBtn, styles.navPrev)}
+          className={styles.navBtn}
           onClick={(e) => {
             e.stopPropagation();
             if (nav.isAlbum && albumIndex > 0) setLightboxAlbumIndex(albumIndex - 1);
@@ -317,11 +344,12 @@ export function LightboxOverlay() {
           albumIndex={albumIndex}
           albumPaths={albumPaths}
           videoRef={videoRef}
+          onDownload={handleDownload}
+          onRetry={handleRetry}
         />
 
-        {/* Next button */}
         <button
-          className={cx(styles.navBtn, styles.navNext)}
+          className={styles.navBtn}
           onClick={(e) => {
             e.stopPropagation();
             if (nav.isAlbum && albumIndex < albumLength - 1) setLightboxAlbumIndex(albumIndex + 1);
