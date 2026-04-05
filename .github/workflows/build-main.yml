@@ -86,6 +86,7 @@ jobs:
             --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
             --revision-suffix "r${SHORT_SHA}"
 
+
       # ── Single-revision mode: deactivate all revisions except the new one ──
       # Container Apps keeps old revisions by default — they consume quota.
       # "Single" mode means only one active revision at a time.
