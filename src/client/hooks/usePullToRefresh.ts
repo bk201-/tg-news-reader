@@ -134,12 +134,14 @@ export function usePullToRefresh(
       if (shouldRefresh) onRefresh();
     };
 
-    // touchstart: NON-passive so that touchmove events are cancelable.
-    // We never call preventDefault() in touchstart itself; we do it in
-    // touchmove only after the ACTIVATE threshold is crossed. This preserves
-    // native momentum/inertia scrolling for quick flicks while still allowing
-    // PTR to intercept deliberate slow pulls.
-    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    // touchstart: PASSIVE — we never call preventDefault() here, so signalling
+    // passive:true lets Chrome start scrolling immediately without waiting for
+    // our handler to complete. With passive:false Chrome serialises the whole
+    // touch sequence and the user's quick flick can be dropped before Chrome
+    // even commits to scrolling (manifests as "every other scroll working").
+    // touchmove remains non-passive so our conditional preventDefault() (called
+    // only after the ACTIVATE threshold) is still honoured there.
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
     el.addEventListener('touchcancel', onTouchEnd, { passive: true });
