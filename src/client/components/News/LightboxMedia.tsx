@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button } from 'antd';
 import { LoadingOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -82,12 +82,26 @@ export function LightboxMedia({
   onRetry,
 }: LightboxMediaProps) {
   const { styles } = useStyles();
-  // Set initial volume on mount / path change
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = 0.5;
-    }
-  }, [path, videoRef]);
+
+  // Ref callback: fires synchronously when the video element mounts/remounts
+  // (key={displayPath} guarantees a fresh element on every navigation).
+  // Setting volume and calling play() here is more reliable than autoPlay +
+  // a useEffect, which runs after paint and races with the browser's own autoplay.
+  const videoRefCallback = useCallback(
+    (el: HTMLVideoElement | null) => {
+      (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+      if (el) {
+        el.volume = 0.5;
+        void el.play().catch(() => {
+          // Autoplay blocked by browser policy — user can tap to play
+        });
+      }
+    },
+    // Re-create the callback when path changes so React replaces the video element
+    // and the callback fires again for the new element.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [path, videoRef],
+  );
 
   const displayPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? path) : path;
 
@@ -125,11 +139,10 @@ export function LightboxMedia({
       {isVideo ? (
         // Video must remount when source changes so the browser reloads it
         <video
-          ref={videoRef}
+          ref={videoRefCallback}
           key={displayPath}
           src={mediaUrl(displayPath!)}
           className={styles.video}
-          autoPlay
           loop
           controls={false}
           playsInline
