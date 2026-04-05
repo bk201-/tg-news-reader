@@ -79,14 +79,14 @@ export function usePullToRefresh(
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (el.scrollTop > 1) return;
+      if (window.scrollY > 1) return;
       startY = e.touches[0].clientY;
       isPulling = false;
       wasReady = false;
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (el.scrollTop > 1) {
+      if (window.scrollY > 1) {
         if (isPulling) snapBack();
         return;
       }

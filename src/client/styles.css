@@ -49,5 +49,13 @@ body {
   *::-webkit-scrollbar {
     display: none; /* Chrome / Safari / WebKit */
   }
+
+  /* Disable native bounce / browser-built-in pull-to-refresh on mobile.
+     Panel hiding (Edge/Safari address bar) is driven by window.scrollY during
+     normal scroll — overscroll-behavior does NOT block it. */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
 }
 

@@ -374,12 +374,12 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [selectedNewsId, displayItems, effectiveViewMode]);
 
   const scrollToTop = useCallback(() => {
-    if (forceAccordion && mobileScrollContainerRef?.current) {
-      mobileScrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    if (forceAccordion) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
     }
-  }, [forceAccordion, mobileScrollContainerRef]);
+  }, [forceAccordion]);
 
   // ── Shared toolbar props ──────────────────────────────────────────────
   const toolbarProps = {
