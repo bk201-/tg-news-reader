@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Channel, ChannelType } from '@shared/types.ts';
-import { useUIStore } from '../store/uiStore';
 
 export const channelKeys = { all: ['channels'] as const };
 
@@ -49,19 +48,8 @@ export function useDeleteChannel() {
   });
 }
 
-export function useCountUnreadChannels() {
-  const setPendingCounts = useUIStore((s) => s.setPendingCounts);
-  return useMutation({
-    mutationFn: (groupId: number | null) => api.post<Record<number, number>>('/channels/count-unread', { groupId }),
-    onSuccess: (counts) => {
-      setPendingCounts(counts);
-    },
-  });
-}
-
 export function useFetchChannel() {
   const qc = useQueryClient();
-  const clearPendingCount = useUIStore((s) => s.clearPendingCount);
   return useMutation({
     mutationFn: ({ id, since, limit }: { id: number; since?: string; limit?: number }) =>
       api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>('/channels/' + id + '/fetch', {
@@ -69,11 +57,7 @@ export function useFetchChannel() {
         limit,
       }),
     onSuccess: (data, variables) => {
-      clearPendingCount(variables.id);
-
-      // Update lastFetchedAt + unreadCount directly in the channels cache —
-      // no GET /api/channels needed. New messages are all unread, so we can
-      // simply add data.inserted to the current count.
+      // Update lastFetchedAt + unreadCount directly in the channels cache
       const now = Math.floor(Date.now() / 1000);
       qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
         old
@@ -85,8 +69,7 @@ export function useFetchChannel() {
           : old,
       );
 
-      // Always refresh the news list after fetch — even if inserted=0,
-      // media paths / read state may have changed since last load.
+      // Refresh the news list after fetch
       void qc.invalidateQueries({ queryKey: ['news', variables.id] });
     },
   });
