@@ -296,8 +296,18 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   // ── Auto-fetch on channel open ────────────────────────────────────────
   // Always fetch latest messages when switching to a channel — the server
   // uses lastFetchedAt as the boundary so only truly new messages are loaded.
+  // NOTE: does NOT use onFetchSuccess — auto-nav to next channel must only
+  // happen on user-initiated fetch, not on every channel switch. If it did,
+  // switching to an empty channel would immediately redirect away.
   useEffect(() => {
-    fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
+    fetchChannel.mutate(
+      { id: channel.id },
+      {
+        onSuccess: (data) => {
+          if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
+        },
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
@@ -305,13 +315,17 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     (val: string | number) => {
       const v = String(val);
       setFetchPeriod(v);
+      const periodSuccess = (data: Parameters<typeof onFetchSuccess>[0]) => {
+        setFetchPeriod(''); // deselect the period button after fetch completes
+        onFetchSuccess(data);
+      };
       if (v === 'sync') {
-        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onFetchSuccess });
+        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: periodSuccess });
       } else {
         const since = new Date();
         since.setDate(since.getDate() - parseInt(v, 10));
         since.setHours(0, 0, 0, 0);
-        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onFetchSuccess });
+        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: periodSuccess });
       }
     },
     [channel.id, fetchChannel, onFetchSuccess],

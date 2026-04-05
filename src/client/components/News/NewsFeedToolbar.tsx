@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button, Space, Typography, Tag, Segmented, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
@@ -124,10 +124,8 @@ export function NewsFeedToolbar({
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleFetchPeriod = (val: string | number) => {
-    setMenuOpen(false);
     onFetchPeriod(val);
   };
 
@@ -155,15 +153,6 @@ export function NewsFeedToolbar({
       hiddenCount > 0 && t('news.toolbar.hidden', { count: hiddenCount }),
     ].filter(Boolean) as string[];
 
-    const periodItems: MenuProps['items'] = [
-      { key: 'p1', label: t('news.period.1d'), onClick: () => handleFetchPeriod('1') },
-      { key: 'p3', label: t('news.period.3d'), onClick: () => handleFetchPeriod('3') },
-      { key: 'p5', label: t('news.period.5d'), onClick: () => handleFetchPeriod('5') },
-      { key: 'p7', label: t('news.period.7d'), onClick: () => handleFetchPeriod('7') },
-      { key: 'p14', label: t('news.period.14d'), onClick: () => handleFetchPeriod('14') },
-      { key: 'sync', label: t('news.period.sync_tooltip'), onClick: () => handleFetchPeriod('sync') },
-    ];
-
     const menuItems: MenuProps['items'] = [
       {
         key: 'fetch',
@@ -171,11 +160,19 @@ export function NewsFeedToolbar({
         label: t('news.toolbar.fetch_default_tooltip').replace(' · [U]', ''),
         onClick: onFetchDefault,
       },
+      // Period items directly in the flat menu — avoids submenu close bug on mobile
+      { type: 'divider' },
+      { key: 'period_label', type: 'group', label: t('news.toolbar.fetch_period'), children: [] },
+      { key: 'p1', label: t('news.period.1d'), onClick: () => handleFetchPeriod('1') },
+      { key: 'p3', label: t('news.period.3d'), onClick: () => handleFetchPeriod('3') },
+      { key: 'p5', label: t('news.period.5d'), onClick: () => handleFetchPeriod('5') },
+      { key: 'p7', label: t('news.period.7d'), onClick: () => handleFetchPeriod('7') },
+      { key: 'p14', label: t('news.period.14d'), onClick: () => handleFetchPeriod('14') },
       {
-        key: 'fetch_period',
+        key: 'sync',
         icon: <HistoryOutlined />,
-        label: t('news.toolbar.fetch_period'),
-        children: periodItems,
+        label: t('news.period.sync_tooltip'),
+        onClick: () => handleFetchPeriod('sync'),
       },
       { type: 'divider' },
       {
@@ -246,13 +243,7 @@ export function NewsFeedToolbar({
         <Space size={4}>
           {/* Always-visible fetch button so loading state is obvious on mobile */}
           <Button type="text" icon={<SyncOutlined />} size="middle" loading={fetchPending} onClick={onFetchDefault} />
-          <Dropdown
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            menu={{ items: menuItems }}
-            trigger={['click']}
-            placement="bottomRight"
-          >
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
             <Button type="text" icon={<MoreOutlined />} size="middle" />
           </Dropdown>
         </Space>

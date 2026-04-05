@@ -144,7 +144,7 @@ export function LightboxMedia({
           src={mediaUrl(displayPath!)}
           className={styles.video}
           loop
-          controls={false}
+          controls
           playsInline
         />
       ) : (
