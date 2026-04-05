@@ -22,6 +22,7 @@ import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 import { useIsXl, BP_XL } from '../../hooks/breakpoints';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { useMediaProgressSSE } from '../../api/mediaProgress';
 import type { VirtuosoHandle } from 'react-virtuoso';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -190,9 +191,12 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
   const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
 
-  // Called after fetch completes: if 0 new items and no unread → go to next channel with unread
+  // Called after fetch completes: if mediaProcessing → reconnect SSE; if no new + no unread → go next.
   const onFetchSuccess = useCallback(
     (data: { inserted: number; mediaProcessing?: boolean }) => {
+      if (data.mediaProcessing) {
+        setMediaProgressKey((k) => k + 1);
+      }
       if (data.inserted === 0 && unreadCount === 0) {
         goToNextChannelWithUnread();
       }
@@ -230,6 +234,7 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
 
   const [digestOpen, setDigestOpen] = useState(false);
   const [fetchPeriod, setFetchPeriod] = useState<string>('');
+  const [mediaProgressKey, setMediaProgressKey] = useState(0);
   useEffect(() => {
     setFetchPeriod('');
   }, [channel.id]);
@@ -284,6 +289,9 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     t('news.ptr.pull'),
     t('news.ptr.release'),
   );
+
+  // ── Media progress SSE: real-time localMediaPath updates during bulk download ──
+  useMediaProgressSSE(channel.id, mediaProgressKey);
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
   // Skip if the channel was fetched within the last 5 minutes — avoids spinning
@@ -351,13 +359,22 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [displayItems]);
 
   // ── Scroll selected item into view ────────────────────────────────────
-  // Uses virtuosoRef.scrollToIndex — Virtuoso renders the item if not yet in DOM.
+  // In accordion mode the item expands AFTER the state update, so we must delay
+  // the scroll until after the expansion paint to avoid the browser re-settling
+  // in the middle. We also use align:'start' since we always want item at the top.
   useEffect(() => {
     if (!selectedNewsId) return;
     const index = displayItems.findIndex((n) => n.id === selectedNewsId);
     if (index === -1) return;
-    virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'center' });
-  }, [selectedNewsId, displayItems]);
+    if (effectiveViewMode === 'accordion') {
+      const id = setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'start' });
+      }, 50);
+      return () => clearTimeout(id);
+    } else {
+      virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'center' });
+    }
+  }, [selectedNewsId, displayItems, effectiveViewMode]);
 
   const scrollToTop = useCallback(() => {
     if (forceAccordion && mobileScrollContainerRef?.current) {

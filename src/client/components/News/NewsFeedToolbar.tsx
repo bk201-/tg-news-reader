@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Space, Typography, Tag, Segmented, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
@@ -124,6 +124,12 @@ export function NewsFeedToolbar({
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleFetchPeriod = (val: string | number) => {
+    setMenuOpen(false);
+    onFetchPeriod(val);
+  };
 
   const periodOptions = [
     { value: '1', label: t('news.period.1d') },
@@ -150,12 +156,12 @@ export function NewsFeedToolbar({
     ].filter(Boolean) as string[];
 
     const periodItems: MenuProps['items'] = [
-      { key: 'p1', label: t('news.period.1d'), onClick: () => onFetchPeriod('1') },
-      { key: 'p3', label: t('news.period.3d'), onClick: () => onFetchPeriod('3') },
-      { key: 'p5', label: t('news.period.5d'), onClick: () => onFetchPeriod('5') },
-      { key: 'p7', label: t('news.period.7d'), onClick: () => onFetchPeriod('7') },
-      { key: 'p14', label: t('news.period.14d'), onClick: () => onFetchPeriod('14') },
-      { key: 'sync', label: t('news.period.sync_tooltip'), onClick: () => onFetchPeriod('sync') },
+      { key: 'p1', label: t('news.period.1d'), onClick: () => handleFetchPeriod('1') },
+      { key: 'p3', label: t('news.period.3d'), onClick: () => handleFetchPeriod('3') },
+      { key: 'p5', label: t('news.period.5d'), onClick: () => handleFetchPeriod('5') },
+      { key: 'p7', label: t('news.period.7d'), onClick: () => handleFetchPeriod('7') },
+      { key: 'p14', label: t('news.period.14d'), onClick: () => handleFetchPeriod('14') },
+      { key: 'sync', label: t('news.period.sync_tooltip'), onClick: () => handleFetchPeriod('sync') },
     ];
 
     const menuItems: MenuProps['items'] = [
@@ -240,7 +246,13 @@ export function NewsFeedToolbar({
         <Space size={4}>
           {/* Always-visible fetch button so loading state is obvious on mobile */}
           <Button type="text" icon={<SyncOutlined />} size="middle" loading={fetchPending} onClick={onFetchDefault} />
-          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+          <Dropdown
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            menu={{ items: menuItems }}
+            trigger={['click']}
+            placement="bottomRight"
+          >
             <Button type="text" icon={<MoreOutlined />} size="middle" />
           </Dropdown>
         </Space>

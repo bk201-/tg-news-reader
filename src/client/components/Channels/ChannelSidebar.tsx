@@ -24,6 +24,7 @@ import { ChannelFormModal } from './ChannelFormModal';
 import { ChannelFetchModal } from './ChannelFetchModal';
 import { useChannelHotkeys } from './useChannelHotkeys';
 import { ApiError } from '../../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { Text } = Typography;
 
@@ -71,6 +72,7 @@ export function ChannelSidebar() {
 
   const { selectedChannelId, setSelectedChannelId, pendingCounts, selectedGroupId } = useUIStore();
   const { styles } = useStyles();
+  const qc = useQueryClient();
 
   useChannelHotkeys();
 
@@ -191,7 +193,10 @@ export function ChannelSidebar() {
           <Tooltip title={t('sidebar.refresh_tooltip')}>
             <Button
               icon={<ReloadOutlined />}
-              onClick={() => countUnread.mutate(selectedGroupId)}
+              onClick={() => {
+                countUnread.mutate(selectedGroupId);
+                void qc.invalidateQueries({ queryKey: ['news'] });
+              }}
               loading={countUnread.isPending}
             />
           </Tooltip>
