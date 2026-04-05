@@ -26,45 +26,50 @@ const useStyles = createStyles(({ css }) => ({
     flex-direction: column;
     outline: none;
   `,
-  // ── Media row: [navPrev][media][navNext] — no absolute positioning ───
-  // Buttons are flex siblings of the media, so they never overlap it.
+  // Image takes full area; nav buttons are absolutely positioned on top.
   mediaArea: css`
     flex: 1;
     min-height: 0;
+    position: relative;
     display: flex;
-    flex-direction: row;
     align-items: center;
     justify-content: center;
   `,
   navBtn: css`
-    flex-shrink: 0;
-    width: 56px;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 64px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: transparent;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.5);
     font-size: 20px;
     cursor: pointer;
     transition:
-      color 0.15s,
-      background 0.15s;
+      background 0.15s,
+      color 0.15s;
     outline: none;
     padding: 0;
-    @container (max-width: 360px) {
-      width: 36px;
-      font-size: 16px;
-    }
-    &:hover {
+    /* Touch-friendly tap target without blocking too much of the image */
+    &:hover,
+    &:active {
+      background: rgba(255, 255, 255, 0.08);
       color: #fff;
-      background: rgba(255, 255, 255, 0.07);
     }
     &:disabled {
       opacity: 0.15;
       cursor: default;
     }
+  `,
+  navPrev: css`
+    left: 0;
+  `,
+  navNext: css`
+    right: 0;
   `,
   counter: css`
     flex-shrink: 0;
@@ -77,7 +82,7 @@ const useStyles = createStyles(({ css }) => ({
 }));
 
 export function LightboxOverlay() {
-  const { styles } = useStyles();
+  const { styles, cx } = useStyles();
   const { t } = useTranslation();
   const qc = useQueryClient();
 
@@ -323,10 +328,10 @@ export function LightboxOverlay() {
         onClose={closeLightbox}
       />
 
-      {/* Issue 11: flex-row layout — buttons are siblings, never overlap image */}
+      {/* Image fills the full area; nav buttons are positioned on top */}
       <div className={styles.mediaArea}>
         <button
-          className={styles.navBtn}
+          className={cx(styles.navBtn, styles.navPrev)}
           onClick={(e) => {
             e.stopPropagation();
             if (nav.isAlbum && albumIndex > 0) setLightboxAlbumIndex(albumIndex - 1);
@@ -349,7 +354,7 @@ export function LightboxOverlay() {
         />
 
         <button
-          className={styles.navBtn}
+          className={cx(styles.navBtn, styles.navNext)}
           onClick={(e) => {
             e.stopPropagation();
             if (nav.isAlbum && albumIndex < albumLength - 1) setLightboxAlbumIndex(albumIndex + 1);
