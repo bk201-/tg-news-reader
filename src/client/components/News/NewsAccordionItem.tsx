@@ -33,54 +33,54 @@ interface NewsAccordionItemProps {
 
 export const NewsAccordionItem = memo(
   function NewsAccordionItem({
-  item,
-  isSelected,
-  isFiltered,
-  showAll,
-  channelTelegramId,
-  onSelect,
-  onTagClick,
-  onMarkedRead,
-}: NewsAccordionItemProps) {
-  const { styles, cx } = useStyles();
+    item,
+    isSelected,
+    isFiltered,
+    showAll,
+    channelTelegramId,
+    onSelect,
+    onTagClick,
+    onMarkedRead,
+  }: NewsAccordionItemProps) {
+    const { styles, cx } = useStyles();
 
-  if (!isFiltered && !showAll) return null;
+    if (!isFiltered && !showAll) return null;
 
-  const dimmed = !isFiltered && showAll;
+    const dimmed = !isFiltered && showAll;
 
-  return (
-    <div
-      data-news-id={item.id}
-      aria-expanded={isSelected}
-      className={cx(styles.item, isSelected && styles.itemExpanded, dimmed && styles.itemDimmed)}
-    >
-      {isSelected ? (
-        <NewsDetail
-          key={item.id}
-          item={item}
-          channelTelegramId={channelTelegramId}
-          onMarkedRead={onMarkedRead}
-          variant="inline"
-          onHeaderClick={() => onSelect(null)}
-          onTagClick={onTagClick}
-        />
-      ) : (
-        <NewsListItem
-          item={item}
-          isSelected={false}
-          isFiltered={isFiltered}
-          showAll={showAll}
-          onClick={() => onSelect(item.id)}
-          onTagClick={onTagClick}
-        />
-      )}
-    </div>
-  );
-},
-(prev, next) =>
-  prev.item === next.item &&
-  prev.isSelected === next.isSelected &&
-  prev.isFiltered === next.isFiltered &&
-  prev.showAll === next.showAll &&
-  prev.channelTelegramId === next.channelTelegramId,
+    return (
+      <div
+        data-news-id={item.id}
+        aria-expanded={isSelected}
+        className={cx(styles.item, isSelected && styles.itemExpanded, dimmed && styles.itemDimmed)}
+      >
+        {isSelected ? (
+          <NewsDetail
+            key={item.id}
+            item={item}
+            channelTelegramId={channelTelegramId}
+            onMarkedRead={onMarkedRead}
+            variant="inline"
+            onHeaderClick={() => onSelect(null)}
+            onTagClick={onTagClick}
+          />
+        ) : (
+          <NewsListItem
+            item={item}
+            isSelected={false}
+            isFiltered={isFiltered}
+            showAll={showAll}
+            onClick={() => onSelect(item.id)}
+            onTagClick={onTagClick}
+          />
+        )}
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.item === next.item &&
+    prev.isSelected === next.isSelected &&
+    prev.isFiltered === next.isFiltered &&
+    prev.showAll === next.showAll &&
+    prev.channelTelegramId === next.channelTelegramId,
 );

@@ -95,11 +95,9 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsFeedProps {
   channel: Channel;
-  /** Passed from AppLayout in mobile mode — the single scroll container */
-  mobileScrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
+export function NewsFeed({ channel }: NewsFeedProps) {
   const { message } = App.useApp();
   const { t } = useTranslation();
 
@@ -338,8 +336,12 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [selectedNewsId, displayItems, effectiveViewMode]);
 
   const scrollToTop = useCallback(() => {
-    virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
-  }, []);
+    if (forceAccordion) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
+    }
+  }, [forceAccordion]);
 
   // ── Shared toolbar props ──────────────────────────────────────────────
   const toolbarProps = {
@@ -392,7 +394,7 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
             onTagClick={handleTagClick}
             onMarkedRead={handleMarkedRead}
             virtuosoRef={virtuosoRef}
-            mobileScrollContainerRef={mobileScrollContainerRef}
+            windowScroll
           />
         ) : (
           <>

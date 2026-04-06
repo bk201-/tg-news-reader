@@ -1,11 +1,11 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { Spin, Empty } from 'antd';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
-import { BP_XL, MOBILE_STICKY_HEIGHT } from '../../hooks/breakpoints';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
@@ -35,10 +35,10 @@ const useStyles = createStyles(({ css, token }) => ({
   empty: css`
     margin-top: 48px;
   `,
-  // Ensure selected items scroll into view below sticky header+toolbar on mobile
+  // Ensure selected items scroll into view below sticky toolbar on mobile
   item: css`
     @media (max-width: ${BP_XL - 1}px) {
-      scroll-margin-top: ${MOBILE_STICKY_HEIGHT}px;
+      scroll-margin-top: ${MOBILE_TOOLBAR_HEIGHT + 8}px;
     }
   `,
 }));
@@ -56,8 +56,8 @@ interface NewsAccordionListProps {
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   onMarkedRead: (id: number) => void;
   virtuosoRef: React.RefObject<VirtuosoHandle | null>;
-  /** Mobile only: the div-based scroll container for Virtuoso's customScrollParent */
-  mobileScrollContainerRef?: React.RefObject<HTMLElement | null>;
+  /** Mobile: use window as scroll parent so browser chrome hides on scroll */
+  windowScroll?: boolean;
 }
 
 export function NewsAccordionList({
@@ -73,22 +73,10 @@ export function NewsAccordionList({
   onTagClick,
   onMarkedRead,
   virtuosoRef,
-  mobileScrollContainerRef,
+  windowScroll,
 }: NewsAccordionListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-
-  // Resolve the actual DOM element for Virtuoso's customScrollParent.
-  // On mobile, the mobileContainer div (overflow-y: auto) is the scroll parent.
-  // On desktop accordion, Virtuoso manages its own internal scroll.
-  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(
-    () => mobileScrollContainerRef?.current ?? undefined,
-  );
-  useEffect(() => {
-    const el = mobileScrollContainerRef?.current ?? undefined;
-    if (el !== customScrollParent) setCustomScrollParent(el);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!mobileScrollContainerRef, mobileScrollContainerRef?.current]);
 
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
@@ -125,11 +113,11 @@ export function NewsAccordionList({
       {!isLoading && items.length > 0 && (
         <Virtuoso
           ref={virtuosoRef}
-          className={customScrollParent ? undefined : styles.virtuoso}
+          className={windowScroll ? undefined : styles.virtuoso}
           data={items}
           overscan={500}
-          customScrollParent={customScrollParent}
-          style={customScrollParent ? undefined : { height: '100%' }}
+          useWindowScroll={windowScroll}
+          style={windowScroll ? undefined : { height: '100%' }}
           itemContent={renderItem}
         />
       )}

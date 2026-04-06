@@ -71,19 +71,14 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
-  // Mobile layout: fixed height div-based scroll container.
-  // 100dvh accounts for mobile browser chrome (address bar).
+  // Mobile layout: body-scroll mode so mobile browser chrome hides on scroll.
+  // min-height instead of height so content can exceed the viewport.
   layoutMobile: css`
-    height: 100dvh;
-    overflow: hidden;
+    min-height: 100dvh;
+    overflow: visible;
   `,
-  // Mobile scroll container: header + toolbar + content all scroll together.
-  // AppHeader scrolls away, NewsFeedToolbar has position:sticky.
+  // Mobile wrapper: normal document flow — body is the scroll parent.
   mobileContainer: css`
-    height: 100dvh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
     background: ${token.colorBgLayout};
   `,
 }));
@@ -96,9 +91,6 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
-
-  // Mobile scroll container ref — passed to NewsFeed so Virtuoso can use it as customScrollParent
-  const mobileContainerRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
   useBossKey();
@@ -221,14 +213,10 @@ export function AppLayout() {
     return (
       <Layout className={styles.layoutMobile}>
         {sidebarDrawer}
-        <div ref={mobileContainerRef} className={styles.mobileContainer}>
+        <div className={styles.mobileContainer}>
           <AppHeader />
           <TelegramSessionBanner />
-          {selectedChannel ? (
-            <NewsFeed channel={selectedChannel} mobileScrollContainerRef={mobileContainerRef} />
-          ) : (
-            emptyState
-          )}
+          {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
         </div>
       </Layout>
     );

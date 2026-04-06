@@ -33,4 +33,3 @@ await import('./downloadWorker.ts');
 // Worker thread will stay alive via worker_threads message loop;
 // unregister is a no-op here but kept for clarity.
 void unregister;
-

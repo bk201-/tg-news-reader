@@ -91,13 +91,7 @@ export function NewsFeedList({
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {!isLoading && items.length > 0 && (
-        <Virtuoso
-          ref={virtuosoRef}
-          className={styles.virtuoso}
-          data={items}
-          overscan={400}
-          itemContent={renderItem}
-        />
+        <Virtuoso ref={virtuosoRef} className={styles.virtuoso} data={items} overscan={400} itemContent={renderItem} />
       )}
     </div>
   );

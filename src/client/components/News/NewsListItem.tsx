@@ -166,104 +166,104 @@ function getTitle(item: NewsItem, fallback: string): string {
 
 export const NewsListItem = memo(
   function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, onTagClick }: NewsListItemProps) {
-  const markRead = useMarkRead();
-  const { styles, cx } = useStyles();
-  const { t } = useTranslation();
-  const openLightbox = useUIStore((s) => s.openLightbox);
+    const markRead = useMarkRead();
+    const { styles, cx } = useStyles();
+    const { t } = useTranslation();
+    const openLightbox = useUIStore((s) => s.openLightbox);
 
-  const title = getTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }));
-  const hashtags = item.hashtags || [];
-  const isRead = item.isRead === 1;
-  const isAudio = item.mediaType === 'audio';
-  const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
-  const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
-  const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
-  // Show thumbnail for downloaded media, or always for audio (even without a file)
-  const showThumb = !!firstMediaPath || isAudio;
+    const title = getTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }));
+    const hashtags = item.hashtags || [];
+    const isRead = item.isRead === 1;
+    const isAudio = item.mediaType === 'audio';
+    const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
+    const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
+    const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+    // Show thumbnail for downloaded media, or always for audio (even without a file)
+    const showThumb = !!firstMediaPath || isAudio;
 
-  // If filtered out and not showAll, don't render
-  if (!isFiltered && !showAll) return null;
+    // If filtered out and not showAll, don't render
+    if (!isFiltered && !showAll) return null;
 
-  const dimmed = !isFiltered && showAll;
+    const dimmed = !isFiltered && showAll;
 
-  const handleMarkRead = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId });
-  };
+    const handleMarkRead = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId });
+    };
 
-  return (
-    <div
-      role="option"
-      aria-selected={isSelected}
-      tabIndex={0}
-      data-news-id={item.id}
-      className={cx(
-        styles.item,
-        isSelected && styles.itemSelected,
-        isRead && styles.itemRead,
-        dimmed && styles.itemDimmed,
-      )}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-    >
-      <div className={styles.header}>
-        <Checkbox checked={isRead} onClick={handleMarkRead} className={styles.checkbox} />
-        <Text
-          className={cx(styles.title, styles.titleWrap, isRead && styles.titleRead, dimmed && styles.titleDimmed)}
-          strong={!isRead}
-          ellipsis={{ tooltip: title }}
-        >
-          {title}
-        </Text>
-        {showThumb && (
-          <div
-            className={cx(styles.thumb, dimmed && styles.thumbDimmed)}
-            onClick={(e) => {
-              if (!isAudio && (item.mediaType === 'photo' || item.mediaType === 'document')) {
-                e.stopPropagation();
-                openLightbox(item.id, 0, item.channelId);
-              }
-            }}
-          >
-            {isAudio ? (
-              <div className={styles.thumbAudio}>
-                <SoundOutlined className={styles.audioIcon} />
-              </div>
-            ) : isVideo ? (
-              <div className={styles.thumbVideo}>
-                <PlayCircleOutlined className={styles.videoIcon} />
-              </div>
-            ) : (
-              <div className={styles.thumbPhoto}>
-                <img src={mediaUrl(firstMediaPath!)} alt="" className={styles.thumbImg} />
-                {isAlbum && <span className={styles.albumBadge}>{item.localMediaPaths!.length}</span>}
-              </div>
-            )}
-          </div>
+    return (
+      <div
+        role="option"
+        aria-selected={isSelected}
+        tabIndex={0}
+        data-news-id={item.id}
+        className={cx(
+          styles.item,
+          isSelected && styles.itemSelected,
+          isRead && styles.itemRead,
+          dimmed && styles.itemDimmed,
         )}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+      >
+        <div className={styles.header}>
+          <Checkbox checked={isRead} onClick={handleMarkRead} className={styles.checkbox} />
+          <Text
+            className={cx(styles.title, styles.titleWrap, isRead && styles.titleRead, dimmed && styles.titleDimmed)}
+            strong={!isRead}
+            ellipsis={{ tooltip: title }}
+          >
+            {title}
+          </Text>
+          {showThumb && (
+            <div
+              className={cx(styles.thumb, dimmed && styles.thumbDimmed)}
+              onClick={(e) => {
+                if (!isAudio && (item.mediaType === 'photo' || item.mediaType === 'document')) {
+                  e.stopPropagation();
+                  openLightbox(item.id, 0, item.channelId);
+                }
+              }}
+            >
+              {isAudio ? (
+                <div className={styles.thumbAudio}>
+                  <SoundOutlined className={styles.audioIcon} />
+                </div>
+              ) : isVideo ? (
+                <div className={styles.thumbVideo}>
+                  <PlayCircleOutlined className={styles.videoIcon} />
+                </div>
+              ) : (
+                <div className={styles.thumbPhoto}>
+                  <img src={mediaUrl(firstMediaPath!)} alt="" className={styles.thumbImg} />
+                  {isAlbum && <span className={styles.albumBadge}>{item.localMediaPaths!.length}</span>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className={styles.meta}>
+          <Text type="secondary" className={styles.metaDate}>
+            {dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm')}
+          </Text>
+          <NewsHashtags hashtags={hashtags} onTagClick={onTagClick} maxVisible={4} className={styles.tags} />
+        </div>
       </div>
-      <div className={styles.meta}>
-        <Text type="secondary" className={styles.metaDate}>
-          {dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm')}
-        </Text>
-        <NewsHashtags hashtags={hashtags} onTagClick={onTagClick} maxVisible={4} className={styles.tags} />
-      </div>
-    </div>
-  );
-},
-// Custom comparator: skip onClick/onTagClick — they're always recreated but
-// functionally stable (close over stable Zustand setters). Only re-render when
-// the actual item data or display-affecting booleans change.
-(prev, next) =>
-  prev.item === next.item &&
-  prev.isSelected === next.isSelected &&
-  prev.isFiltered === next.isFiltered &&
-  prev.showAll === next.showAll,
+    );
+  },
+  // Custom comparator: skip onClick/onTagClick — they're always recreated but
+  // functionally stable (close over stable Zustand setters). Only re-render when
+  // the actual item data or display-affecting booleans change.
+  (prev, next) =>
+    prev.item === next.item &&
+    prev.isSelected === next.isSelected &&
+    prev.isFiltered === next.isFiltered &&
+    prev.showAll === next.showAll,
 );
 
 // Filter logic helper — active filters EXCLUDE matching news

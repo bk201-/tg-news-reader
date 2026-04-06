@@ -86,10 +86,6 @@
     }
   },
   "news": {
-    "ptr": {
-      "pull": "Pull to refresh",
-      "release": "Release to refresh"
-    },
     "toolbar": {
       "fetch_default_tooltip": "Fetch since last read · [U]",
       "sync_tooltip": "Since last sync",
@@ -162,11 +158,6 @@
       "tag_add_filter": "Add to filters",
       "tag_added_toast": "Tag {{tag}} added to filters",
       "message_fallback": "Message #{{id}}"
-    },
-    "ptr": {
-      "pull": "Pull down to refresh",
-      "release": "Release to refresh",
-      "fetching": "Refreshing…"
     }
   },
   "filters": {
