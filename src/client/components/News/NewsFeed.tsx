@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { App, Empty, Button } from 'antd';
-import { ArrowDownOutlined, VerticalAlignTopOutlined } from '@ant-design/icons';
+import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
@@ -21,7 +21,6 @@ import { useHashTagSync } from './useHashTagSync';
 import { useNewsHotkeys } from './useNewsHotkeys';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 import { useIsXl, BP_XL } from '../../hooks/breakpoints';
-import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { useMediaProgressSSE } from '../../api/mediaProgress';
 import type { VirtuosoHandle } from 'react-virtuoso';
 
@@ -31,7 +30,7 @@ const useStyles = createStyles(({ css, token }) => ({
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    /* Mobile: parent is the scroll container */
+    /* Mobile: parent div is the scroll container */
     @media (max-width: ${BP_XL - 1}px) {
       height: auto;
       overflow: visible;
@@ -92,27 +91,6 @@ const useStyles = createStyles(({ css, token }) => ({
       transform 0.2s ease;
     box-shadow: ${token.boxShadow};
   `,
-  // Pull-to-refresh indicator — slides down from above the viewport.
-  // Initial transform is set programmatically by usePullToRefresh (translateY(-height)).
-  ptrIndicator: css`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1001;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 16px;
-    background: ${token.colorBgElevated};
-    border-bottom: 1px solid ${token.colorBorderSecondary};
-    color: ${token.colorText};
-    font-size: 13px;
-    opacity: 0;
-    pointer-events: none;
-    box-shadow: ${token.boxShadowSecondary};
-  `,
 }));
 
 interface NewsFeedProps {
@@ -134,6 +112,7 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     newsViewMode,
     setNewsViewMode,
     setSelectedChannelId,
+    autoAdvance,
   } = useUIStore();
 
   const { styles, cx } = useStyles();
@@ -153,9 +132,8 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
 
-  // Advance to the next channel with unread items, cycling within the same group.
-  const goToNextChannelWithUnread = useCallback(() => {
-    // All channels in the same group, sorted by sortOrder
+  // Advance to the next channel in order (circular), regardless of unread count.
+  const goToNextChannel = useCallback(() => {
     const sameGroup = allChannels
       .filter((ch) => (ch.groupId ?? null) === (channel.groupId ?? null))
       .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -163,14 +141,8 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     const currentIdx = sameGroup.findIndex((ch) => ch.id === channel.id);
     if (currentIdx === -1 || sameGroup.length <= 1) return;
 
-    // Circular search forward for a channel with unread
-    for (let i = 1; i < sameGroup.length; i++) {
-      const ch = sameGroup[(currentIdx + i) % sameGroup.length];
-      if (ch.unreadCount > 0) {
-        setSelectedChannelId(ch.id);
-        return;
-      }
-    }
+    const next = sameGroup[(currentIdx + 1) % sameGroup.length];
+    setSelectedChannelId(next.id);
   }, [allChannels, channel.id, channel.groupId, setSelectedChannelId]);
 
   const selectedItem = useMemo(
@@ -191,17 +163,18 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
   const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
 
-  // Called after fetch completes: if mediaProcessing → reconnect SSE; if no new + no unread → go next.
-  const onFetchSuccess = useCallback(
+  // Called after a USER-TRIGGERED fetch (button, double-space at end).
+  // Auto-advance only fires here — NOT on the automatic fetch when opening a channel.
+  const onUserFetchSuccess = useCallback(
     (data: { inserted: number; mediaProcessing?: boolean }) => {
       if (data.mediaProcessing) {
         setMediaProgressKey((k) => k + 1);
       }
-      if (data.inserted === 0 && unreadCount === 0) {
-        goToNextChannelWithUnread();
+      if (autoAdvance && data.inserted === 0 && unreadCount === 0) {
+        goToNextChannel();
       }
     },
-    [goToNextChannelWithUnread, unreadCount],
+    [goToNextChannel, unreadCount, autoAdvance],
   );
 
   const handleMarkedRead = useCallback(
@@ -241,19 +214,15 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
 
   const handleFetchDefault = useCallback(() => {
     setFetchPeriod('');
-    fetchChannel.mutate({ id: channel.id }, { onSuccess: onFetchSuccess });
-  }, [channel.id, fetchChannel, onFetchSuccess]);
+    fetchChannel.mutate({ id: channel.id }, { onSuccess: onUserFetchSuccess });
+  }, [channel.id, fetchChannel, onUserFetchSuccess]);
 
   // ── Refs ──────────────────────────────────────────────────────────────
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const ptrBaseRef = useRef<HTMLElement>(null); // dummy fallback when mobileScrollContainerRef absent
   const scrollTopBtnRef = useRef<HTMLButtonElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
-  const ptrRef = useRef<HTMLDivElement>(null);
 
   // ── Scroll-to-top FAB visibility via viewport IO on post-toolbar sentinel ─
-  // Fires when the 1px sentinel (placed after the sticky toolbar) exits the viewport.
-  // This means header + toolbar have scrolled off → show the FAB.
   useEffect(() => {
     if (!forceAccordion) return;
     const sentinel = topSentinelRef.current;
@@ -280,25 +249,13 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     };
   }, [forceAccordion]);
 
-  // ── Pull-to-refresh: attaches to mobile scroll container ──────────────
-  usePullToRefresh(
-    mobileScrollContainerRef ?? ptrBaseRef,
-    ptrRef,
-    handleFetchDefault,
-    forceAccordion,
-    t('news.ptr.pull'),
-    t('news.ptr.release'),
-  );
-
   // ── Media progress SSE: real-time localMediaPath updates during bulk download ──
   useMediaProgressSSE(channel.id, mediaProgressKey);
 
   // ── Auto-fetch on channel open ────────────────────────────────────────
   // Always fetch latest messages when switching to a channel — the server
   // uses lastFetchedAt as the boundary so only truly new messages are loaded.
-  // NOTE: does NOT use onFetchSuccess — auto-nav to next channel must only
-  // happen on user-initiated fetch, not on every channel switch. If it did,
-  // switching to an empty channel would immediately redirect away.
+  // NOTE: intentionally does NOT trigger auto-advance — user hasn't finished reading.
   useEffect(() => {
     fetchChannel.mutate(
       { id: channel.id },
@@ -315,20 +272,16 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
     (val: string | number) => {
       const v = String(val);
       setFetchPeriod(v);
-      const periodSuccess = (data: Parameters<typeof onFetchSuccess>[0]) => {
-        setFetchPeriod(''); // deselect the period button after fetch completes
-        onFetchSuccess(data);
-      };
       if (v === 'sync') {
-        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: periodSuccess });
+        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onUserFetchSuccess });
       } else {
         const since = new Date();
         since.setDate(since.getDate() - parseInt(v, 10));
         since.setHours(0, 0, 0, 0);
-        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: periodSuccess });
+        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onUserFetchSuccess });
       }
     },
-    [channel.id, fetchChannel, onFetchSuccess],
+    [channel.id, fetchChannel, onUserFetchSuccess],
   );
 
   const handleSpaceKey = useCallback(
@@ -370,9 +323,6 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [displayItems]);
 
   // ── Scroll selected item into view ────────────────────────────────────
-  // In accordion mode the item expands AFTER the state update, so we must delay
-  // the scroll until after the expansion paint to avoid the browser re-settling
-  // in the middle. We also use align:'start' since we always want item at the top.
   useEffect(() => {
     if (!selectedNewsId) return;
     const index = displayItems.findIndex((n) => n.id === selectedNewsId);
@@ -388,12 +338,8 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
   }, [selectedNewsId, displayItems, effectiveViewMode]);
 
   const scrollToTop = useCallback(() => {
-    if (forceAccordion) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
-    }
-  }, [forceAccordion]);
+    virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
+  }, []);
 
   // ── Shared toolbar props ──────────────────────────────────────────────
   const toolbarProps = {
@@ -481,25 +427,19 @@ export function NewsFeed({ channel, mobileScrollContainerRef }: NewsFeedProps) {
         )}
       </div>
 
-      {/* PTR + FAB portaled to body — bypasses any transform ancestor */}
+      {/* Scroll-to-top FAB — portaled to body to bypass transform ancestors */}
       {forceAccordion &&
         createPortal(
-          <>
-            <div ref={ptrRef} className={styles.ptrIndicator}>
-              <ArrowDownOutlined data-ptr-icon />
-              <span data-ptr-text>{t('news.ptr.pull')}</span>
-            </div>
-            <Button
-              ref={scrollTopBtnRef}
-              type="primary"
-              shape="circle"
-              size="large"
-              icon={<VerticalAlignTopOutlined />}
-              className={styles.scrollTopBtn}
-              onClick={scrollToTop}
-              aria-label="Scroll to top"
-            />
-          </>,
+          <Button
+            ref={scrollTopBtnRef}
+            type="primary"
+            shape="circle"
+            size="large"
+            icon={<VerticalAlignTopOutlined />}
+            className={styles.scrollTopBtn}
+            onClick={scrollToTop}
+            aria-label="Scroll to top"
+          />,
           document.body,
         )}
 

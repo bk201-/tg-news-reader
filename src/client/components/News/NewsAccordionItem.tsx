@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsListItem } from './NewsListItem';
@@ -31,7 +31,8 @@ interface NewsAccordionItemProps {
   onMarkedRead: (id: number) => void;
 }
 
-export function NewsAccordionItem({
+export const NewsAccordionItem = memo(
+  function NewsAccordionItem({
   item,
   isSelected,
   isFiltered,
@@ -75,4 +76,11 @@ export function NewsAccordionItem({
       )}
     </div>
   );
-}
+},
+(prev, next) =>
+  prev.item === next.item &&
+  prev.isSelected === next.isSelected &&
+  prev.isFiltered === next.isFiltered &&
+  prev.showAll === next.showAll &&
+  prev.channelTelegramId === next.channelTelegramId,
+);

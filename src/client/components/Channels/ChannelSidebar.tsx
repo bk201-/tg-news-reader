@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Modal, Button, Space, Typography, Form } from 'antd';
+import { Modal, Button, Space, Typography, Form, Switch } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PlusOutlined, ReloadOutlined, OrderedListOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -69,7 +69,7 @@ export function ChannelSidebar() {
   const reorderChannels = useReorderChannels();
   const { t } = useTranslation();
 
-  const { selectedChannelId, setSelectedChannelId, selectedGroupId } = useUIStore();
+  const { selectedChannelId, setSelectedChannelId, selectedGroupId, autoAdvance, toggleAutoAdvance } = useUIStore();
   const { styles } = useStyles();
   const qc = useQueryClient();
 
@@ -196,7 +196,10 @@ export function ChannelSidebar() {
           {t('sidebar.channels')}
         </Text>
         <Space size={4}>
-          <Tooltip title={t('sidebar.add')}>
+          <Tooltip title={t('sidebar.auto_advance_tooltip')}>
+            <Switch size="small" checked={autoAdvance} onChange={toggleAutoAdvance} />
+          </Tooltip>
+          <Tooltip title={t('sidebar.add_tooltip')}>
             <Button icon={<PlusOutlined />} onClick={openCreate} />
           </Tooltip>
           <Tooltip title={t('sidebar.sort_tooltip')}>

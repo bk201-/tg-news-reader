@@ -26,6 +26,21 @@ npm run lint           # ESLint
 npm run format:check   # Prettier (read-only check, use format to fix)
 ```
 
+## Versioning
+
+Version is in `package.json` and displayed in the app's user menu. Bump it **in the same PR** that introduces the change:
+
+| Change | Version part | Example |
+|---|---|---|
+| Bug fix only | **patch** (`1.1.0 → 1.1.1`) | fix scroll, fix video autoplay |
+| New feature (with or without bug fixes) | **minor** (`1.1.0 → 1.2.0`) | new digest button, version display |
+| Breaking / major rework | **major** — discuss first | n/a |
+
+Rules:
+- If a PR contains **both** a fix and a feature → bump **minor** only.
+- Never bump major without explicit discussion.
+- Use `npm version patch` / `npm version minor` (updates `package.json` and creates a git tag), or edit `package.json` directly.
+
 ## Git Workflow & CI/CD
 
 **`main` is protected** — direct pushes are blocked by a GitHub Ruleset. All changes must go through a PR.

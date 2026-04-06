@@ -13,8 +13,10 @@
     "refresh": "Refresh",
     "refresh_tooltip": "Count unread in Telegram",
     "add": "Add",
+    "add_tooltip": "Add channel",
     "sort_tooltip": "Reorder channels",
     "sort_title": "Reorder channels",
+    "auto_advance_tooltip": "Auto-advance: after fetch with no new items, jump to next channel",
     "select_channel": "Select a channel from the list on the left"
   },
   "channels": {
@@ -244,6 +246,7 @@
       "clear_cache_confirm_content": "All cached photos and videos will be removed from the browser. They will reload on next view.",
       "clear_cache_success": "Media cache cleared",
       "language": "Language",
+      "version": "v{{version}}",
       "logout": "Sign out"
     }
   },

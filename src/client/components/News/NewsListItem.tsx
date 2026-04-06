@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Typography, Checkbox } from 'antd';
 import { PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -164,7 +164,8 @@ function getTitle(item: NewsItem, fallback: string): string {
   return firstLine.length > 80 ? firstLine.substring(0, 80) + '…' : firstLine || fallback;
 }
 
-export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, onTagClick }: NewsListItemProps) {
+export const NewsListItem = memo(
+  function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, onTagClick }: NewsListItemProps) {
   const markRead = useMarkRead();
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
@@ -254,7 +255,16 @@ export function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, o
       </div>
     </div>
   );
-}
+},
+// Custom comparator: skip onClick/onTagClick — they're always recreated but
+// functionally stable (close over stable Zustand setters). Only re-render when
+// the actual item data or display-affecting booleans change.
+(prev, next) =>
+  prev.item === next.item &&
+  prev.isSelected === next.isSelected &&
+  prev.isFiltered === next.isFiltered &&
+  prev.showAll === next.showAll,
+);
 
 // Filter logic helper — active filters EXCLUDE matching news
 export function applyFilters(items: NewsItem[], filters: Filter[]): Set<number> {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Spin, Empty } from 'antd';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
@@ -14,7 +14,7 @@ const useStyles = createStyles(({ css, token }) => ({
     position: relative;
     background: ${token.colorBgContainer};
     overscroll-behavior-y: contain;
-    /* Mobile: parent (mobileContainer) is the scroll container — no inner scroll */
+    /* Mobile: parent div is the scroll container — no inner scroll */
     @media (max-width: ${BP_XL - 1}px) {
       flex: none;
       overflow-y: visible;
@@ -56,7 +56,7 @@ interface NewsAccordionListProps {
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   onMarkedRead: (id: number) => void;
   virtuosoRef: React.RefObject<VirtuosoHandle | null>;
-  /** Mobile only: outer scroll container for Virtuoso's customScrollParent */
+  /** Mobile only: the div-based scroll container for Virtuoso's customScrollParent */
   mobileScrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
@@ -78,26 +78,41 @@ export function NewsAccordionList({
   const { t } = useTranslation();
   const { styles } = useStyles();
 
-  // On mobile the scroll container is document.body (body-scroll model so that
-  // mobile browser chrome hides/shows as the user scrolls).
-  // customScrollParent is set only when mobileScrollContainerRef is provided
-  // (i.e. we're in accordion/mobile mode); undefined on desktop lets Virtuoso
-  // manage its own internal scroll.
-  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(() =>
-    mobileScrollContainerRef ? document.body : undefined,
+  // Resolve the actual DOM element for Virtuoso's customScrollParent.
+  // On mobile, the mobileContainer div (overflow-y: auto) is the scroll parent.
+  // On desktop accordion, Virtuoso manages its own internal scroll.
+  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(
+    () => mobileScrollContainerRef?.current ?? undefined,
   );
   useEffect(() => {
-    if (mobileScrollContainerRef && customScrollParent !== document.body) {
-      setCustomScrollParent(document.body);
-    }
+    const el = mobileScrollContainerRef?.current ?? undefined;
+    if (el !== customScrollParent) setCustomScrollParent(el);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!mobileScrollContainerRef]);
+  }, [!!mobileScrollContainerRef, mobileScrollContainerRef?.current]);
 
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
       ? t('news.list.empty_filtered')
       : t('news.list.empty');
+
+  const renderItem = useCallback(
+    (_: number, item: NewsItem) => (
+      <div data-news-id={item.id} className={styles.item}>
+        <NewsAccordionItem
+          item={item}
+          isSelected={selectedNewsId === item.id}
+          isFiltered={filteredIds.has(item.id)}
+          showAll={showAll}
+          channelTelegramId={channelTelegramId}
+          onSelect={onSelect}
+          onTagClick={onTagClick}
+          onMarkedRead={onMarkedRead}
+        />
+      </div>
+    ),
+    [selectedNewsId, filteredIds, showAll, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
+  );
 
   return (
     <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion}>
@@ -115,20 +130,7 @@ export function NewsAccordionList({
           overscan={500}
           customScrollParent={customScrollParent}
           style={customScrollParent ? undefined : { height: '100%' }}
-          itemContent={(_, item) => (
-            <div data-news-id={item.id} className={styles.item}>
-              <NewsAccordionItem
-                item={item}
-                isSelected={selectedNewsId === item.id}
-                isFiltered={filteredIds.has(item.id)}
-                showAll={showAll}
-                channelTelegramId={channelTelegramId}
-                onSelect={onSelect}
-                onTagClick={onTagClick}
-                onMarkedRead={onMarkedRead}
-              />
-            </div>
-          )}
+          itemContent={renderItem}
         />
       )}
     </div>

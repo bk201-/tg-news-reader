@@ -71,20 +71,19 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
-  // Mobile layout: no fixed height / overflow — body is the scroll container.
-  // window.scrollY changes as user scrolls → Edge/Safari hide their browser chrome.
+  // Mobile layout: fixed height div-based scroll container.
+  // 100dvh accounts for mobile browser chrome (address bar).
   layoutMobile: css`
-    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
   `,
-  // ── Mobile-only: single scroll container ─────────────────────────────────
-  // In accordion mode (< 1200px) the entire page — header, toolbar, news — lives
-  // in normal document flow. Body scrolls naturally:
-  //   - AppHeader scrolls away
-  //   - NewsFeedToolbar has position:sticky top:0 → sticks when header is off-screen
-  //   - window.scrollY changes → mobile browser chrome (Edge/Safari) hides/shows
+  // Mobile scroll container: header + toolbar + content all scroll together.
+  // AppHeader scrolls away, NewsFeedToolbar has position:sticky.
   mobileContainer: css`
-    min-height: 100dvh;
+    height: 100dvh;
+    overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     background: ${token.colorBgLayout};
   `,
 }));
@@ -98,7 +97,7 @@ export function AppLayout() {
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
 
-  // mobile scroll container ref — passed to NewsFeed for PTR and scroll-to-top
+  // Mobile scroll container ref — passed to NewsFeed so Virtuoso can use it as customScrollParent
   const mobileContainerRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
@@ -214,10 +213,10 @@ export function AppLayout() {
     </Drawer>
   );
 
-  // ── MOBILE (< 1200px): single scroll container ──────────────────────────
-  // AppHeader is in NORMAL FLOW — scrolls away naturally.
-  // NewsFeedToolbar has position:sticky so it sticks when header is gone.
-  // No JS needed for any header/toolbar behaviour.
+  // ── MOBILE (< 1200px): div-based scroll container ─────────────────────
+  // AppHeader is in normal flow — scrolls away.
+  // NewsFeedToolbar sticks via position:sticky top:0.
+  // Scroll is on the mobileContainer div (overflow-y: auto), NOT body.
   if (isAccordionMode) {
     return (
       <Layout className={styles.layoutMobile}>
