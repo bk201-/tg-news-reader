@@ -11,7 +11,9 @@ import {
   ClearOutlined,
   TranslationOutlined,
   MenuOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
+import { version as APP_VERSION } from '../../../../package.json';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { FlagRU, FlagUS } from '../Flags';
@@ -187,6 +189,17 @@ export function AppHeader() {
           </Button>
         </div>
       ),
+    },
+    { type: 'divider' as const },
+    {
+      key: 'version',
+      icon: <TagOutlined />,
+      label: (
+        <Text type="secondary" className={styles.emailText}>
+          {t('header.user_menu.version', { version: APP_VERSION })}
+        </Text>
+      ),
+      disabled: true,
     },
     { type: 'divider' as const },
     {

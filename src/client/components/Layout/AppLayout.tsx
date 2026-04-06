@@ -71,20 +71,14 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100vh;
     overflow: hidden;
   `,
-  // Mobile layout: no fixed height / overflow — body is the scroll container.
-  // window.scrollY changes as user scrolls → Edge/Safari hide their browser chrome.
+  // Mobile layout: body-scroll mode so mobile browser chrome hides on scroll.
+  // min-height instead of height so content can exceed the viewport.
   layoutMobile: css`
     min-height: 100dvh;
+    overflow: visible;
   `,
-  // ── Mobile-only: single scroll container ─────────────────────────────────
-  // In accordion mode (< 1200px) the entire page — header, toolbar, news — lives
-  // in normal document flow. Body scrolls naturally:
-  //   - AppHeader scrolls away
-  //   - NewsFeedToolbar has position:sticky top:0 → sticks when header is off-screen
-  //   - window.scrollY changes → mobile browser chrome (Edge/Safari) hides/shows
+  // Mobile wrapper: normal document flow — body is the scroll parent.
   mobileContainer: css`
-    min-height: 100dvh;
-    overflow-x: hidden;
     background: ${token.colorBgLayout};
   `,
 }));
@@ -97,9 +91,6 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
   const initialized = useRef(false);
-
-  // mobile scroll container ref — passed to NewsFeed for PTR and scroll-to-top
-  const mobileContainerRef = useRef<HTMLDivElement>(null);
 
   // Boss key: Esc Esc to lock all PIN groups
   useBossKey();
@@ -214,22 +205,18 @@ export function AppLayout() {
     </Drawer>
   );
 
-  // ── MOBILE (< 1200px): single scroll container ──────────────────────────
-  // AppHeader is in NORMAL FLOW — scrolls away naturally.
-  // NewsFeedToolbar has position:sticky so it sticks when header is gone.
-  // No JS needed for any header/toolbar behaviour.
+  // ── MOBILE (< 1200px): div-based scroll container ─────────────────────
+  // AppHeader is in normal flow — scrolls away.
+  // NewsFeedToolbar sticks via position:sticky top:0.
+  // Scroll is on the mobileContainer div (overflow-y: auto), NOT body.
   if (isAccordionMode) {
     return (
       <Layout className={styles.layoutMobile}>
         {sidebarDrawer}
-        <div ref={mobileContainerRef} className={styles.mobileContainer}>
+        <div className={styles.mobileContainer}>
           <AppHeader />
           <TelegramSessionBanner />
-          {selectedChannel ? (
-            <NewsFeed channel={selectedChannel} mobileScrollContainerRef={mobileContainerRef} />
-          ) : (
-            emptyState
-          )}
+          {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
         </div>
       </Layout>
     );

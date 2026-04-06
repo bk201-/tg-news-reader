@@ -9,9 +9,7 @@ export const BP_XL = 1200;
 export const BP_XXL = 1600;
 
 // ── Height constants ──────────────────────────────────────────────────
-export const MOBILE_HEADER_HEIGHT = 64;
 export const MOBILE_TOOLBAR_HEIGHT = 44;
-export const MOBILE_STICKY_HEIGHT = MOBILE_HEADER_HEIGHT + MOBILE_TOOLBAR_HEIGHT + 13; // = 120
 
 // ── Singleton breakpoint store ────────────────────────────────────────
 // A single set of 5 matchMedia listeners broadcasts to all React subscribers.

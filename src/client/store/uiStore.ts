@@ -34,6 +34,9 @@ interface UIStore {
   // News view mode: 2-pane list or accordion
   newsViewMode: NewsViewMode;
   setNewsViewMode: (mode: NewsViewMode) => void;
+  // Auto-advance to next channel after fetch with no new items
+  autoAdvance: boolean;
+  toggleAutoAdvance: () => void;
   // Mobile header hide-on-scroll
   headerHidden: boolean;
   setHeaderHidden: (v: boolean) => void;
@@ -80,6 +83,13 @@ export const useUIStore = create<UIStore>()((set) => ({
     localStorage.setItem('newsViewMode', mode);
     set({ newsViewMode: mode });
   },
+  autoAdvance: localStorage.getItem('autoAdvance') === 'true',
+  toggleAutoAdvance: () =>
+    set((state) => {
+      const next = !state.autoAdvance;
+      localStorage.setItem('autoAdvance', String(next));
+      return { autoAdvance: next };
+    }),
   headerHidden: false,
   setHeaderHidden: (v) => set({ headerHidden: v }),
   // Lightbox

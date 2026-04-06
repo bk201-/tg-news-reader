@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Spin, Empty } from 'antd';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
@@ -61,6 +61,21 @@ export function NewsFeedList({
 }: NewsFeedListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
+
+  const renderItem = useCallback(
+    (_: number, item: NewsItem) => (
+      <NewsListItem
+        item={item}
+        isSelected={selectedNewsId === item.id}
+        isFiltered={filteredIds.has(item.id)}
+        showAll={showAll}
+        onClick={() => onSelect(item.id)}
+        onTagClick={onTagClick}
+      />
+    ),
+    [selectedNewsId, filteredIds, showAll, onSelect, onTagClick],
+  );
+
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
@@ -76,22 +91,7 @@ export function NewsFeedList({
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {!isLoading && items.length > 0 && (
-        <Virtuoso
-          ref={virtuosoRef}
-          className={styles.virtuoso}
-          data={items}
-          overscan={400}
-          itemContent={(_, item) => (
-            <NewsListItem
-              item={item}
-              isSelected={selectedNewsId === item.id}
-              isFiltered={filteredIds.has(item.id)}
-              showAll={showAll}
-              onClick={() => onSelect(item.id)}
-              onTagClick={onTagClick}
-            />
-          )}
-        />
+        <Virtuoso ref={virtuosoRef} className={styles.virtuoso} data={items} overscan={400} itemContent={renderItem} />
       )}
     </div>
   );

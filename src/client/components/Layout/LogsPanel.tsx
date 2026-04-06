@@ -73,7 +73,7 @@ export function LogsPanel() {
       <Drawer
         title={t('logs.title')}
         placement="right"
-        width={760}
+        size="large"
         open={open}
         onClose={() => setOpen(false)}
         styles={{ body: { padding: 0 } }}

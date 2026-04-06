@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { Spin, Empty } from 'antd';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
-import { BP_XL, MOBILE_STICKY_HEIGHT } from '../../hooks/breakpoints';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
@@ -14,7 +14,7 @@ const useStyles = createStyles(({ css, token }) => ({
     position: relative;
     background: ${token.colorBgContainer};
     overscroll-behavior-y: contain;
-    /* Mobile: parent (mobileContainer) is the scroll container — no inner scroll */
+    /* Mobile: parent div is the scroll container — no inner scroll */
     @media (max-width: ${BP_XL - 1}px) {
       flex: none;
       overflow-y: visible;
@@ -35,10 +35,10 @@ const useStyles = createStyles(({ css, token }) => ({
   empty: css`
     margin-top: 48px;
   `,
-  // Ensure selected items scroll into view below sticky header+toolbar on mobile
+  // Ensure selected items scroll into view below sticky toolbar on mobile
   item: css`
     @media (max-width: ${BP_XL - 1}px) {
-      scroll-margin-top: ${MOBILE_STICKY_HEIGHT}px;
+      scroll-margin-top: ${MOBILE_TOOLBAR_HEIGHT + 8}px;
     }
   `,
 }));
@@ -56,8 +56,8 @@ interface NewsAccordionListProps {
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   onMarkedRead: (id: number) => void;
   virtuosoRef: React.RefObject<VirtuosoHandle | null>;
-  /** Mobile only: outer scroll container for Virtuoso's customScrollParent */
-  mobileScrollContainerRef?: React.RefObject<HTMLElement | null>;
+  /** Mobile: use window as scroll parent so browser chrome hides on scroll */
+  windowScroll?: boolean;
 }
 
 export function NewsAccordionList({
@@ -73,31 +73,34 @@ export function NewsAccordionList({
   onTagClick,
   onMarkedRead,
   virtuosoRef,
-  mobileScrollContainerRef,
+  windowScroll,
 }: NewsAccordionListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-
-  // On mobile the scroll container is document.body (body-scroll model so that
-  // mobile browser chrome hides/shows as the user scrolls).
-  // customScrollParent is set only when mobileScrollContainerRef is provided
-  // (i.e. we're in accordion/mobile mode); undefined on desktop lets Virtuoso
-  // manage its own internal scroll.
-  const [customScrollParent, setCustomScrollParent] = useState<HTMLElement | undefined>(() =>
-    mobileScrollContainerRef ? document.body : undefined,
-  );
-  useEffect(() => {
-    if (mobileScrollContainerRef && customScrollParent !== document.body) {
-      setCustomScrollParent(document.body);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!mobileScrollContainerRef]);
 
   const emptyDescription = hashTagFilter
     ? t('news.list.empty_tag', { tag: hashTagFilter })
     : activeFilterCount > 0
       ? t('news.list.empty_filtered')
       : t('news.list.empty');
+
+  const renderItem = useCallback(
+    (_: number, item: NewsItem) => (
+      <div data-news-id={item.id} className={styles.item}>
+        <NewsAccordionItem
+          item={item}
+          isSelected={selectedNewsId === item.id}
+          isFiltered={filteredIds.has(item.id)}
+          showAll={showAll}
+          channelTelegramId={channelTelegramId}
+          onSelect={onSelect}
+          onTagClick={onTagClick}
+          onMarkedRead={onMarkedRead}
+        />
+      </div>
+    ),
+    [selectedNewsId, filteredIds, showAll, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
+  );
 
   return (
     <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion}>
@@ -110,25 +113,12 @@ export function NewsAccordionList({
       {!isLoading && items.length > 0 && (
         <Virtuoso
           ref={virtuosoRef}
-          className={customScrollParent ? undefined : styles.virtuoso}
+          className={windowScroll ? undefined : styles.virtuoso}
           data={items}
           overscan={500}
-          customScrollParent={customScrollParent}
-          style={customScrollParent ? undefined : { height: '100%' }}
-          itemContent={(_, item) => (
-            <div data-news-id={item.id} className={styles.item}>
-              <NewsAccordionItem
-                item={item}
-                isSelected={selectedNewsId === item.id}
-                isFiltered={filteredIds.has(item.id)}
-                showAll={showAll}
-                channelTelegramId={channelTelegramId}
-                onSelect={onSelect}
-                onTagClick={onTagClick}
-                onMarkedRead={onMarkedRead}
-              />
-            </div>
-          )}
+          useWindowScroll={windowScroll}
+          style={windowScroll ? undefined : { height: '100%' }}
+          itemContent={renderItem}
         />
       )}
     </div>
