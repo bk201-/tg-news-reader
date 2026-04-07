@@ -150,6 +150,7 @@
       "text_panel_title": "Текст новости",
       "link_fallback": "Ссылка {{n}}"
     },
+    "scroll_to_top": "Наверх",
     "list": {
       "list_label": "Список новостей",
       "empty_tag": "Нет новостей с тегом {{tag}}",

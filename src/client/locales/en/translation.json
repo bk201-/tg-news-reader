@@ -150,6 +150,7 @@
       "text_panel_title": "Post text",
       "link_fallback": "Link {{n}}"
     },
+    "scroll_to_top": "Scroll to top",
     "list": {
       "list_label": "News list",
       "empty_tag": "No news with tag {{tag}}",

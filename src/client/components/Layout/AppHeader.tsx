@@ -52,7 +52,7 @@ const useStyles = createStyles(({ css, token }, sidebarInDrawer: boolean) => ({
     white-space: nowrap;
   `,
   channelName: css`
-    color: rgba(255, 255, 255, 0.85);
+    color: color-mix(in srgb, ${token.colorTextLightSolid} 85%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -68,10 +68,11 @@ export function useDownloadsSSE() {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   useEffect(() => {
+    // No token = not authenticated — don't connect
+    if (!accessToken) return;
+
     // EventSource cannot send custom headers — pass JWT as ?token= query param
-    const url = accessToken
-      ? `/api/downloads/stream?token=${encodeURIComponent(accessToken)}`
-      : '/api/downloads/stream';
+    const url = `/api/downloads/stream?token=${encodeURIComponent(accessToken)}`;
     const es = new EventSource(url);
 
     es.addEventListener('init', (e: MessageEvent) => {

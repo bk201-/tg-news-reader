@@ -186,7 +186,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             icon={<VerticalAlignTopOutlined />}
             className={styles.scrollTopBtn}
             onClick={scrollToTop}
-            aria-label="Scroll to top"
+            aria-label={t('news.scroll_to_top')}
           />,
           document.body,
         )}

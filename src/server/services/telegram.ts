@@ -570,44 +570,7 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       const result = await tg.getMessages(channelUsername, { ids: [msgId] });
       const msg = result[0];
       if (!(msg instanceof _Api.Message)) return null;
-
-      const text = msg.message || '';
-      const links = extractLinks(text, msg.entities);
-      const hashtags = extractHashtags(text, msg.entities);
-      let mediaType: string | undefined;
-      let mediaSizeBytes: number | undefined;
-
-      if (msg.media) {
-        if (msg.media instanceof _Api.MessageMediaPhoto) {
-          mediaType = 'photo';
-          const photo = msg.media.photo;
-          if (photo instanceof _Api.Photo) {
-            const photoSizes = photo.sizes.filter((s) => s instanceof _Api.PhotoSize);
-            const largest = photoSizes.sort((a, b) => b.size - a.size)[0];
-            if (largest) mediaSizeBytes = largest.size;
-          }
-        } else if (msg.media instanceof _Api.MessageMediaDocument) {
-          mediaType = 'document';
-          const doc = msg.media.document;
-          if (doc instanceof _Api.Document) mediaSizeBytes = Number(doc.size);
-        } else if (msg.media instanceof _Api.MessageMediaWebPage) {
-          mediaType = 'webpage';
-        } else {
-          // Unsupported media (poll, geo, contact, etc.) — skip
-          return null;
-        }
-      }
-
-      return {
-        id: msg.id,
-        message: text,
-        date: msg.date || 0,
-        links,
-        hashtags,
-        mediaType,
-        mediaSizeBytes,
-        rawMedia: msg.media ?? undefined,
-      };
+      return parseMessageFields(msg, channelUsername);
     }, 'fetchMessageById');
   } catch (err) {
     logger.warn({ module: 'telegram', channelUsername, msgId, err }, 'error fetching message by ID');
