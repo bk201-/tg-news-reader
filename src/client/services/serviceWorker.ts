@@ -43,7 +43,7 @@ export function registerMediaServiceWorker(): void {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
+      .register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then((reg) => {
         logger.info({ module: 'sw', scope: reg.scope }, 'service worker registered');
       })

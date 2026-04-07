@@ -1,0 +1,72 @@
+/**
+ * EventSource wrapper with exponential backoff on reconnection.
+ *
+ * Native EventSource auto-reconnects on error with a fixed ~3s delay,
+ * which floods the server when it's down. This wrapper closes on error
+ * and re-creates the connection with exponential backoff (1s → 2s → 4s → … → 30s cap).
+ * The backoff resets on a successful connection (open event).
+ */
+
+import { logger } from '../logger';
+
+const BASE_DELAY_MS = 1_000;
+const MAX_DELAY_MS = 30_000;
+
+export interface ReconnectingES {
+  /** Close the connection permanently — no more reconnects. */
+  close: () => void;
+}
+
+interface ReconnectingESOptions {
+  url: string;
+  /** Called on every new EventSource instance so the caller can attach listeners. */
+  onConnect: (es: EventSource) => void;
+  /** Module name for logging. */
+  module?: string;
+}
+
+export function createReconnectingEventSource({
+  url,
+  onConnect,
+  module = 'sse',
+}: ReconnectingESOptions): ReconnectingES {
+  let attempt = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let es: EventSource | null = null;
+  let closed = false;
+
+  function connect() {
+    if (closed) return;
+
+    es = new EventSource(url);
+
+    es.addEventListener('open', () => {
+      // Connection succeeded — reset backoff
+      attempt = 0;
+    });
+
+    es.onerror = () => {
+      if (closed) return;
+      es?.close();
+      es = null;
+
+      const delay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+      attempt++;
+      logger.warn({ module, attempt, delay }, 'SSE error — reconnecting with backoff');
+      timer = setTimeout(connect, delay);
+    };
+
+    onConnect(es);
+  }
+
+  connect();
+
+  return {
+    close() {
+      closed = true;
+      if (timer) clearTimeout(timer);
+      es?.close();
+      es = null;
+    },
+  };
+}

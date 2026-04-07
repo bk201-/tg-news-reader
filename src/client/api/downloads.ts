@@ -2,9 +2,9 @@ import { useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanst
 import { useEffect } from 'react';
 import { api } from './client';
 import { useAuthStore } from '../store/authStore';
-import { logger } from '../logger';
 import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
 import { type NewsResponse, updatePaginatedItems } from './news';
+import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 
 export const downloadsKeys = {
   all: ['downloads'] as const,
@@ -73,64 +73,62 @@ export function useDownloadsSSE() {
 
     // EventSource cannot send custom headers — pass JWT as ?token= query param
     const url = `/api/downloads/stream?token=${encodeURIComponent(accessToken)}`;
-    const es = new EventSource(url);
 
-    es.addEventListener('init', (e: MessageEvent) => {
-      const tasks = JSON.parse(e.data as string) as DownloadTask[];
-      qc.setQueryData(downloadsKeys.all, tasks);
-    });
+    const rec = createReconnectingEventSource({
+      url,
+      module: 'downloads',
+      onConnect: (es) => {
+        es.addEventListener('init', (e: MessageEvent) => {
+          const tasks = JSON.parse(e.data as string) as DownloadTask[];
+          qc.setQueryData(downloadsKeys.all, tasks);
+        });
 
-    es.addEventListener('task_update', (e: MessageEvent) => {
-      const task = JSON.parse(e.data as string) as DownloadTask;
+        es.addEventListener('task_update', (e: MessageEvent) => {
+          const task = JSON.parse(e.data as string) as DownloadTask;
 
-      if (task.status === 'done') {
-        if (task.type === 'media' && task.channelId) {
-          // Update localMediaPath / localMediaPaths in-place — no refetch needed.
-          // Same pattern as useMediaProgressSSE to avoid spammy GET /api/news.
-          qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
-            updatePaginatedItems(old, (items) =>
-              items.map((item: NewsItem) => {
-                if (item.id !== task.newsId) return item;
-                return {
-                  ...item,
-                  localMediaPath: task.localMediaPath ?? item.localMediaPath,
-                  localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
-                };
-              }),
-            ),
-          );
-          qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => (old ?? []).filter((t) => t.id !== task.id));
-          return;
-        }
+          if (task.status === 'done') {
+            if (task.type === 'media' && task.channelId) {
+              qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
+                updatePaginatedItems(old, (items) =>
+                  items.map((item: NewsItem) => {
+                    if (item.id !== task.newsId) return item;
+                    return {
+                      ...item,
+                      localMediaPath: task.localMediaPath ?? item.localMediaPath,
+                      localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
+                    };
+                  }),
+                ),
+              );
+              qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
+                (old ?? []).filter((t) => t.id !== task.id),
+              );
+              return;
+            }
 
-        if (task.channelId) {
-          // Article task: need fullContent — refetch the news list, then drop the task.
-          // Refetch FIRST so content is in cache before button state changes.
-          void qc.refetchQueries({ queryKey: ['news', task.channelId] }).then(() => {
-            qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
-              (old ?? []).filter((t) => t.id !== task.id),
-            );
+            if (task.channelId) {
+              void qc.refetchQueries({ queryKey: ['news', task.channelId] }).then(() => {
+                qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
+                  (old ?? []).filter((t) => t.id !== task.id),
+                );
+              });
+              return;
+            }
+          }
+
+          qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => {
+            const idx = old.findIndex((t) => t.id === task.id);
+            if (idx >= 0) {
+              const updated = [...old];
+              updated[idx] = task;
+              return updated;
+            }
+            return [...old, task];
           });
-          return;
-        }
-      }
-
-      qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => {
-        const idx = old.findIndex((t) => t.id === task.id);
-        if (idx >= 0) {
-          const updated = [...old];
-          updated[idx] = task;
-          return updated;
-        }
-        return [...old, task];
-      });
+        });
+      },
     });
 
-    es.onerror = () => {
-      // Browser auto-reconnects EventSource on error
-      logger.warn({ module: 'downloads' }, 'SSE connection error — browser will reconnect');
-    };
-
-    return () => es.close();
+    return () => rec.close();
   }, [qc, accessToken]);
 }
