@@ -46,26 +46,29 @@ export async function applyFiltersToInserted(
 
   if (activeFilters.length === 0) return;
 
-  const toFilter: number[] = [];
+  const toFilter = new Set<number>();
   const hits = new Map<number, number>();
 
   for (const item of insertedItems) {
     for (const filter of activeFilters) {
       if (checkFilterMatch(filter, item)) {
-        if (!toFilter.includes(item.newsId)) toFilter.push(item.newsId);
+        toFilter.add(item.newsId);
         hits.set(filter.id, (hits.get(filter.id) ?? 0) + 1);
       }
     }
   }
 
-  if (toFilter.length > 0) {
-    await db.update(news).set({ isFiltered: 1 }).where(inArray(news.id, toFilter));
+  if (toFilter.size > 0) {
+    await db
+      .update(news)
+      .set({ isFiltered: 1 })
+      .where(inArray(news.id, [...toFilter]));
   }
 
   await recordFilterHits(hits);
 
   logger.debug(
-    { module: 'filterEngine', channelId, filtered: toFilter.length, total: insertedItems.length },
+    { module: 'filterEngine', channelId, filtered: toFilter.size, total: insertedItems.length },
     'filters applied to inserted news',
   );
 }

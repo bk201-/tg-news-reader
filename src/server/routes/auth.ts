@@ -121,6 +121,18 @@ router.post('/refresh', async (c) => {
   const [user] = await db.select().from(users).where(eq(users.id, session.userId));
   if (!user) return c.json({ error: 'User not found' }, 401);
 
+  // Rotate refresh token: generate new token, update hash + expiry in DB, re-set cookie
+  const newRefreshToken = randomUUID();
+  const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 8);
+  const newExpiresAt = Math.floor(Date.now() / 1000) + REFRESH_EXPIRES_DAYS * 24 * 60 * 60;
+
+  await db
+    .update(sessions)
+    .set({ refreshTokenHash: newRefreshTokenHash, expiresAt: newExpiresAt })
+    .where(eq(sessions.id, sessionId));
+
+  setCookie(c, 'refresh_token', `${sessionId}:${newRefreshToken}`, refreshCookieOptions());
+
   const unlockedGroupIds = JSON.parse(session.unlockedGroupIds ?? '[]') as number[];
   const accessToken = await issueAccessToken(user.id, user.role, sessionId, unlockedGroupIds);
   return c.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });

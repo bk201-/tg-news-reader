@@ -6,18 +6,6 @@
 
 ---
 
-## 🔴 Critical Fixes
-
-| # | Task | Description | Complexity |
-|---|------|-------------|------------|
-| 1 | Refresh token rotation | `POST /refresh` reuses the same refresh token for 7 days. Must generate a new `refreshToken` + `refreshTokenHash` on every refresh, update `sessions`, and re-set the cookie. Without this a leaked token = 7 days of unlimited access. **File:** `routes/auth.ts` | ⭐ |
-| 2 | UNIQUE(channel_id, telegram_msg_id) on `news` | No DB-level uniqueness — concurrent fetches (two tabs, double-click) can insert duplicates. Add composite unique constraint in `schema.ts` + idempotent ALTER in `migrate.ts`. Enables native `ON CONFLICT DO UPDATE` in `channelFetchService` instead of manual pre-query split. **File:** `db/schema.ts`, `db/migrate.ts`, `channelFetchService.ts` | ⭐ |
-| 3 | Fix `until` filter in digest route | `routes/digest.ts` lines 48–50: `eq(news.postedAt, untilTs)` is a placeholder — should be `lte`. The `until` parameter is silently ignored. **File:** `routes/digest.ts` | ⭐ |
-| 4 | O(n²) in filterEngine — use Set | `filterEngine.ts` line 55: `toFilter.includes(item.newsId)` inside a nested loop = O(n×m) linear scans. Replace `toFilter: number[]` with `Set<number>`. **File:** `services/filterEngine.ts` | ⭐ |
-
----
-
-
 ## ⬜ Technical Debt
 
 | # | Task | Description | Complexity |
