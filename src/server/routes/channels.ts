@@ -151,7 +151,10 @@ router.delete('/:id', async (c) => {
     try {
       rmSync(mediaDir, { recursive: true, force: true });
     } catch (err) {
-      console.warn(`Failed to remove media folder for channel ${deleted.telegramId}:`, err);
+      logger.warn(
+        { module: 'channels', channelId: id, err },
+        `Failed to remove media folder for channel ${deleted.telegramId}`,
+      );
     }
   }
 
@@ -364,7 +367,7 @@ router.post('/:id/fetch', async (c) => {
     return c.json({ inserted, total: messages.length, mediaProcessing });
   } catch (err: unknown) {
     const error = err as { message?: string };
-    console.error('Fetch error:', err);
+    logger.error({ module: 'channels', channelId, err }, 'Fetch error');
     return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
   }
 });

@@ -15,8 +15,7 @@
 ### Unread badges
 
 - `unreadCount` in `GET /api/channels` (LEFT JOIN news WHERE is_read = 0)
-- `pendingCounts` in `uiStore` — Telegram messages not yet fetched to DB
-- Badge = `unreadCount + pendingCounts[channelId]`
+- Badge = `unreadCount` from the channel list query
 - **Refresh** button → `POST /api/channels/count-unread` — counts only, uses `lastFetchedAt`
 - `lastFetchedAt` is the DB boundary: everything before it is already stored; only newer messages need to be fetched
 - `lastReadAt` is the unread display boundary: used only on first-ever channel fetch to align with Telegram's read position
@@ -60,7 +59,7 @@ CREATE TABLE groups (
 ### Implementation
 
 - `GroupPanel` — 72px left panel; buttons with `FolderFilled` in group color, radial-gradient bg via `color-mix`
-- Group badge = sum of `unreadCount + pendingCounts` for all channels in the group
+- Group badge = sum of `unreadCount` for all channels in the group
 - `selectedGroupId === null` → "General" (channels without group_id)
 - PIN: `bcrypt(pin, 10)` → `POST /api/groups/:id/verify-pin` → `unlockGroup(id)` in uiStore (in-memory)
 - After PIN verification, server updates `sessions.unlocked_group_ids` and issues a new access token

@@ -23,7 +23,7 @@ SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
 ### count-unread: lastFetchedAt vs lastReadAt
 
 `count-unread` intentionally uses `lastFetchedAt` (not `lastReadAt`):
-- Badge = `unreadCount (DB) + pendingCounts (uiStore)`
+- Badge = `unreadCount` from channel list query
 - Using `lastReadAt` would double-count already-fetched unread messages
 - `getSinceDate` is used only in the fetch route
 
@@ -42,8 +42,8 @@ SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
 
 **Symptom**: after "Mark all as read" + refresh, badges remained and items weren't marked.
 
-**Bug 1**: `useMarkAllRead.onSuccess` did not clear `pendingCounts[channelId]` in `uiStore`.  
-**Fix**: add `clearPendingCount(channelId)` in `onSuccess`.
+**Bug 1**: `useMarkAllRead.onSuccess` did not properly invalidate the channel list query.  
+**Fix**: ensure `invalidateQueries` fires for channel list on mark-all-read success.
 
 **Bug 2**: fetch route deletes `isRead=1` items before fetching new ones; `/read-all` did not update `lastReadAt` → after deletion, the server re-fetched them from Telegram with `isRead=0`.  
 **Fix**: in `/read-all`, update `lastReadAt = max(news.postedAt)` for the channel.
