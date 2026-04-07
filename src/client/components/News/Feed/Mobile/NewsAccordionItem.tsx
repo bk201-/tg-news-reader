@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsListItem } from './NewsListItem';
-import { NewsDetail } from './NewsDetail';
+import { NewsListItem } from '../NewsListItem';
+import { NewsDetail } from '../../Detail/NewsDetail';
 
 const useStyles = createStyles(({ css, token }) => ({
   item: css`

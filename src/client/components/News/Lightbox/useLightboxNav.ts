@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { NewsItem } from '@shared/types.ts';
-import type { NewsResponse } from '../../api/news';
+import type { NewsResponse } from '../../../api/news';
 
 /** Media types that appear in the lightbox (photo + document covers images and videos) */
 const LIGHTBOX_MEDIA_TYPES = new Set(['photo', 'document']);

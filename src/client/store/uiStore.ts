@@ -45,6 +45,9 @@ interface UIStore {
   openLightbox: (newsId: number, albumIndex: number, channelId: number) => void;
   closeLightbox: () => void;
   setLightboxAlbumIndex: (index: number) => void;
+  // Signal to ChannelSidebar to auto-open the create modal
+  openAddChannel: boolean;
+  setOpenAddChannel: (v: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -61,7 +64,10 @@ export const useUIStore = create<UIStore>()((set) => ({
   setFilterPanelOpen: (v) => set({ filterPanelOpen: v }),
   hashTagFilter: null,
   setHashTagFilter: (tag) => set({ hashTagFilter: tag }),
-  isDarkTheme: localStorage.getItem('theme') === 'dark',
+  isDarkTheme:
+    localStorage.getItem('theme') !== null
+      ? localStorage.getItem('theme') === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches,
   toggleTheme: () =>
     set((state) => {
       const next = !state.isDarkTheme;
@@ -98,4 +104,6 @@ export const useUIStore = create<UIStore>()((set) => ({
   closeLightbox: () => set({ lightbox: null }),
   setLightboxAlbumIndex: (index) =>
     set((state) => (state.lightbox ? { lightbox: { ...state.lightbox, albumIndex: index } } : {})),
+  openAddChannel: false,
+  setOpenAddChannel: (v) => set({ openAddChannel: v }),
 }));

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { NewsFeedToolbarProps } from './newsFeedToolbarTypes';
-import { NewsFeedToolbarDesktop } from './NewsFeedToolbarDesktop';
-import { NewsFeedToolbarMobile } from './NewsFeedToolbarMobile';
+import { NewsFeedToolbarDesktop } from './Desktop/NewsFeedToolbarDesktop';
+import { NewsFeedToolbarMobile } from './Mobile/NewsFeedToolbarMobile';
 
 export type { NewsFeedToolbarProps } from './newsFeedToolbarTypes';
 

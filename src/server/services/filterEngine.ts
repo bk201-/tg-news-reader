@@ -90,8 +90,7 @@ export async function reprocessChannelFilters(channelId: number): Promise<void> 
   const toUnfilter: number[] = [];
 
   for (const row of allNews) {
-    const hashtags = JSON.parse(row.hashtags) as string[];
-    const isFiltered = activeFilters.some((f) => checkFilterMatch(f, { text: row.text, hashtags }));
+    const isFiltered = activeFilters.some((f) => checkFilterMatch(f, { text: row.text, hashtags: row.hashtags }));
     if (isFiltered) toFilter.push(row.id);
     else toUnfilter.push(row.id);
   }

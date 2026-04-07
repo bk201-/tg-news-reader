@@ -7,9 +7,9 @@ import { useFilters, useCreateFilter } from '../../api/filters';
 import { useFetchChannel, useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { applyFilters } from './filterUtils';
-import { useHashTagSync } from './useHashTagSync';
-import { useNewsHotkeys } from './useNewsHotkeys';
-import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
+import { useHashTagSync } from './Feed/useHashTagSync';
+import { useNewsHotkeys } from './Feed/useNewsHotkeys';
+import { useNewsFeedHotkeys } from './Feed/useNewsFeedHotkeys';
 import { useIsXl } from '../../hooks/breakpoints';
 import { useMediaProgressSSE } from '../../api/mediaProgress';
 import type { VirtuosoHandle } from 'react-virtuoso';
@@ -183,14 +183,10 @@ export function useNewsFeedState(channel: Channel) {
     (val: string | number) => {
       const v = String(val);
       setFetchPeriod(v);
-      if (v === 'sync') {
-        fetchChannel.mutate({ id: channel.id, since: 'lastSync' }, { onSuccess: onUserFetchSuccess });
-      } else {
-        const since = new Date();
-        since.setDate(since.getDate() - parseInt(v, 10));
-        since.setHours(0, 0, 0, 0);
-        fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onUserFetchSuccess });
-      }
+      const since = new Date();
+      since.setDate(since.getDate() - parseInt(v, 10));
+      since.setHours(0, 0, 0, 0);
+      fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onUserFetchSuccess });
     },
     [channel.id, fetchChannel, onUserFetchSuccess],
   );
@@ -212,11 +208,33 @@ export function useNewsFeedState(channel: Channel) {
     [displayItems, markRead, handleMarkedRead, setSelectedNewsId, handleFetchDefault],
   );
 
+  // ── Mark all read (+ auto-advance when enabled) ─────────────────────
+  const handleMarkAllReadAndAdvance = useCallback(() => {
+    if (!autoAdvance) {
+      markAllRead.mutate(channel.id);
+      return;
+    }
+    // Chain: mark all read → fetch → advance if nothing new
+    markAllRead.mutate(channel.id, {
+      onSuccess: () => {
+        fetchChannel.mutate(
+          { id: channel.id },
+          {
+            onSuccess: (data) => {
+              if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
+              if (data.inserted === 0) goToNextChannel();
+            },
+          },
+        );
+      },
+    });
+  }, [autoAdvance, markAllRead, channel.id, fetchChannel, goToNextChannel]);
+
   useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
   useNewsFeedHotkeys({
     onFetch: handleFetchDefault,
     onToggleShowAll: () => setShowAll(!showAll),
-    onMarkAllRead: () => markAllRead.mutate(channel.id),
+    onMarkAllRead: handleMarkAllReadAndAdvance,
     onOpenFilters: () => setFilterPanelOpen(true),
   });
 
@@ -266,8 +284,8 @@ export function useNewsFeedState(channel: Channel) {
     onFetchPeriod: handleFetchPeriod,
     showAll,
     onToggleShowAll: () => setShowAll(!showAll),
-    markAllPending: markAllRead.isPending,
-    onMarkAllRead: () => markAllRead.mutate(channel.id),
+    markAllPending: markAllRead.isPending || (autoAdvance && fetchChannel.isPending),
+    onMarkAllRead: handleMarkAllReadAndAdvance,
     activeFilterCount,
     onOpenFilters: () => setFilterPanelOpen(true),
     hashTagFilter,

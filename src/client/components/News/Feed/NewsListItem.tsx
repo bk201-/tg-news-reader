@@ -5,10 +5,10 @@ import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead } from '../../api/news';
-import { mediaUrl } from '../../api/mediaUrl';
+import { useMarkRead } from '../../../api/news';
+import { mediaUrl } from '../../../api/mediaUrl';
 import { NewsHashtags } from './NewsHashtags';
-import { useUIStore } from '../../store/uiStore';
+import { useUIStore } from '../../../store/uiStore';
 
 const { Text } = Typography;
 

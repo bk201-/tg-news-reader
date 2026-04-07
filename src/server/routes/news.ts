@@ -5,8 +5,9 @@ import { eq, and, asc, max, sql, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
-import { readChannelHistory, fetchMessageById, downloadMessageMedia } from '../services/telegram.js';
+import { readChannelHistory } from '../services/telegram.js';
 import { logger } from '../logger.js';
+import { toNewsItem } from '../db/mappers.js';
 
 const router = new Hono();
 
@@ -23,9 +24,9 @@ function deleteMediaFile(localMediaPath: string | null) {
 }
 
 /** Delete all media files for a news row (handles both single and album). */
-function deleteAllMediaFiles(localMediaPath: string | null, localMediaPaths: string | null) {
+function deleteAllMediaFiles(localMediaPath: string | null, localMediaPaths: string[] | null) {
   if (localMediaPaths) {
-    (JSON.parse(localMediaPaths) as string[]).forEach(deleteMediaFile);
+    localMediaPaths.forEach(deleteMediaFile);
   } else if (localMediaPath) {
     deleteMediaFile(localMediaPath);
   }
@@ -81,9 +82,7 @@ router.delete('/read', async (c) => {
     .delete(news)
     .where(and(...conditions))
     .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
-  deleted.forEach((r: { localMediaPath: string | null; localMediaPaths: string | null }) =>
-    deleteAllMediaFiles(r.localMediaPath, r.localMediaPaths),
-  );
+  deleted.forEach((r) => deleteAllMediaFiles(r.localMediaPath, r.localMediaPaths));
   return c.json({ deleted: deleted.length });
 });
 
@@ -135,20 +134,7 @@ router.get('/', async (c) => {
     filteredOut = result?.count ?? 0;
   }
 
-  const items: NewsItem[] = rows.map((r: (typeof rows)[number]) => ({
-    ...r,
-    links: JSON.parse(r.links) as string[],
-    hashtags: JSON.parse(r.hashtags) as string[],
-    mediaType: r.mediaType || undefined,
-    fullContent: r.fullContent || undefined,
-    localMediaPath: r.localMediaPath || undefined,
-    localMediaPaths: r.localMediaPaths ? (JSON.parse(r.localMediaPaths) as string[]) : undefined,
-    albumMsgIds: r.albumMsgIds ? (JSON.parse(r.albumMsgIds) as number[]) : undefined,
-    mediaSize: r.mediaSize || undefined,
-    textInPanel: r.textInPanel ?? 0,
-    canLoadArticle: r.canLoadArticle ?? 0,
-    fullContentFormat: r.fullContentFormat ?? 'text',
-  }));
+  const items: NewsItem[] = rows.map(toNewsItem);
 
   return c.json({ items, filteredOut });
 });
@@ -158,13 +144,7 @@ router.get('/:id', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
   const [row] = await db.select().from(news).where(eq(news.id, id));
   if (!row) return c.json({ error: 'News not found' }, 404);
-  return c.json({
-    ...row,
-    links: JSON.parse(row.links) as string[],
-    hashtags: JSON.parse(row.hashtags) as string[],
-    mediaType: row.mediaType || undefined,
-    fullContent: row.fullContent || undefined,
-  });
+  return c.json(toNewsItem(row));
 });
 
 // PATCH /api/news/:id/read
@@ -195,75 +175,7 @@ router.patch('/:id/read', async (c) => {
     }
   }
 
-  return c.json({
-    ...updated,
-    links: JSON.parse(updated.links) as string[],
-    hashtags: JSON.parse(updated.hashtags) as string[],
-    mediaType: updated.mediaType || undefined,
-    fullContent: updated.fullContent || undefined,
-  });
-});
-
-// POST /api/news/:id/download-media — on-demand download (no size limit)
-router.post('/:id/download-media', async (c) => {
-  const id = parseInt(c.req.param('id'), 10);
-  const [row] = await db.select().from(news).where(eq(news.id, id));
-  if (!row) return c.json({ error: 'News not found' }, 404);
-  if (row.localMediaPath) return c.json({ localMediaPath: row.localMediaPath }); // already downloaded
-
-  const [channel] = await db.select().from(channels).where(eq(channels.id, row.channelId));
-  if (!channel) return c.json({ error: 'Channel not found' }, 404);
-
-  if (row.albumMsgIds) {
-    // Album: download all member messages
-    const albumIds = JSON.parse(row.albumMsgIds) as number[];
-    const paths: string[] = [];
-    for (const msgId of albumIds) {
-      const msg = await fetchMessageById(channel.telegramId, msgId);
-      if (!msg?.rawMedia) continue;
-      const localPath = await downloadMessageMedia(msg, channel.telegramId, { ignoreLimit: true });
-      if (localPath) paths.push(localPath);
-    }
-    if (paths.length === 0) return c.json({ error: 'Failed to download album media' }, 500);
-
-    const [updated] = await db
-      .update(news)
-      .set({ localMediaPath: paths[0], localMediaPaths: JSON.stringify(paths) })
-      .where(eq(news.id, id))
-      .returning();
-
-    return c.json({
-      ...updated,
-      links: JSON.parse(updated.links) as string[],
-      hashtags: JSON.parse(updated.hashtags) as string[],
-      mediaType: updated.mediaType || undefined,
-      fullContent: updated.fullContent || undefined,
-      localMediaPath: updated.localMediaPath || undefined,
-      localMediaPaths: updated.localMediaPaths ? (JSON.parse(updated.localMediaPaths) as string[]) : undefined,
-      albumMsgIds: updated.albumMsgIds ? (JSON.parse(updated.albumMsgIds) as number[]) : undefined,
-      mediaSize: updated.mediaSize || undefined,
-    } satisfies NewsItem);
-  }
-
-  const msg = await fetchMessageById(channel.telegramId, row.telegramMsgId);
-  if (!msg) return c.json({ error: 'Message not found in Telegram' }, 404);
-
-  const localPath = await downloadMessageMedia(msg, channel.telegramId, { ignoreLimit: true });
-  if (!localPath) return c.json({ error: 'Failed to download media' }, 500);
-
-  const [updated] = await db.update(news).set({ localMediaPath: localPath }).where(eq(news.id, id)).returning();
-
-  return c.json({
-    ...updated,
-    links: JSON.parse(updated.links) as string[],
-    hashtags: JSON.parse(updated.hashtags) as string[],
-    mediaType: updated.mediaType || undefined,
-    fullContent: updated.fullContent || undefined,
-    localMediaPath: updated.localMediaPath || undefined,
-    localMediaPaths: updated.localMediaPaths ? (JSON.parse(updated.localMediaPaths) as string[]) : undefined,
-    albumMsgIds: updated.albumMsgIds ? (JSON.parse(updated.albumMsgIds) as number[]) : undefined,
-    mediaSize: updated.mediaSize || undefined,
-  } satisfies NewsItem);
+  return c.json(toNewsItem(updated));
 });
 
 export default router;

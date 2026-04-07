@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
 import {
   ReloadOutlined,
   LinkOutlined,
@@ -14,9 +14,9 @@ import {
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
-import { isYouTubeUrl } from './newsUtils';
-import { NewsHashtags } from './NewsHashtags';
-import type { NewsDetailToolbarProps } from './newsDetailToolbarTypes';
+import { isYouTubeUrl } from '../../newsUtils';
+import { NewsHashtags } from '../../Feed/NewsHashtags';
+import type { NewsDetailToolbarProps } from '../newsDetailToolbarTypes';
 
 const useStyles = createStyles(({ css, token }) => ({
   headerTop: css`

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Modal, Button, Space, Typography, Form, Switch } from 'antd';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PlusOutlined, ReloadOutlined, OrderedListOutlined } from '@ant-design/icons';
@@ -104,6 +104,16 @@ export function ChannelSidebar() {
     form.setFieldValue('groupId', selectedGroupId ?? undefined);
     setModalOpen(true);
   };
+
+  // Auto-open create modal when triggered from empty state CTA
+  const openAddChannel = useUIStore((s) => s.openAddChannel);
+  useEffect(() => {
+    if (openAddChannel) {
+      openCreate();
+      useUIStore.getState().setOpenAddChannel(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAddChannel]);
 
   const openEdit = (ch: Channel) => {
     setEditingChannel(ch);

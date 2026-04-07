@@ -1,5 +1,6 @@
 import { sqliteTable, integer, text, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import { jsonStringArray, jsonNumberArray } from './customTypes.js';
 
 export const groups = sqliteTable('groups', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -37,15 +38,19 @@ export const news = sqliteTable('news', {
     .references(() => channels.id, { onDelete: 'cascade' }),
   telegramMsgId: integer('telegram_msg_id').notNull(),
   text: text('text').notNull().default(''),
-  links: text('links').notNull().default('[]'),
-  hashtags: text('hashtags').notNull().default('[]'),
+  links: jsonStringArray('links')
+    .notNull()
+    .default(sql`('[]')`),
+  hashtags: jsonStringArray('hashtags')
+    .notNull()
+    .default(sql`('[]')`),
   mediaType: text('media_type'),
   isRead: integer('is_read').notNull().default(0),
   postedAt: integer('posted_at').notNull(),
   fullContent: text('full_content'),
   localMediaPath: text('local_media_path'),
-  localMediaPaths: text('local_media_paths'), // JSON array of paths for albums, e.g. ["ch/101.jpg","ch/102.jpg"]
-  albumMsgIds: text('album_msg_ids'), // JSON array of telegram msg IDs, e.g. [101,102,103]
+  localMediaPaths: jsonStringArray('local_media_paths'), // album: all downloaded paths, e.g. ["ch/101.jpg","ch/102.jpg"]
+  albumMsgIds: jsonNumberArray('album_msg_ids'), // album: full list of Telegram msg IDs, e.g. [101,102,103]
   mediaSize: integer('media_size'),
   isFiltered: integer('is_filtered').notNull().default(0),
   textInPanel: integer('text_in_panel').notNull().default(0),

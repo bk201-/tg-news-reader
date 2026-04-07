@@ -4,14 +4,14 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUIStore } from '../../store/uiStore';
-import { useChannels, channelKeys } from '../../api/channels';
-import { useMarkRead } from '../../api/news';
-import { useDownloadMedia } from '../../api/news';
+import { useUIStore } from '../../../store/uiStore';
+import { useChannels, channelKeys } from '../../../api/channels';
+import { useMarkRead } from '../../../api/news';
+import { useDownloadMedia } from '../../../api/news';
 import { useLightboxNav } from './useLightboxNav';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
-import { mediaUrl } from '../../api/mediaUrl';
+import { mediaUrl } from '../../../api/mediaUrl';
 
 /** History state key pushed when the lightbox opens */
 const HISTORY_KEY = '_lightboxOpen';

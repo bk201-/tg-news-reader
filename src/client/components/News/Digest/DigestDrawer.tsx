@@ -4,8 +4,8 @@ import { CopyOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { message } from 'antd';
-import { streamDigest, type DigestParams } from '../../api/digest';
-import { useUIStore } from '../../store/uiStore';
+import { streamDigest, type DigestParams } from '../../../api/digest';
+import { useUIStore } from '../../../store/uiStore';
 import { DigestBody } from './DigestBody';
 
 const { Text } = Typography;

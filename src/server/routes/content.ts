@@ -26,7 +26,7 @@ router.post('/news/:id', async (c) => {
   const [row] = await db.select().from(news).where(eq(news.id, id));
   if (!row) return c.json({ error: 'News not found' }, 404);
 
-  const links = JSON.parse(row.links) as string[];
+  const links = row.links;
   if (!links.length) return c.json({ error: 'No links in this news item' }, 400);
 
   // Try the first link

@@ -2,14 +2,12 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, count, and, inArray } from 'drizzle-orm';
-import { rmSync, existsSync, unlinkSync } from 'fs';
+import { eq, count, and } from 'drizzle-orm';
+import { rmSync, existsSync } from 'fs';
 import { join } from 'path';
-import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, getChannelInfo } from '../services/telegram.js';
+import { getChannelInfo } from '../services/telegram.js';
 import { mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
-import { getChannelStrategy, type PostProcessArgs } from '../services/channelStrategies.js';
-import { applyFiltersToInserted } from '../services/filterEngine.js';
-import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
+import { fetchChannelNews } from '../services/channelFetchService.js';
 import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
 
@@ -197,176 +195,14 @@ router.post('/:id/fetch', async (c) => {
     .json<{ since?: string; limit?: number }>()
     .catch((): { since?: string; limit?: number } => ({}));
 
-  const [channel] = await db.select().from(channels).where(eq(channels.id, channelId));
-  if (!channel) return c.json({ error: 'Channel not found' }, 404);
-
-  let sinceDate: Date | undefined;
-
-  if (body.since === 'lastSync') {
-    // Dropdown: "С последней синхронизации" — use lastFetchedAt
-    if (channel.lastFetchedAt) {
-      sinceDate = new Date(channel.lastFetchedAt * 1000);
-    }
-  } else if (body.since) {
-    // Dropdown: specific days (ISO date string)
-    sinceDate = new Date(body.since);
-  } else {
-    // Default button
-    if (!channel.lastFetchedAt) {
-      // First-ever fetch for this channel — sync read position from Telegram so we only show
-      // messages the user hasn't read yet (avoids loading the entire channel history).
-      const readMaxId = await getReadInboxMaxId(channel.telegramId);
-      if (readMaxId) {
-        const readMsg = await fetchMessageById(channel.telegramId, readMaxId);
-        if (readMsg) {
-          sinceDate = new Date(readMsg.date * 1000);
-          await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channelId));
-        }
-      }
-      // Fallback: configured days ago
-      if (!sinceDate) {
-        sinceDate = new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
-      }
-    } else {
-      // Subsequent fetches: lastFetchedAt is the DB boundary — everything before it is already stored.
-      // No need to call Telegram for readInboxMaxId; that would only waste an API round-trip and
-      // cause us to re-fetch messages already in DB when lastReadAt < lastFetchedAt.
-      sinceDate = new Date(channel.lastFetchedAt * 1000);
-    }
-  }
-
   try {
-    // Clean up read news (and their media files) before fetching new ones
-    const deletedRead = await db
-      .delete(news)
-      .where(and(eq(news.channelId, channelId), eq(news.isRead, 1)))
-      .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
-    for (const row of deletedRead) {
-      const paths: string[] = row.localMediaPaths
-        ? (JSON.parse(row.localMediaPaths) as string[])
-        : row.localMediaPath
-          ? [row.localMediaPath]
-          : [];
-      for (const p of paths) {
-        const filepath = join(process.cwd(), 'data', p);
-        if (existsSync(filepath)) {
-          try {
-            unlinkSync(filepath);
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-    }
-
-    const messages = await fetchChannelMessages(channel.telegramId, {
-      sinceDate,
-      limit: body.limit || NEWS_FETCH_LIMIT,
-    });
-
-    const strategy = getChannelStrategy(channel.channelType as ChannelType);
-
-    // Build rows to insert (filter via strategy, derive flags)
-    const valuesToInsert = messages
-      .filter((msg) => !strategy.shouldSkipMessage(msg))
-      .map((msg) => {
-        const flags = strategy.getItemFlags(msg);
-        return {
-          channelId,
-          telegramMsgId: msg.id,
-          text: msg.message,
-          links: JSON.stringify(msg.links),
-          hashtags: JSON.stringify(msg.hashtags),
-          mediaType: msg.mediaType,
-          postedAt: msg.date,
-          mediaSize: msg.mediaSizeBytes,
-          albumMsgIds: msg.albumTelegramIds ? JSON.stringify(msg.albumTelegramIds) : null,
-          ...(msg.instantViewContent
-            ? { fullContent: msg.instantViewContent, fullContentFormat: 'markdown' as const }
-            : {}),
-          textInPanel: flags.textInPanel ? 1 : 0,
-          canLoadArticle: flags.canLoadArticle ? 1 : 0,
-        };
-      });
-
-    // Batch-upsert: pre-split into new vs existing rows so we never need the `excluded`
-    // pseudo-table (avoids WebStorm SQL injection false positives).
-    // onConflictDoUpdate keeps text/links/hashtags in sync when Telegram messages are edited.
-    const BATCH_SIZE = 50;
-
-    // Snapshot which telegramMsgIds already exist before the upsert so we can tell
-    // "inserted" (new row) apart from "updated" (edited message, row already existed).
-    const allMsgIds = valuesToInsert.map((v) => v.telegramMsgId);
-    const existingMsgIds = new Set(
-      allMsgIds.length
-        ? (
-            await db
-              .select({ telegramMsgId: news.telegramMsgId })
-              .from(news)
-              .where(and(eq(news.channelId, channelId), inArray(news.telegramMsgId, allMsgIds)))
-          ).map((r) => r.telegramMsgId)
-        : [],
-    );
-
-    const toInsertValues = valuesToInsert.filter((v) => !existingMsgIds.has(v.telegramMsgId));
-    const toUpdateValues = valuesToInsert.filter((v) => existingMsgIds.has(v.telegramMsgId));
-
-    const insertedMap = new Map<number, number>(); // telegramMsgId → news.id (new rows only)
-    let updatedCount = 0;
-
-    await db.transaction(async (tx) => {
-      // INSERT new rows in chunks — no conflict possible since we pre-filtered
-      for (let i = 0; i < toInsertValues.length; i += BATCH_SIZE) {
-        const chunk = toInsertValues.slice(i, i + BATCH_SIZE);
-        const rows = await tx.insert(news).values(chunk).returning({ id: news.id, telegramMsgId: news.telegramMsgId });
-        for (const row of rows) {
-          insertedMap.set(row.telegramMsgId, row.id);
-        }
-      }
-
-      // UPDATE mutable content fields for existing rows (edited Telegram messages).
-      // Edits are rare in the short fetch window, so individual updates per row are fine.
-      for (const v of toUpdateValues) {
-        await tx
-          .update(news)
-          .set({ text: v.text, links: v.links, hashtags: v.hashtags })
-          .where(and(eq(news.channelId, channelId), eq(news.telegramMsgId, v.telegramMsgId)));
-        updatedCount++;
-      }
-    });
-
-    const inserted = insertedMap.size;
-    const updated = updatedCount;
-
-    const now = Math.floor(Date.now() / 1000);
-    await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
-
-    // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
-    const insertedItems = messages
-      .filter((msg) => insertedMap.has(msg.id))
-      .map((msg) => ({ newsId: insertedMap.get(msg.id)!, text: msg.message, hashtags: msg.hashtags }));
-    await applyFiltersToInserted(channelId, insertedItems);
-
-    const mediaProcessing = strategy.requiresMediaProcessing(messages);
-
-    const args: PostProcessArgs = {
-      channelId,
-      channelTelegramId: channel.telegramId,
-      messages,
-      insertedMap,
-    };
-
-    // Fire post-processing in background — just queues tasks, returns immediately
-    void strategy.postProcess(args);
-
-    logger.info(
-      { module: 'channels', channelId, inserted, updated, total: messages.length, mediaProcessing },
-      `fetch done: ${inserted} inserted, ${updated} updated / ${messages.length} total`,
-    );
-
-    return c.json({ inserted, total: messages.length, mediaProcessing });
+    const result = await fetchChannelNews(channelId, body);
+    return c.json(result);
   } catch (err: unknown) {
     const error = err as { message?: string };
+    if (error.message === 'Channel not found') {
+      return c.json({ error: 'Channel not found' }, 404);
+    }
     logger.error({ module: 'channels', channelId, err }, 'Fetch error');
     return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
   }

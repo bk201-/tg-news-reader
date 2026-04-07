@@ -95,7 +95,7 @@ router.post('/', async (c) => {
 
         // Enqueue article downloads at priority=10 (user-initiated; no size limits)
         for (const item of prefetchItems) {
-          const links = JSON.parse(item.links) as string[];
+          const links = item.links;
           if (links[0]) {
             await enqueueTask(item.id, 'article', links[0], 10);
           }

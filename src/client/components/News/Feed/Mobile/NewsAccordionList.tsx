@@ -5,7 +5,7 @@ import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsAccordionItem } from './NewsAccordionItem';
-import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../hooks/breakpoints';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`

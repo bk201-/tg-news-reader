@@ -3,15 +3,15 @@ import { App } from 'antd';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead, useExtractContent, useDownloadMedia } from '../../api/news';
-import { useNewsDownloadTask } from '../../api/downloads';
+import { useMarkRead, useExtractContent, useDownloadMedia } from '../../../api/news';
+import { useNewsDownloadTask } from '../../../api/downloads';
 import { useQueryClient } from '@tanstack/react-query';
-import { isYouTubeUrl, getNewsTitle } from './newsUtils';
+import { isYouTubeUrl, getNewsTitle } from '../newsUtils';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailBody } from './NewsDetailBody';
 import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
-import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../hooks/breakpoints';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   detail: css`

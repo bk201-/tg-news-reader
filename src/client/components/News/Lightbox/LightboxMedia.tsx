@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Button } from 'antd';
 import { LoadingOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
-import { mediaUrl } from '../../api/mediaUrl';
+import { mediaUrl } from '../../../api/mediaUrl';
 
 interface LightboxMediaProps {
   path: string | undefined;

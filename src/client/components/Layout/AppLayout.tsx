@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Drawer, Layout, Splitter, Typography } from 'antd';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Drawer, Layout, Splitter, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { ChannelSidebar } from '../Channels/ChannelSidebar';
@@ -178,16 +179,37 @@ export function AppLayout() {
     [styles],
   );
 
+  const handleAddChannel = useCallback(() => {
+    if (sidebarInDrawer) {
+      setSidebarDrawerOpen(true);
+      // Small delay so the drawer animation starts first
+      setTimeout(() => useUIStore.getState().setOpenAddChannel(true), 300);
+    } else {
+      useUIStore.getState().setOpenAddChannel(true);
+    }
+  }, [sidebarInDrawer, setSidebarDrawerOpen]);
+
   const emptyState = useMemo(
     () => (
       <div className={styles.emptyState}>
         <span className={styles.emptyEmoji}>📡</span>
-        <Text type="secondary" className={styles.emptyText}>
-          {t('sidebar.select_channel')}
-        </Text>
+        {channels.length === 0 ? (
+          <>
+            <Text type="secondary" className={styles.emptyText}>
+              {t('sidebar.empty_no_channels')}
+            </Text>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddChannel}>
+              {t('sidebar.add_first_channel')}
+            </Button>
+          </>
+        ) : (
+          <Text type="secondary" className={styles.emptyText}>
+            {t('sidebar.select_channel')}
+          </Text>
+        )}
       </div>
     ),
-    [styles, t],
+    [styles, t, channels.length, handleAddChannel],
   );
 
   // ── Sidebar Drawer — shared between mobile and desktop ──────────────────

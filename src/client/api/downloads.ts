@@ -95,9 +95,7 @@ export function useDownloadsSSE() {
                 return {
                   ...item,
                   localMediaPath: task.localMediaPath ?? item.localMediaPath,
-                  localMediaPaths: task.localMediaPaths
-                    ? (JSON.parse(task.localMediaPaths) as string[])
-                    : item.localMediaPaths,
+                  localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
                 };
               }),
             };
