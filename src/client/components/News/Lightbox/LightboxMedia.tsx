@@ -157,11 +157,10 @@ export function LightboxMedia({
             alt=""
             className={styles.img}
             draggable={false}
-            onLoadStart={() => {
-              setImgLoading(true);
+            onLoad={() => {
+              setImgLoading(false);
               setImgError(false);
             }}
-            onLoad={() => setImgLoading(false)}
             onError={() => {
               setImgLoading(false);
               setImgError(true);
