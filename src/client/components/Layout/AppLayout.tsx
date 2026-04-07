@@ -85,8 +85,7 @@ const useStyles = createStyles(({ css, token }) => ({
 }));
 
 export function AppLayout() {
-  const { selectedChannelId, setSelectedChannelId, downloadsPanelPinned, sidebarDrawerOpen, setSidebarDrawerOpen } =
-    useUIStore();
+  const { selectedChannelId, downloadsPanelPinned, sidebarDrawerOpen, setSidebarDrawerOpen } = useUIStore();
   const { data: channels = [] } = useChannels();
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const { t } = useTranslation();
@@ -155,8 +154,13 @@ export function AppLayout() {
     if (initialized.current || channels.length === 0) return;
     initialized.current = true;
     const id = parseInt(new URLSearchParams(window.location.search).get('channel') ?? '', 10);
-    if (id && channels.some((c) => c.id === id)) setSelectedChannelId(id);
-  }, [channels, setSelectedChannelId]);
+    const ch = channels.find((c) => c.id === id);
+    if (ch) {
+      // Restore both channel and its group so the sidebar shows the correct folder
+      const groupId = ch.groupId ?? null;
+      useUIStore.setState({ selectedChannelId: id, selectedGroupId: groupId });
+    }
+  }, [channels]);
 
   useEffect(() => {
     if (!initialized.current) return;

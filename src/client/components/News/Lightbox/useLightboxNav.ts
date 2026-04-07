@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { NewsItem } from '@shared/types.ts';
 import type { NewsResponse } from '../../../api/news';
 
@@ -43,16 +43,16 @@ export function useLightboxNav(
   const qc = useQueryClient();
 
   // Try all possible cache keys — whichever was loaded last is fine for building the media list
-  const newsData =
-    qc.getQueryData<NewsResponse>(['news', channelId, 'all']) ??
-    qc.getQueryData<NewsResponse>(['news', channelId, 'filtered']);
+  const infiniteData =
+    qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'all']) ??
+    qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'filtered']);
 
   const entries = useMemo<LightboxEntry[]>(() => {
-    const items = newsData?.items ?? [];
+    const items = infiniteData?.pages.flatMap((page) => page.items) ?? [];
     return items
       .filter((item) => item.mediaType && LIGHTBOX_MEDIA_TYPES.has(item.mediaType))
       .map((item) => ({ newsId: item.id, item }));
-  }, [newsData]);
+  }, [infiniteData]);
 
   const cursor = useMemo(() => entries.findIndex((e) => e.newsId === newsId), [entries, newsId]);
   const currentEntry = cursor >= 0 ? entries[cursor] : null;
