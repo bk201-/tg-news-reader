@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { news, channels, downloads } from '../db/schema.js';
-import { eq, and, desc, inArray, isNull, isNotNull, gt, or } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull, isNotNull, gt, lte, or } from 'drizzle-orm';
 import { createOpenAiClient, DIGEST_DEPLOYMENT, isAiConfigured } from '../services/openaiClient.js';
 import { DIGEST_MAX_ITEMS, DIGEST_ARTICLE_CONTENT_LIMIT, DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS } from '../config.js';
 import { logger } from '../logger.js';
@@ -45,8 +45,7 @@ router.post('/', async (c) => {
   }
   if (body.until) {
     const untilTs = Math.floor(new Date(body.until).getTime() / 1000);
-    conditions.push(gt(news.postedAt, 0));
-    conditions.push(eq(news.postedAt, untilTs)); // placeholder, real filter below
+    conditions.push(lte(news.postedAt, untilTs));
   }
 
   const rows = await db

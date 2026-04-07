@@ -32,34 +32,38 @@ export const channels = sqliteTable('channels', {
     .default(sql`(unixepoch())`),
 });
 
-export const news = sqliteTable('news', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  channelId: integer('channel_id')
-    .notNull()
-    .references(() => channels.id, { onDelete: 'cascade' }),
-  telegramMsgId: integer('telegram_msg_id').notNull(),
-  text: text('text').notNull().default(''),
-  links: jsonStringArray('links')
-    .notNull()
-    .default(sql`('[]')`),
-  hashtags: jsonStringArray('hashtags')
-    .notNull()
-    .default(sql`('[]')`),
-  mediaType: text('media_type'),
-  isRead: integer('is_read').notNull().default(0),
-  postedAt: integer('posted_at').notNull(),
-  fullContent: text('full_content'),
-  localMediaPath: text('local_media_path'),
-  localMediaPaths: jsonStringArray('local_media_paths'), // album: all downloaded paths, e.g. ["ch/101.jpg","ch/102.jpg"]
-  albumMsgIds: jsonNumberArray('album_msg_ids'), // album: full list of Telegram msg IDs, e.g. [101,102,103]
-  mediaSize: integer('media_size'),
-  isFiltered: integer('is_filtered').notNull().default(0),
-  textInPanel: integer('text_in_panel').notNull().default(0),
-  canLoadArticle: integer('can_load_article').notNull().default(0),
-  fullContentFormat: text('full_content_format', { enum: ['text', 'markdown'] })
-    .notNull()
-    .default('text'),
-});
+export const news = sqliteTable(
+  'news',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    channelId: integer('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    telegramMsgId: integer('telegram_msg_id').notNull(),
+    text: text('text').notNull().default(''),
+    links: jsonStringArray('links')
+      .notNull()
+      .default(sql`('[]')`),
+    hashtags: jsonStringArray('hashtags')
+      .notNull()
+      .default(sql`('[]')`),
+    mediaType: text('media_type'),
+    isRead: integer('is_read').notNull().default(0),
+    postedAt: integer('posted_at').notNull(),
+    fullContent: text('full_content'),
+    localMediaPath: text('local_media_path'),
+    localMediaPaths: jsonStringArray('local_media_paths'), // album: all downloaded paths, e.g. ["ch/101.jpg","ch/102.jpg"]
+    albumMsgIds: jsonNumberArray('album_msg_ids'), // album: full list of Telegram msg IDs, e.g. [101,102,103]
+    mediaSize: integer('media_size'),
+    isFiltered: integer('is_filtered').notNull().default(0),
+    textInPanel: integer('text_in_panel').notNull().default(0),
+    canLoadArticle: integer('can_load_article').notNull().default(0),
+    fullContentFormat: text('full_content_format', { enum: ['text', 'markdown'] })
+      .notNull()
+      .default('text'),
+  },
+  (table) => [unique().on(table.channelId, table.telegramMsgId)],
+);
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
