@@ -173,12 +173,34 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
     }
 
     // UPDATE mutable content fields for existing rows (edited Telegram messages)
-    for (const v of toUpdateValues) {
+    // Batched: single UPDATE with CASE WHEN per field to avoid N+1 round-trips.
+    for (let i = 0; i < toUpdateValues.length; i += BATCH_SIZE) {
+      const chunk = toUpdateValues.slice(i, i + BATCH_SIZE);
+      const msgIds = chunk.map((v) => v.telegramMsgId);
+
+      // Build CASE expressions for each mutable field
+      const textCase = sql.join(
+        chunk.map((v) => sql`WHEN ${news.telegramMsgId} = ${v.telegramMsgId} THEN ${v.text}`),
+        sql` `,
+      );
+      const linksCase = sql.join(
+        chunk.map((v) => sql`WHEN ${news.telegramMsgId} = ${v.telegramMsgId} THEN ${JSON.stringify(v.links)}`),
+        sql` `,
+      );
+      const hashtagsCase = sql.join(
+        chunk.map((v) => sql`WHEN ${news.telegramMsgId} = ${v.telegramMsgId} THEN ${JSON.stringify(v.hashtags)}`),
+        sql` `,
+      );
+
       await tx
         .update(news)
-        .set({ text: v.text, links: v.links, hashtags: v.hashtags })
-        .where(and(eq(news.channelId, channelId), eq(news.telegramMsgId, v.telegramMsgId)));
-      updatedCount++;
+        .set({
+          text: sql`CASE ${textCase} ELSE ${news.text} END`,
+          links: sql`CASE ${linksCase} ELSE ${news.links} END`,
+          hashtags: sql`CASE ${hashtagsCase} ELSE ${news.hashtags} END`,
+        })
+        .where(and(eq(news.channelId, channelId), inArray(news.telegramMsgId, msgIds)));
+      updatedCount += chunk.length;
     }
   });
 

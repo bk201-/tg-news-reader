@@ -1,16 +1,10 @@
-import React, { useCallback } from 'react';
-import { App } from 'antd';
+import React from 'react';
 import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead, useExtractContent, useDownloadMedia } from '../../../api/news';
-import { useNewsDownloadTask } from '../../../api/downloads';
-import { useQueryClient } from '@tanstack/react-query';
-import { isYouTubeUrl, getNewsTitle } from '../newsUtils';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailBody } from './NewsDetailBody';
-import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
+import { useNewsDetailState } from './useNewsDetailState';
 import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -35,11 +29,8 @@ const useStyles = createStyles(({ css, token }) => ({
     container-type: inline-size;
   `,
   headerInline: css`
-    /* Stays sticky within the accordion scroll container so action buttons remain visible */
     position: sticky;
     top: 0;
-    /* On mobile the NewsFeedToolbar is sticky at top:0 with a fixed height,
-       so the detail header must sit exactly below it. */
     @media (max-width: ${BP_XL - 1}px) {
       top: ${MOBILE_TOOLBAR_HEIGHT}px;
     }
@@ -50,12 +41,10 @@ const useStyles = createStyles(({ css, token }) => ({
 
 interface NewsDetailProps {
   item: NewsItem;
-  /** Telegram channel username — used to build a fallback t.me deep-link when the post has no links */
   channelTelegramId: string;
   onMarkedRead?: (id: number) => void;
   variant?: 'panel' | 'inline';
   onHeaderClick?: () => void;
-  /** Tag click handler forwarded to the toolbar (show / addFilter dropdown) */
   onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
 }
 
@@ -67,178 +56,71 @@ export function NewsDetail({
   onHeaderClick,
   onTagClick,
 }: NewsDetailProps) {
-  const { message } = App.useApp();
-  const { t } = useTranslation();
   const { styles, cx } = useStyles();
-  const qc = useQueryClient();
-  const markRead = useMarkRead();
-  const extractContent = useExtractContent();
-  const downloadMedia = useDownloadMedia();
-
-  const mediaTask = useNewsDownloadTask(item.id, 'media');
-  const articleTask = useNewsDownloadTask(item.id, 'article');
-
-  // ── Derived values ────────────────────────────────────────────────────
-  const links = item.links || [];
-  const isRead = item.isRead === 1;
-  const firstLink = links[0];
-  // openUrl: prefer the post's first link; fall back to the channel's Telegram message permalink
-  const openUrl = firstLink ?? `https://t.me/${channelTelegramId}/${item.telegramMsgId}`;
-  const isExternalLink = !!firstLink;
-  // shareUrl: always the Telegram message permalink (not an external website)
-  const shareUrl = `https://t.me/${channelTelegramId}/${item.telegramMsgId}`;
-  const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
-  // albumLength: how many images are already downloaded (can be less than expected)
-  const albumLength = item.localMediaPaths?.length ?? 0;
-  // albumExpectedLength: total images in the album per Telegram (known even before download completes)
-  const albumExpectedLength = item.albumMsgIds?.length ?? albumLength;
-  // isAlbum controls the carousel UI — only active when ≥2 images are actually downloaded.
-  // albumExpectedLength is used separately for Space-key blocking (see hotkey handler).
-  const isAlbum = albumLength > 1;
-  const isVideo = /\.(mp4|webm|mov)$/i.test(firstMediaPath ?? '');
-  const isAudio = item.mediaType === 'audio';
-  const articleLoading = extractContent.isPending || articleTask?.status === 'processing';
-  const articleQueued = articleTask?.status === 'pending';
-  const mediaLoading = downloadMedia.isPending || mediaTask?.status === 'processing';
-  const mediaQueued = mediaTask?.status === 'pending';
-
-  // ── Handlers (stable refs passed to the hotkeys hook) ─────────────────
-  const handleRefresh = useCallback(
-    () => void qc.invalidateQueries({ queryKey: ['news', item.channelId] }),
-    [qc, item.channelId],
-  );
-  const handleExtract = useCallback(
-    (url: string) =>
-      extractContent.mutate(
-        { newsId: item.id, url },
-        { onSuccess: () => void message.success(t('news.detail.article_queued_toast')) },
-      ),
-    [extractContent, item.id, message, t],
-  );
-  const handleShare = useCallback(async () => {
-    const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-    if (navigator.share && isTouchDevice) {
-      // No title — it gets prepended by the OS share sheet and looks ugly ("News https://t.me/…")
-      await navigator.share({ url: shareUrl });
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      void message.success(t('news.detail.share_copied'));
-    }
-  }, [shareUrl, message, t]);
-
-  // ── Hotkeys + driven state ────────────────────────────────────────────
-  // Registered in the CAPTURE phase so this handler always fires before
-  // useNewsHotkeys (which listens in the default bubble phase). Without capture,
-  // both listeners sit on `window` and fire in registration order — useNewsHotkeys
-  // (from the parent NewsFeed) may be registered first, meaning stopImmediatePropagation()
-  // called here would be too late to stop it.
-  const {
-    albumIndex,
-    setAlbumIndex,
-    topPanel,
-    setTopPanel,
-    linkModalOpen,
-    setLinkModalOpen,
-    selectedUrl,
-    setSelectedUrl,
-  } = useNewsDetailHotkeys({
-    item,
-    openUrl,
-    articleQueued,
-    isAlbum,
-    albumLength,
-    albumExpectedLength,
-    onRefresh: handleRefresh,
-    onExtractArticle: handleExtract,
-    onShare: () => void handleShare(),
-  });
-
-  // ── Handlers ─────────────────────────────────────────────────────────
-  const handleMarkRead = () =>
-    markRead.mutate(
-      { id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId },
-      {
-        onSuccess: () => {
-          if (!isRead) onMarkedRead?.(item.id);
-        },
-      },
-    );
-  const handleExtractClick = () => {
-    const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
-    if (nonYtLinks.length === 0) return;
-    if (nonYtLinks.length === 1) handleExtract(nonYtLinks[0]);
-    else {
-      setSelectedUrl(nonYtLinks[0]);
-      setLinkModalOpen(true);
-    }
-  };
+  const s = useNewsDetailState({ item, channelTelegramId, onMarkedRead, variant });
 
   return (
     <div className={cx(styles.detail, variant === 'inline' && styles.detailInline)}>
       <div className={cx(styles.header, variant === 'inline' && styles.headerInline)}>
         <NewsDetailToolbar
           item={item}
-          links={links}
-          topPanel={topPanel}
-          onTogglePanel={(p) => setTopPanel((prev) => (prev === p ? null : p))}
-          articleLoading={articleLoading}
-          articleQueued={articleQueued}
-          onExtractClick={handleExtractClick}
-          isRead={isRead}
-          onMarkRead={handleMarkRead}
-          markReadPending={markRead.isPending}
-          onRefresh={handleRefresh}
-          openUrl={openUrl}
-          isExternalLink={isExternalLink}
+          links={s.links}
+          topPanel={s.topPanel}
+          onTogglePanel={(p) => s.setTopPanel((prev) => (prev === p ? null : p))}
+          articleLoading={s.articleLoading}
+          articleQueued={s.articleQueued}
+          onExtractClick={s.handleExtractClick}
+          isRead={s.isRead}
+          onMarkRead={s.handleMarkRead}
+          markReadPending={s.markReadPending}
+          onRefresh={s.handleRefresh}
+          openUrl={s.openUrl}
+          isExternalLink={s.isExternalLink}
           variant={variant}
-          title={
-            variant === 'inline'
-              ? getNewsTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }))
-              : undefined
-          }
+          title={s.title}
           onHeaderClick={onHeaderClick}
           onTagClick={onTagClick}
-          onShare={() => void handleShare()}
+          onShare={() => void s.handleShare()}
         />
       </div>
 
-      {topPanel && (
-        <NewsDetailTopPanel panel={topPanel} links={links} text={item.text} onClose={() => setTopPanel(null)} />
+      {s.topPanel && (
+        <NewsDetailTopPanel panel={s.topPanel} links={s.links} text={item.text} onClose={() => s.setTopPanel(null)} />
       )}
 
       <NewsDetailBody
         item={item}
-        links={links}
-        firstMediaPath={firstMediaPath}
-        isAlbum={isAlbum}
-        isVideo={isVideo}
-        isAudio={isAudio}
-        albumIndex={albumIndex}
-        albumLength={albumLength}
-        albumExpectedLength={albumExpectedLength}
-        onAlbumNav={(delta) => setAlbumIndex((i) => Math.max(0, Math.min(albumLength - 1, i + delta)))}
-        mediaLoading={mediaLoading}
-        mediaQueued={mediaQueued}
-        mediaTaskStatus={mediaTask?.status}
-        mediaTaskError={mediaTask?.error ?? undefined}
+        links={s.links}
+        firstMediaPath={s.firstMediaPath}
+        isAlbum={s.isAlbum}
+        isVideo={s.isVideo}
+        isAudio={s.isAudio}
+        albumIndex={s.albumIndex}
+        albumLength={s.albumLength}
+        albumExpectedLength={s.albumExpectedLength}
+        onAlbumNav={(delta) => s.setAlbumIndex((i) => Math.max(0, Math.min(s.albumLength - 1, i + delta)))}
+        mediaLoading={s.mediaLoading}
+        mediaQueued={s.mediaQueued}
+        mediaTaskStatus={s.mediaTask?.status}
+        mediaTaskError={s.mediaTask?.error ?? undefined}
         onDownload={() =>
-          downloadMedia.mutate(item.id, {
-            onSuccess: () => void message.success(t('news.detail.media_queued_toast')),
+          s.downloadMedia.mutate(item.id, {
+            onSuccess: () => void s.message.success(s.t('news.detail.media_queued_toast')),
           })
         }
-        articleLoading={articleLoading}
-        articleQueued={articleQueued}
-        articleTaskStatus={articleTask?.status}
-        articleTaskError={articleTask?.error ?? undefined}
-        onExtractClick={handleExtractClick}
-        linkModalOpen={linkModalOpen}
-        selectedUrl={selectedUrl}
-        onSelectedUrlChange={setSelectedUrl}
+        articleLoading={s.articleLoading}
+        articleQueued={s.articleQueued}
+        articleTaskStatus={s.articleTask?.status}
+        articleTaskError={s.articleTask?.error ?? undefined}
+        onExtractClick={s.handleExtractClick}
+        linkModalOpen={s.linkModalOpen}
+        selectedUrl={s.selectedUrl}
+        onSelectedUrlChange={s.setSelectedUrl}
         onModalConfirm={() => {
-          setLinkModalOpen(false);
-          handleExtract(selectedUrl);
+          s.setLinkModalOpen(false);
+          s.handleExtract(s.selectedUrl);
         }}
-        onModalCancel={() => setLinkModalOpen(false)}
+        onModalCancel={() => s.setLinkModalOpen(false)}
       />
     </div>
   );
