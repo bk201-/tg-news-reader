@@ -64,18 +64,27 @@ class TelegramCircuitBreaker {
     }
   }
 
+  private _reconnecting = false;
+
   private async handleAuthKeyInvalid(reason: string): Promise<void> {
+    // Deduplicate: if 13 concurrent fetches all get AUTH_KEY_DUPLICATED,
+    // only the first one triggers reconnect — the rest just wait.
+    if (this._reconnecting) return;
+    this._reconnecting = true;
+
     logger.warn({ module: 'telegram', reason }, `${reason} — attempting automatic reconnect`);
     if (_reconnectFn) {
       try {
         await _reconnectFn();
         logger.info({ module: 'telegram' }, 'Telegram auto-reconnect succeeded — session restored');
         this._sessionExpired = false;
+        this._reconnecting = false;
         return;
       } catch (reconnectErr) {
         logger.warn({ module: 'telegram', err: reconnectErr }, 'Telegram auto-reconnect failed');
       }
     }
+    this._reconnecting = false;
     // Reconnect failed (or no callback registered) — mark as expired
     if (!this._sessionExpired) {
       this._sessionExpired = true;

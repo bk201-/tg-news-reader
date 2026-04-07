@@ -30,6 +30,13 @@ const API_ID = parseInt(process.env.TG_API_ID || '0', 10);
 const API_HASH = process.env.TG_API_HASH || '';
 const SESSION = process.env.TG_SESSION || '';
 
+// ─── Connection mutex ─────────────────────────────────────────────────────────
+// Prevents multiple concurrent callers from creating duplicate connections.
+// When getTelegramClient() is called by 13 channel fetches simultaneously,
+// only one actually connects — the rest await the same promise.
+
+let _connectPromise: Promise<TelegramClient> | null = null;
+
 // ─── Startup delay ────────────────────────────────────────────────────────────
 // During deploys old and new containers overlap. The old one gets SIGTERM and
 // disconnects (see gracefulShutdown in index.ts). This delay gives the old
@@ -72,19 +79,68 @@ export function isTelegramDelayed(): boolean {
 export async function getTelegramClient(): Promise<TelegramClient> {
   await waitForStartupDelay();
   await ensureTgLibs();
+
+  // Fast path: already connected
   if (client && client.connected) {
     return client;
   }
-  const stringSession = new _StringSession(SESSION);
-  client = new _TelegramClient(stringSession, API_ID, API_HASH, { connectionRetries: 5 });
-  await client.connect();
-  return client;
+
+  // Mutex: if another caller is already connecting, wait for their result
+  if (_connectPromise) {
+    return _connectPromise;
+  }
+
+  // We are the one to connect — store the promise so others can await it
+  _connectPromise = (async () => {
+    try {
+      const stringSession = new _StringSession(SESSION);
+      const newClient = new _TelegramClient(stringSession, API_ID, API_HASH, { connectionRetries: 5 });
+      await newClient.connect();
+      client = newClient;
+      return newClient;
+    } finally {
+      _connectPromise = null;
+    }
+  })();
+
+  return _connectPromise;
 }
 
-/** Reset the TG client — forces a fresh reconnect on the next call to getTelegramClient(). */
+/**
+ * Reset the TG client — disconnect the old client first, then reconnect.
+ * Deduplicated: concurrent callers share the same reconnect promise.
+ */
+let _reconnectPromise: Promise<void> | null = null;
+
 export async function resetTelegramClient(): Promise<void> {
-  client = null;
-  await getTelegramClient();
+  // Deduplicate: if a reconnect is already in progress, wait for it
+  if (_reconnectPromise) {
+    return _reconnectPromise;
+  }
+
+  _reconnectPromise = (async () => {
+    try {
+      // Disconnect old client properly to release the auth key
+      if (client) {
+        try {
+          await client.disconnect();
+          logger.info({ module: 'telegram' }, 'Old Telegram client disconnected before reconnect');
+        } catch (err) {
+          logger.warn({ module: 'telegram', err }, 'Error disconnecting old Telegram client');
+        }
+        client = null;
+      }
+
+      // Small pause to let Telegram server release the auth key
+      await new Promise((r) => setTimeout(r, 2_000));
+
+      await getTelegramClient();
+    } finally {
+      _reconnectPromise = null;
+    }
+  })();
+
+  return _reconnectPromise;
 }
 
 /** Gracefully disconnect the Telegram client (called on SIGTERM). */
