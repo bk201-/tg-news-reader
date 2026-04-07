@@ -96,6 +96,7 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE news ADD COLUMN text_in_panel INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE news ADD COLUMN can_load_article INTEGER NOT NULL DEFAULT 0',
     "ALTER TABLE news ADD COLUMN full_content_format TEXT NOT NULL DEFAULT 'text'",
+    'ALTER TABLE channels ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0',
   ];
   for (const sql of alterMigrations) {
     try {
@@ -143,6 +144,16 @@ export async function runMigration(): Promise<void> {
 
   // Composite index for the common "unread news for channel" query pattern
   await client.execute('CREATE INDEX IF NOT EXISTS idx_news_channel_is_read ON news(channel_id, is_read)');
+
+  // Index for cursor-based pagination: efficient ORDER BY posted_at with channel filter
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_news_channel_posted_at ON news(channel_id, posted_at)');
+
+  // Backfill unread_count from actual unread news counts
+  await client.execute(`
+    UPDATE channels SET unread_count = (
+      SELECT count(*) FROM news WHERE news.channel_id = channels.id AND news.is_read = 0
+    )
+  `);
 
   logger.info('✅ Database migrated successfully');
 }

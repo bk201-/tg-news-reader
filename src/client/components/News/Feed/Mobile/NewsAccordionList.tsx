@@ -58,6 +58,9 @@ interface NewsAccordionListProps {
   virtuosoRef: React.RefObject<VirtuosoHandle | null>;
   /** Mobile: use window as scroll parent so browser chrome hides on scroll */
   windowScroll?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onEndReached?: () => void;
 }
 
 export function NewsAccordionList({
@@ -74,6 +77,9 @@ export function NewsAccordionList({
   onMarkedRead,
   virtuosoRef,
   windowScroll,
+  hasNextPage,
+  isFetchingNextPage,
+  onEndReached,
 }: NewsAccordionListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -102,6 +108,16 @@ export function NewsAccordionList({
     [selectedNewsId, filteredIds, showAll, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
   );
 
+  const footer = useCallback(
+    () =>
+      isFetchingNextPage ? (
+        <div className={styles.loadingWrap}>
+          <Spin size="small" />
+        </div>
+      ) : null,
+    [isFetchingNextPage, styles.loadingWrap],
+  );
+
   return (
     <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion}>
       {isLoading && (
@@ -119,6 +135,8 @@ export function NewsAccordionList({
           useWindowScroll={windowScroll}
           style={windowScroll ? undefined : { height: '100%' }}
           itemContent={renderItem}
+          endReached={hasNextPage ? onEndReached : undefined}
+          components={{ Footer: footer }}
         />
       )}
     </div>

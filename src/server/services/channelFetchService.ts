@@ -7,7 +7,7 @@
 
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
@@ -189,6 +189,14 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
 
   const now = Math.floor(Date.now() / 1000);
   await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
+
+  // Increment denormalized unread_count by the number of newly inserted items
+  if (inserted > 0) {
+    await db
+      .update(channels)
+      .set({ unreadCount: sql`${channels.unreadCount} + ${inserted}` })
+      .where(eq(channels.id, channelId));
+  }
 
   // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
   const insertedItems = messages

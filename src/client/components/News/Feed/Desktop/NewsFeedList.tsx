@@ -32,6 +32,11 @@ const useStyles = createStyles(({ css, token }) => ({
   empty: css`
     margin-top: 48px;
   `,
+  loadingMore: css`
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+  `,
 }));
 
 interface NewsFeedListProps {
@@ -45,6 +50,9 @@ interface NewsFeedListProps {
   onSelect: (id: number) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
   virtuosoRef: React.RefObject<VirtuosoHandle | null>;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onEndReached?: () => void;
 }
 
 export function NewsFeedList({
@@ -58,6 +66,9 @@ export function NewsFeedList({
   onSelect,
   onTagClick,
   virtuosoRef,
+  hasNextPage,
+  isFetchingNextPage,
+  onEndReached,
 }: NewsFeedListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -82,6 +93,16 @@ export function NewsFeedList({
       ? t('news.list.empty_filtered')
       : t('news.list.empty');
 
+  const footer = useCallback(
+    () =>
+      isFetchingNextPage ? (
+        <div className={styles.loadingMore}>
+          <Spin size="small" />
+        </div>
+      ) : null,
+    [isFetchingNextPage, styles.loadingMore],
+  );
+
   return (
     <div role="listbox" aria-label={t('news.list.list_label')} className={styles.list}>
       {isLoading && (
@@ -91,7 +112,15 @@ export function NewsFeedList({
       )}
       {!isLoading && items.length === 0 && <Empty description={emptyDescription} className={styles.empty} />}
       {!isLoading && items.length > 0 && (
-        <Virtuoso ref={virtuosoRef} className={styles.virtuoso} data={items} overscan={400} itemContent={renderItem} />
+        <Virtuoso
+          ref={virtuosoRef}
+          className={styles.virtuoso}
+          data={items}
+          overscan={400}
+          itemContent={renderItem}
+          endReached={hasNextPage ? onEndReached : undefined}
+          components={{ Footer: footer }}
+        />
       )}
     </div>
   );

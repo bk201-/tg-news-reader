@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { api } from './client';
 import type { NewsItem, Channel } from '@shared/types.ts';
 
@@ -9,12 +9,42 @@ export const newsKeys = {
 export interface NewsResponse {
   items: NewsItem[];
   filteredOut: number;
+  nextCursor: number | null;
+  hasMore: boolean;
+}
+
+/** Helper: update items inside paginated InfiniteData<NewsResponse> structure */
+export function updatePaginatedItems(
+  old: InfiniteData<NewsResponse> | undefined,
+  updater: (items: NewsItem[]) => NewsItem[],
+): InfiniteData<NewsResponse> | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    pages: old.pages.map((page) => ({
+      ...page,
+      items: updater(page.items),
+    })),
+  };
+}
+
+/** Helper: flatten all items from paginated data */
+export function flattenPaginatedItems(data: InfiniteData<NewsResponse> | undefined): NewsItem[] {
+  if (!data) return [];
+  return data.pages.flatMap((page) => page.items);
 }
 
 export function useNews(channelId: number, filtered = false) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: newsKeys.byChannel(channelId, filtered),
-    queryFn: () => api.get<NewsResponse>(`/news?channelId=${channelId}${filtered ? '&filtered=1' : ''}`),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ channelId: String(channelId) });
+      if (filtered) params.set('filtered', '1');
+      if (pageParam) params.set('cursor', String(pageParam));
+      return api.get<NewsResponse>(`/news?${params.toString()}`);
+    },
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
     enabled: channelId > 0,
   });
 }
@@ -26,8 +56,8 @@ export function useMarkRead() {
       api.patch(`/news/${id}/read`, { isRead }),
     onSuccess: (_data, { id, isRead = 1, channelId }) => {
       // Update the item in-place — no refetch needed
-      qc.setQueriesData<NewsResponse>({ queryKey: ['news', channelId] }, (old) =>
-        old ? { ...old, items: old.items.map((n) => (n.id === id ? { ...n, isRead } : n)) } : old,
+      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+        updatePaginatedItems(old, (items) => items.map((n) => (n.id === id ? { ...n, isRead } : n))),
       );
       // Adjust unread badge on the channel
       qc.setQueryData<Channel[]>(['channels'], (old) =>
@@ -47,15 +77,15 @@ export function useMarkAllRead() {
     mutationFn: (channelId?: number) => api.post('/news/read-all', { channelId }),
     onSuccess: (_data, channelId) => {
       if (channelId !== undefined) {
-        qc.setQueriesData<NewsResponse>({ queryKey: ['news', channelId] }, (old) =>
-          old ? { ...old, items: old.items.map((n) => ({ ...n, isRead: 1 })) } : old,
+        qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: 1 }))),
         );
         qc.setQueryData<Channel[]>(['channels'], (old) =>
           old ? old.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)) : old,
         );
       } else {
-        qc.setQueriesData<NewsResponse>({ queryKey: ['news'] }, (old) =>
-          old ? { ...old, items: old.items.map((n) => ({ ...n, isRead: 1 })) } : old,
+        qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news'] }, (old) =>
+          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: 1 }))),
         );
         qc.setQueryData<Channel[]>(['channels'], (old) => (old ? old.map((ch) => ({ ...ch, unreadCount: 0 })) : old));
       }

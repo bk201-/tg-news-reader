@@ -70,6 +70,12 @@ async function tryRefresh(): Promise<string | null> {
   return refreshing;
 }
 
+// ─── ETag caching is handled by the browser HTTP cache ────────────────────────
+// Server sends `Cache-Control: no-cache, must-revalidate, private` + `ETag`.
+// The browser stores the response, sends `If-None-Match` automatically on the
+// next fetch(), and on 304 transparently returns the cached body as a normal 200.
+// No client-side ETag map needed — the browser manages cache size and eviction.
+
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
   const { accessToken } = useAuthStore.getState();
 

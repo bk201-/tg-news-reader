@@ -2,9 +2,9 @@ import { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { App } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { Channel, NewsItem } from '../../../shared/types';
-import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
+import { useNews, useMarkAllRead, useMarkRead, flattenPaginatedItems } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
-import { useFetchChannel, useChannels } from '../../api/channels';
+import { useFetchChannel, useChannels, useMarkReadAndFetch } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { applyFilters } from './filterUtils';
 import { useHashTagSync } from './Feed/useHashTagSync';
@@ -36,14 +36,15 @@ export function useNewsFeedState(channel: Channel) {
   const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
   const { data: allChannels = [] } = useChannels();
 
-  const { data: newsData, isLoading } = useNews(channel.id, !showAll);
-  const newsItems = useMemo(() => newsData?.items ?? [], [newsData?.items]);
-  const serverFilteredOut = newsData?.filteredOut ?? 0;
+  const { data: newsData, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useNews(channel.id, !showAll);
+  const newsItems = useMemo(() => flattenPaginatedItems(newsData), [newsData]);
+  const serverFilteredOut = newsData?.pages[0]?.filteredOut ?? 0;
   const { data: filters = [] } = useFilters(channel.id);
   const markAllRead = useMarkAllRead();
   const markRead = useMarkRead();
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
+  const markReadAndFetch = useMarkReadAndFetch();
 
   // Advance to the next channel in order (circular), regardless of unread count.
   const goToNextChannel = useCallback(() => {
@@ -214,21 +215,14 @@ export function useNewsFeedState(channel: Channel) {
       markAllRead.mutate(channel.id);
       return;
     }
-    // Chain: mark all read → fetch → advance if nothing new
-    markAllRead.mutate(channel.id, {
-      onSuccess: () => {
-        fetchChannel.mutate(
-          { id: channel.id },
-          {
-            onSuccess: (data) => {
-              if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
-              if (data.inserted === 0) goToNextChannel();
-            },
-          },
-        );
+    // Combined mark-read + fetch in one round-trip
+    markReadAndFetch.mutate(channel.id, {
+      onSuccess: (data) => {
+        if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
+        if (data.inserted === 0) goToNextChannel();
       },
     });
-  }, [autoAdvance, markAllRead, channel.id, fetchChannel, goToNextChannel]);
+  }, [autoAdvance, markAllRead, channel.id, markReadAndFetch, goToNextChannel]);
 
   useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
   useNewsFeedHotkeys({
@@ -284,7 +278,7 @@ export function useNewsFeedState(channel: Channel) {
     onFetchPeriod: handleFetchPeriod,
     showAll,
     onToggleShowAll: () => setShowAll(!showAll),
-    markAllPending: markAllRead.isPending || (autoAdvance && fetchChannel.isPending),
+    markAllPending: markAllRead.isPending || markReadAndFetch.isPending || (autoAdvance && fetchChannel.isPending),
     onMarkAllRead: handleMarkAllReadAndAdvance,
     activeFilterCount,
     onOpenFilters: () => setFilterPanelOpen(true),
@@ -314,6 +308,10 @@ export function useNewsFeedState(channel: Channel) {
     activeFilterCount,
     effectiveViewMode,
     forceAccordion,
+    // Pagination
+    hasNextPage: hasNextPage ?? false,
+    fetchNextPage,
+    isFetchingNextPage,
     // Digest
     digestOpen,
     setDigestOpen,
