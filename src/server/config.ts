@@ -31,6 +31,13 @@ export const MAX_VIDEO_SIZE_BYTES = parseInt(process.env.MAX_VIDEO_SIZE_MB ?? '7
 /** Env: MAX_IMG_DOC_SIZE_MB (default 5) */
 export const MAX_IMG_DOC_SIZE_BYTES = parseInt(process.env.MAX_IMG_DOC_SIZE_MB ?? '5', 10) * 1024 * 1024;
 
+// ─── Telegram connection ──────────────────────────────────────────────────────
+/** Seconds to delay the first Telegram connection after server start.
+ *  Gives the old container time to disconnect on SIGTERM during deploys.
+ *  Env: TG_CONNECT_DELAY_SEC (default 0 in dev, 15 in prod) */
+export const TG_CONNECT_DELAY_MS =
+  parseInt(process.env.TG_CONNECT_DELAY_SEC ?? (process.env.NODE_ENV === 'production' ? '30' : '0'), 10) * 1_000;
+
 // ─── News fetching ────────────────────────────────────────────────────────────
 /** Days to look back for a brand-new channel's first fetch. Env: NEWS_DEFAULT_FETCH_DAYS */
 export const NEWS_DEFAULT_FETCH_DAYS = parseInt(process.env.NEWS_DEFAULT_FETCH_DAYS ?? '3', 10);

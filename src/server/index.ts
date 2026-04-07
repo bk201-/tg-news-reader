@@ -23,6 +23,7 @@ import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 import { logger } from './logger.js';
 import { getTelegramCircuitState, getTelegramSessionExpired } from './services/telegramCircuitBreaker.js';
 import { sendAlert } from './services/alertBot.js';
+import { disconnectTelegramClient, isTelegramDelayed } from './services/telegram.js';
 import { client } from './db/index.js';
 import { runMigration } from './db/migrate.js';
 import { renderErrorHtml } from './services/errorHtml.js';
@@ -50,6 +51,29 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   logger.error({ module: 'process', reason }, 'unhandledRejection');
 });
+
+// ─── Graceful shutdown ───────────────────────────────────────────────────────
+// On SIGTERM (sent by Azure Container Apps during deploys) disconnect the
+// Telegram client BEFORE the process exits. This prevents the old container
+// from holding the auth key while the new one tries to connect, which causes
+// AUTH_KEY_DUPLICATED errors.
+
+let _shuttingDown = false;
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  logger.info({ module: 'server', signal }, `${signal} received — disconnecting Telegram and shutting down`);
+  try {
+    await disconnectTelegramClient();
+  } catch (err) {
+    logger.warn({ module: 'server', err }, 'Error during Telegram disconnect on shutdown');
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -92,7 +116,7 @@ if (!isDev) {
 app.route('/api/auth', authRouter);
 
 // Protect all other /api/* routes with JWT auth
-const PUBLIC_PATHS = new Set(['/api/health']);
+const PUBLIC_PATHS = new Set(['/api/health', '/api/ready']);
 const PUBLIC_PREFIXES = ['/api/auth/'];
 
 app.use('/api/*', async (c, next) => {
@@ -116,7 +140,8 @@ app.route('/api/log/client', clientLogRouter);
 app.route('/api/logs', logsRouter);
 app.route('/api/digest', digestRouter);
 
-// Health check — exposes DB + Telegram circuit state for uptime monitors
+// Health check — liveness/startup probe: "process is alive, HTTP works"
+// Always 200 as long as the process is running (used by smoke test + startup probe).
 app.get('/api/health', async (c) => {
   let dbOk = true;
   try {
@@ -127,6 +152,7 @@ app.get('/api/health', async (c) => {
 
   const telegramCircuit = getTelegramCircuitState();
   const sessionExpired = getTelegramSessionExpired();
+  const connectDelayed = isTelegramDelayed();
   const status = !dbOk || telegramCircuit === 'open' ? 'degraded' : 'ok';
 
   return c.json({
@@ -134,8 +160,30 @@ app.get('/api/health', async (c) => {
     timestamp: Date.now(),
     uptime: Math.floor(process.uptime()),
     db: dbOk ? 'ok' : 'error',
-    telegram: { circuit: telegramCircuit, sessionExpired },
+    telegram: { circuit: telegramCircuit, sessionExpired, connectDelayed },
   });
+});
+
+// Readiness probe — "ready to accept user traffic"
+// ⚠️ Must return 200 IMMEDIATELY (even during Telegram startup delay).
+// Why: if we return 503 during delay, Azure won't kill the old container →
+// old stays connected to Telegram → when delay expires, new connects too →
+// AUTH_KEY_DUPLICATED (both containers hold the same session).
+//
+// Correct flow:
+//   1. New container starts, /api/ready → 200 immediately
+//   2. Azure switches traffic quickly, sends SIGTERM to old container
+//   3. Old receives SIGTERM → disconnectTelegramClient() → session freed
+//   4. Telegram startup delay (30s) still active → new does NOT connect yet
+//   5. Delay expires → new connects to Telegram → clean, no overlap
+app.get('/api/ready', (c) => {
+  return c.json(
+    {
+      ready: true,
+      telegram: { connectDelayed: isTelegramDelayed() },
+    },
+    200,
+  );
 });
 
 // ─── Global error handlers ────────────────────────────────────────────────────

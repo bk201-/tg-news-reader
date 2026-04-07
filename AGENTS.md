@@ -173,7 +173,7 @@ src/
 - All API routes mounted under `/api/` in `server/index.ts`
 - Each route file exports a Hono `router` as default
 - `/api/auth/*` is **public** (login/refresh/logout) — no auth middleware applied
-- `/api/health` is public; all other `/api/*` routes require a valid JWT
+- `/api/health` and `/api/ready` are public; all other `/api/*` routes require a valid JWT
 - `channels.ts` exports `getSinceDate()` helper (used by the fetch route). `count-unread` intentionally does **not** use `getSinceDate` — it uses `lastFetchedAt` directly to avoid double-counting already-fetched unread messages.
 
 ## Auth System
@@ -527,7 +527,24 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 - **Retry**: 3 attempts; `FloodWaitError` → waits exactly `error.seconds * 1000ms`; other transient errors → **2s → 4s → 8s**; permanent errors (wrong username, missing media) pass through immediately
 - **Circuit breaker**: opens after **5 consecutive transient failures**, half-opens after **30s**, closes on first success; logs every state transition at `warn`/`error`/`info`
 - All exported functions in `telegram.ts` are wrapped: `fetchChannelMessages`, `getChannelInfo`, `getReadInboxMaxId`, `readChannelHistory`, `fetchMessageById`, `downloadMessageMedia` (only the `tg.downloadMedia` call, not the local size checks)
-- `GET /api/health` exposes circuit state: `{ status: 'ok'|'degraded', telegram: { circuit: 'closed'|'open'|'half-open' } }`
+- `GET /api/health` exposes circuit state: `{ status: 'ok'|'degraded', telegram: { circuit: 'closed'|'open'|'half-open', connectDelayed } }`
+- `GET /api/ready` — readiness probe: returns 200 when Telegram is connected, 503 during startup delay
+
+### Deploy safety — preventing AUTH_KEY_DUPLICATED
+Telegram allows only one connection per auth key. During deploys, old and new containers overlap → both connect → `AUTH_KEY_DUPLICATED`. Three mechanisms prevent this:
+
+1. **Startup delay** (`TG_CONNECT_DELAY_SEC`, default 30 in prod): new container delays its first Telegram connection, giving time for the old one to shut down. Timer starts at module load, not at first request.
+2. **Graceful shutdown** (SIGTERM handler in `index.ts`): old container calls `disconnectTelegramClient()` on SIGTERM, releasing the auth key before the process exits.
+3. **Readiness probe** (`/api/ready`): returns 200 immediately so Azure switches traffic and kills the old container **fast**. Configure via `scripts/setup-health-probes.sh` (one-time).
+
+**Correct deploy timeline:**
+1. New container starts, `/api/ready` → 200 immediately
+2. Azure switches traffic → sends SIGTERM to old container (~5-10s after start)
+3. Old receives SIGTERM → `disconnectTelegramClient()` → session freed (~10s)
+4. Telegram delay still counting (30s total) → new does NOT connect yet
+5. Delay expires (t=30s) → old is long dead → new connects cleanly
+
+> ⚠️ **Readiness probe must NOT return 503 during Telegram delay.** If it does, Azure won't kill the old container → old stays connected → when delay expires, both containers are connected simultaneously → `AUTH_KEY_DUPLICATED`. The delay must be invisible to Azure — it's an internal application-level gate.
 
 ### Server-side: download worker retry
 `src/server/services/downloadManager.ts`:
@@ -537,7 +554,7 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 - **`spawnWorker(id)`** — self-healing: if `runWorker()` throws (shouldn't, but safety), restarts after 5s
 
 ### Azure boundary
-Azure App Service / Container Apps handles: process-level crash recovery (containers restart), TCP-level retries, health probing against `/api/health`. It does **not** retry application logic — that's all in code above.
+Azure App Service / Container Apps handles: process-level crash recovery (containers restart), TCP-level retries, health probing against `/api/health` (liveness) and `/api/ready` (readiness). Custom probes configured via `scripts/setup-health-probes.sh`. It does **not** retry application logic — that's all in code above.
 
 ## Logging Pipeline
 

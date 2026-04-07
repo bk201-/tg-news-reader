@@ -4,7 +4,7 @@ import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { logger } from '../logger.js';
 import { telegramCircuit, setReconnectCallback } from './telegramCircuitBreaker.js';
-import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
+import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES, TG_CONNECT_DELAY_MS } from '../config.js';
 
 // Lazy runtime references — gramjs loads TL schema on import (~2.5s), so defer until first use
 let _Api: typeof Api;
@@ -30,7 +30,47 @@ const API_ID = parseInt(process.env.TG_API_ID || '0', 10);
 const API_HASH = process.env.TG_API_HASH || '';
 const SESSION = process.env.TG_SESSION || '';
 
+// ─── Startup delay ────────────────────────────────────────────────────────────
+// During deploys old and new containers overlap. The old one gets SIGTERM and
+// disconnects (see gracefulShutdown in index.ts). This delay gives the old
+// container time to fully disconnect before the new one connects, preventing
+// AUTH_KEY_DUPLICATED errors from Telegram.
+
+let _startupDelayPromise: Promise<void> | null = null;
+let _startupDelayDone = false;
+
+/** Resolves when the startup delay is over. Called once, memoised. */
+function waitForStartupDelay(): Promise<void> {
+  if (_startupDelayDone) return Promise.resolve();
+  if (_startupDelayPromise) return _startupDelayPromise;
+
+  if (TG_CONNECT_DELAY_MS <= 0) {
+    _startupDelayDone = true;
+    return Promise.resolve();
+  }
+
+  logger.info(
+    { module: 'telegram', delaySec: TG_CONNECT_DELAY_MS / 1_000 },
+    `Delaying Telegram connection by ${TG_CONNECT_DELAY_MS / 1_000}s (TG_CONNECT_DELAY_SEC) to avoid AUTH_KEY_DUPLICATED during deploy`,
+  );
+
+  _startupDelayPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      _startupDelayDone = true;
+      logger.info({ module: 'telegram' }, 'Startup delay complete — Telegram connection allowed');
+      resolve();
+    }, TG_CONNECT_DELAY_MS);
+  });
+  return _startupDelayPromise;
+}
+
+/** Whether the startup delay is still active (Telegram connection blocked). */
+export function isTelegramDelayed(): boolean {
+  return !_startupDelayDone && TG_CONNECT_DELAY_MS > 0;
+}
+
 export async function getTelegramClient(): Promise<TelegramClient> {
+  await waitForStartupDelay();
   await ensureTgLibs();
   if (client && client.connected) {
     return client;
@@ -47,8 +87,26 @@ export async function resetTelegramClient(): Promise<void> {
   await getTelegramClient();
 }
 
+/** Gracefully disconnect the Telegram client (called on SIGTERM). */
+export async function disconnectTelegramClient(): Promise<void> {
+  if (client) {
+    try {
+      await client.disconnect();
+      logger.info({ module: 'telegram' }, 'Telegram client disconnected gracefully');
+    } catch (err) {
+      logger.warn({ module: 'telegram', err }, 'Error disconnecting Telegram client');
+    }
+    client = null;
+  }
+}
+
 // Register the reconnect callback for auto-recovery on AUTH_KEY_UNREGISTERED
 setReconnectCallback(resetTelegramClient);
+
+// Start the delay timer immediately at module load time so the countdown begins
+// at server start, not at the first Telegram call. This way if the first request
+// comes 60s after start, there's no unnecessary extra wait.
+void waitForStartupDelay();
 
 export interface TelegramMessage {
   id: number;
