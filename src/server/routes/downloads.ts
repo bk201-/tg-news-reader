@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { downloads } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { enqueueTask, prioritizeTask, getActiveTasks } from '../services/downloadManager.js';
 import { downloadProgressEmitter } from '../services/downloadProgress.js';
-import type { DownloadTask, DownloadType } from '../../shared/types.js';
+import type { DownloadTask } from '../../shared/types.js';
+import { createDownloadSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -16,11 +18,8 @@ router.get('/', async (c) => {
 });
 
 // POST /api/downloads — enqueue a task (user-initiated → default priority=10)
-router.post('/', async (c) => {
-  const body = await c.req.json<{ newsId: number; type: DownloadType; url?: string; priority?: number }>();
-  if (!body.newsId || !body.type) {
-    return c.json({ error: 'newsId and type are required' }, 400);
-  }
+router.post('/', zValidator('json', createDownloadSchema), async (c) => {
+  const body = c.req.valid('json');
   const priority = body.priority ?? 10;
   await enqueueTask(body.newsId, body.type, body.url, priority);
   return c.json({ success: true });

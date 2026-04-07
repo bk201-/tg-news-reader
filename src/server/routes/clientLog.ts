@@ -1,14 +1,7 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { logger } from '../logger.js';
-
-interface ClientLogEntry {
-  level: 'warn' | 'error';
-  module?: unknown;
-  msg?: string;
-  time?: number;
-  url?: string;
-  [key: string]: unknown;
-}
+import { clientLogSchema, parseOptionalBody } from './schemas.js';
 
 const ALLOWED_LEVELS = new Set(['warn', 'error']);
 const MAX_ENTRIES = 20;
@@ -22,8 +15,8 @@ function truncate(v: unknown): unknown {
 const router = new Hono();
 
 router.post('/', async (c) => {
-  const body = await c.req.json<{ entries: ClientLogEntry[] }>().catch(() => null);
-  if (!body || !Array.isArray(body.entries)) return c.json({ ok: false }, 400);
+  const body = await parseOptionalBody(c, clientLogSchema, null as unknown as z.infer<typeof clientLogSchema>);
+  if (!body) return c.json({ ok: false }, 400);
 
   const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 

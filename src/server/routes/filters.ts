@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { db, client } from '../db/index.js';
 import { filters } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { reprocessChannelFilters } from '../services/filterEngine.js';
+import { createFilterSchema, updateFilterSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -37,12 +39,9 @@ router.get('/stats', async (c) => {
 });
 
 // POST /api/channels/:channelId/filters
-router.post('/', async (c) => {
+router.post('/', zValidator('json', createFilterSchema), async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
-  const body = await c.req.json<{ name: string; type: 'tag' | 'keyword'; value: string }>();
-  if (!body.name || !body.type || !body.value) {
-    return c.json({ error: 'name, type, and value are required' }, 400);
-  }
+  const body = c.req.valid('json');
   const [created] = await db
     .insert(filters)
     .values({
@@ -57,15 +56,10 @@ router.post('/', async (c) => {
 });
 
 // PUT /api/channels/:channelId/filters/:id
-router.put('/:id', async (c) => {
+router.put('/:id', zValidator('json', updateFilterSchema), async (c) => {
   const channelId = parseInt(c.req.param('channelId')!, 10);
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{
-    name?: string;
-    type?: 'tag' | 'keyword';
-    value?: string;
-    isActive?: number;
-  }>();
+  const body = c.req.valid('json');
   const [updated] = await db
     .update(filters)
     .set({

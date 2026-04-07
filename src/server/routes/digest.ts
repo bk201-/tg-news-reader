@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { news, channels, downloads } from '../db/schema.js';
@@ -7,20 +8,16 @@ import { createOpenAiClient, DIGEST_DEPLOYMENT, isAiConfigured } from '../servic
 import { DIGEST_MAX_ITEMS, DIGEST_ARTICLE_CONTENT_LIMIT, DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS } from '../config.js';
 import { logger } from '../logger.js';
 import { enqueueTask } from '../services/downloadManager.js';
+import { createDigestSchema } from './schemas.js';
 
 const router = new Hono();
 
-router.post('/', async (c) => {
+router.post('/', zValidator('json', createDigestSchema), async (c) => {
   if (!isAiConfigured()) {
     return c.json({ error: 'AI provider not configured' }, 503);
   }
 
-  const body = await c.req.json<{
-    channelIds?: number[];
-    groupId?: number | null;
-    since?: string;
-    until?: string;
-  }>();
+  const body = c.req.valid('json');
 
   // ── Fetch news items from DB ─────────────────────────────────────────────
   const conditions = [];

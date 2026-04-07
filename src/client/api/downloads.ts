@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { api } from './client';
 import { useAuthStore } from '../store/authStore';
 import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
+import type { CreateDownloadInput } from '@shared/schemas.ts';
 import { type NewsResponse, updatePaginatedItems } from './news';
 import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 
@@ -24,8 +25,7 @@ export function useDownloads() {
 export function useCreateDownload() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { newsId: number; type: DownloadType; url?: string; priority?: number }) =>
-      api.post<{ success: boolean }>('/downloads', args),
+    mutationFn: (args: CreateDownloadInput) => api.post<{ success: boolean }>('/downloads', args),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: downloadsKeys.all });
     },

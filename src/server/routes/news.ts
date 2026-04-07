@@ -8,6 +8,7 @@ import type { NewsItem } from '../../shared/types.js';
 import { readChannelHistory } from '../services/telegram.js';
 import { logger } from '../logger.js';
 import { toNewsItem } from '../db/mappers.js';
+import { readAllNewsSchema, markReadSchema, parseOptionalBody } from './schemas.js';
 
 const router = new Hono();
 
@@ -34,7 +35,7 @@ function deleteAllMediaFiles(localMediaPath: string | null, localMediaPaths: str
 
 // POST /api/news/read-all
 router.post('/read-all', async (c) => {
-  const body = await c.req.json<{ channelId?: number }>().catch((): { channelId?: number } => ({}));
+  const body = await parseOptionalBody(c, readAllNewsSchema, {});
   const conditions = [eq(news.isRead, 0)];
   if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
 
@@ -82,7 +83,7 @@ router.post('/read-all', async (c) => {
 
 // DELETE /api/news/read - delete all read news
 router.delete('/read', async (c) => {
-  const body = await c.req.json<{ channelId?: number }>().catch((): { channelId?: number } => ({}));
+  const body = await parseOptionalBody(c, readAllNewsSchema, {});
   const conditions = [eq(news.isRead, 1)];
   if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
   const deleted = await db
@@ -187,7 +188,7 @@ router.get('/:id', async (c) => {
 // PATCH /api/news/:id/read
 router.patch('/:id/read', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{ isRead?: number }>().catch(() => ({ isRead: 1 }));
+  const body = await parseOptionalBody(c, markReadSchema, { isRead: 1 });
   const isRead = body.isRead ?? 1;
 
   const [updated] = await db.update(news).set({ isRead }).where(eq(news.id, id)).returning();

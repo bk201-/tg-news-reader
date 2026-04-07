@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
@@ -8,8 +9,14 @@ import { join } from 'path';
 import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
 import { mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
 import { fetchChannelNews } from '../services/channelFetchService.js';
-import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
+import {
+  createChannelSchema,
+  updateChannelSchema,
+  reorderItemsSchema,
+  fetchChannelSchema,
+  parseOptionalBody,
+} from './schemas.js';
 
 const router = new Hono();
 
@@ -54,17 +61,8 @@ router.get('/', async (c) => {
 });
 
 // POST /api/channels
-router.post('/', async (c) => {
-  const body = await c.req.json<{
-    telegramId: string;
-    name: string;
-    description?: string;
-    channelType?: ChannelType;
-    groupId?: number | null;
-  }>();
-  if (!body.telegramId || !body.name) {
-    return c.json({ error: 'telegramId and name are required' }, 400);
-  }
+router.post('/', zValidator('json', createChannelSchema), async (c) => {
+  const body = c.req.valid('json');
 
   const telegramId = body.telegramId
     .trim()
@@ -94,9 +92,8 @@ router.post('/', async (c) => {
 });
 
 // PATCH /api/channels/reorder
-router.patch('/reorder', async (c) => {
-  const body = await c.req.json<{ items: { id: number; sortOrder: number }[] }>();
-  if (!Array.isArray(body.items)) return c.json({ error: 'items is required' }, 400);
+router.patch('/reorder', zValidator('json', reorderItemsSchema), async (c) => {
+  const body = c.req.valid('json');
   for (const item of body.items) {
     await db.update(channels).set({ sortOrder: item.sortOrder }).where(eq(channels.id, item.id));
   }
@@ -104,15 +101,9 @@ router.patch('/reorder', async (c) => {
 });
 
 // PUT /api/channels/:id
-router.put('/:id', async (c) => {
+router.put('/:id', zValidator('json', updateChannelSchema), async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{
-    name?: string;
-    description?: string;
-    channelType?: ChannelType;
-    groupId?: number | null;
-    lastFetchedAt?: number;
-  }>();
+  const body = c.req.valid('json');
 
   const [updated] = await db
     .update(channels)
@@ -184,9 +175,7 @@ router.get('/:id/media-progress', (c) => {
 // POST /api/channels/:id/fetch
 router.post('/:id/fetch', async (c) => {
   const channelId = parseInt(c.req.param('id'), 10);
-  const body = await c.req
-    .json<{ since?: string; limit?: number }>()
-    .catch((): { since?: string; limit?: number } => ({}));
+  const body = await parseOptionalBody(c, fetchChannelSchema, {});
 
   try {
     const result = await fetchChannelNews(channelId, body);
