@@ -234,7 +234,6 @@ Real-time progress for bulk media fetches (used by `media_content` channels):
 - `selectedChannelId` / `selectedGroupId` (null = "Общее") / `selectedNewsId`
 - `showAll`, `filterPanelOpen`, `hashTagFilter`
 - `downloadsPanelPinned` — persisted in `localStorage`; when true, panel renders as inline sidebar
-- `pendingCounts` — messages in Telegram fetched after `lastFetchedAt`, not yet in DB; used in **both** `ChannelSidebar` and `GroupPanel` badge calculations (`unreadCount + pendingCounts[channelId]`)
 - `isDarkTheme` — persisted in `localStorage`
 
 `authStore` (Zustand, `src/client/store/authStore.ts`) holds:
@@ -251,7 +250,7 @@ Real-time progress for bulk media fetches (used by `media_content` channels):
   - `GroupItem` — single group button (icon, badge, context menu); mirrors `ChannelItem` pattern
   - `GroupFormModal` — create/edit modal; exports `PRESET_COLORS` and `GroupFormValues`
   - `GroupPinModal` — PIN unlock modal with `Input.OTP`; auto-submits on 4th digit, passes `val` directly to avoid React state batching issues
-- Group badge = `unreadCount (DB) + pendingCounts[channelId]` — same formula as `ChannelSidebar`; **both** must be summed or badge will be stale after "Обновить"
+- Group badge = sum of `unreadCount` from all channels in the group
 - `selectedGroupId === null` → "Общее" (channels where `group_id IS NULL`)
 - PIN hashed with `bcryptjs` (saltRounds=10), verified via `POST /api/groups/:id/verify-pin`
 - On successful PIN verification the server updates `sessions.unlocked_group_ids` and issues a **new access token** with the updated `unlockedGroupIds` list — unlocked groups persist across page refreshes for the duration of the session. Client receives `{ success, accessToken, unlockedGroupIds }` and calls `authStore.updateToken()`.
