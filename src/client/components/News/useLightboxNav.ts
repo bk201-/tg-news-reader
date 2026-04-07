@@ -59,7 +59,7 @@ export function useLightboxNav(
 
   const item = currentEntry?.item;
   const firstMediaPath = item?.localMediaPaths?.[0] ?? item?.localMediaPath;
-  const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+  const isVideo = /\.(mp4|webm|mov)$/i.test(firstMediaPath ?? '');
   const albumLength = item?.localMediaPaths?.length ?? 0;
   const albumExpectedLength = item?.albumMsgIds?.length ?? albumLength;
   const isAlbum = albumLength > 1;

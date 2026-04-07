@@ -211,7 +211,9 @@ function parseMessageFields(msg: Api.Message, channelUsername: string): Telegram
         if (text) instantViewContent = text;
       }
     } else {
-      mediaType = 'other';
+      // Unsupported media types (poll, geo, contact, game, dice, giveaway, etc.)
+      // — skip entirely, not useful in a news reader
+      return null;
     }
   }
 
@@ -399,6 +401,7 @@ export async function downloadMessageMedia(
     else if (mime === 'image/webp') ext = 'webp';
     else if (mime === 'video/mp4') ext = 'mp4';
     else if (mime === 'video/webm') ext = 'webm';
+    else if (mime === 'video/quicktime') ext = 'mov';
     else if (mime === 'audio/ogg' || mime === 'application/ogg') ext = 'ogg';
     else if (mime === 'audio/mpeg') ext = 'mp3';
     else if (mime === 'audio/mp4' || mime === 'audio/m4a' || mime === 'audio/x-m4a') ext = 'm4a';
@@ -409,7 +412,7 @@ export async function downloadMessageMedia(
     const isAudio = mime.startsWith('audio/') || mime === 'application/ogg';
     if (!options.ignoreLimit) {
       if (isAudio) return null;
-      const isVideo = ext === 'mp4' || ext === 'webm';
+      const isVideo = ext === 'mp4' || ext === 'webm' || ext === 'mov';
       const limit = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMG_DOC_SIZE_BYTES;
       if (sizeNum > limit) return null;
     }
@@ -476,7 +479,8 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
         } else if (msg.media instanceof _Api.MessageMediaWebPage) {
           mediaType = 'webpage';
         } else {
-          mediaType = 'other';
+          // Unsupported media (poll, geo, contact, etc.) — skip
+          return null;
         }
       }
 

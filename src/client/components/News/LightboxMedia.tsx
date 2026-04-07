@@ -26,6 +26,7 @@ const useStyles = createStyles(({ css, token }) => ({
     min-height: 0;
     user-select: none;
     position: relative;
+    z-index: 1;
   `,
   img: css`
     max-width: 100%;

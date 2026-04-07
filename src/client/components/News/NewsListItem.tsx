@@ -177,7 +177,7 @@ export const NewsListItem = memo(
     const isAudio = item.mediaType === 'audio';
     const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
     const isAlbum = (item.localMediaPaths?.length ?? 0) > 1;
-    const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+    const isVideo = /\.(mp4|webm|mov)$/i.test(firstMediaPath ?? '');
     // Show thumbnail for downloaded media, or always for audio (even without a file)
     const showThumb = !!firstMediaPath || isAudio;
 
