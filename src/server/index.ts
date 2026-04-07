@@ -97,7 +97,24 @@ app.use('/api/*', async (c, next) => {
 // load their player configuration; without it they return Error 153.
 // strict-origin-when-cross-origin sends origin only (no path) on cross-origin
 // requests, which is sufficient for YouTube while still being safe.
-app.use('*', secureHeaders({ referrerPolicy: 'strict-origin-when-cross-origin' }));
+app.use(
+  '*',
+  secureHeaders({
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // antd injects inline styles
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      mediaSrc: ["'self'", 'blob:'],
+      frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      workerSrc: ["'self'"],
+      objectSrc: ["'none'"],
+    },
+  }),
+);
 
 // Tell all crawlers and bots to stay away
 app.use('*', async (c, next) => {

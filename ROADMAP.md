@@ -54,17 +54,6 @@
 
 ---
 
-## ⬜ Security Hardening
-
-| # | Task | Description | Complexity |
-|---|------|-------------|------------|
-| 37 | Content Security Policy | `secureHeaders()` is enabled but CSP is not configured. Need policy that allows YouTube embeds, antd inline styles, `blob:` URLs. | ⭐⭐ |
-| 38 | Service Worker versioning | `sw.js` is a static file with no build hash. Add `updateViaCache: 'none'` to registration or append version query param to force update on deploy. | ⭐ |
-| 39 | SSE reconnection backoff | `useDownloadsSSE` / `useMediaProgressSSE` use native `EventSource` which reconnects without backoff. When server is down this floods with connection attempts. Wrap with exponential backoff. | ⭐⭐ |
-| 40 | downloads UNIQUE constraint verification | `enqueueTask` uses `onConflictDoUpdate` on `(newsId, type)` but `schema.ts` has no explicit `unique()` on that pair. Verify it exists in `migrate.ts` or add it. | ⭐ |
-
----
-
 ## ⬜ Deferred (low priority)
 
 | # | Task | Description | Complexity |

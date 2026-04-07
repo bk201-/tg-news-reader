@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
-import { logger } from '../logger';
 import type { NewsItem } from '@shared/types.ts';
 import { type NewsResponse, updatePaginatedItems } from './news';
+import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 
 interface MediaProgressEvent {
   type: 'item' | 'complete';
@@ -34,46 +34,40 @@ export function useMediaProgressSSE(
     if (!channelId) return;
 
     const token = accessToken ? `?token=${encodeURIComponent(accessToken)}` : '';
-    const es = new EventSource(`/api/channels/${channelId}/media-progress${token}`);
+    const url = `/api/channels/${channelId}/media-progress${token}`;
 
-    es.addEventListener('item', (e: MessageEvent) => {
-      const data = JSON.parse(e.data as string) as MediaProgressEvent;
-      if (!data.newsId || !data.localMediaPath) return;
+    const rec = createReconnectingEventSource({
+      url,
+      module: 'mediaProgress',
+      onConnect: (es) => {
+        es.addEventListener('item', (e: MessageEvent) => {
+          const data = JSON.parse(e.data as string) as MediaProgressEvent;
+          if (!data.newsId || !data.localMediaPath) return;
 
-      // Cache stores InfiniteData<NewsResponse> (paginated), not NewsItem[] directly.
-      // Update only the affected item's localMediaPath — no refetch needed.
-      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
-        updatePaginatedItems(old, (items) =>
-          items.map((item: NewsItem) =>
-            item.id === data.newsId ? { ...item, localMediaPath: data.localMediaPath } : item,
-          ),
-        ),
-      );
+          qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+            updatePaginatedItems(old, (items) =>
+              items.map((item: NewsItem) =>
+                item.id === data.newsId ? { ...item, localMediaPath: data.localMediaPath } : item,
+              ),
+            ),
+          );
 
-      onProgressRef.current?.(data.done, data.total);
+          onProgressRef.current?.(data.done, data.total);
+        });
+
+        es.addEventListener('complete', (e: MessageEvent) => {
+          const data = JSON.parse(e.data as string) as MediaProgressEvent;
+          rec.close(); // Done — no reconnect needed
+          onProgressRef.current?.(data.done, data.total);
+          onCompleteRef.current?.();
+        });
+
+        es.addEventListener('aborted', () => {
+          rec.close(); // Server aborted — no reconnect needed
+        });
+      },
     });
 
-    es.addEventListener('complete', (e: MessageEvent) => {
-      const data = JSON.parse(e.data as string) as MediaProgressEvent;
-      es.close();
-      // All items were already updated in-place via 'item' events — no refetch needed.
-      onProgressRef.current?.(data.done, data.total);
-      onCompleteRef.current?.();
-    });
-
-    // Server aborted processing (new fetch started) — close silently, new SSE will open
-    es.addEventListener('aborted', () => {
-      es.close();
-    });
-
-    es.onerror = () => {
-      logger.warn({ module: 'mediaProgress', channelId }, 'SSE error — closing stream');
-      es.close();
-      // On error we may have missed some item events — do a full refetch as fallback.
-      void qc.invalidateQueries({ queryKey: ['news', channelId] });
-      onCompleteRef.current?.();
-    };
-
-    return () => es.close();
+    return () => rec.close();
   }, [channelId, key, qc, accessToken]); // key forces reconnect on each fetch
 }
