@@ -135,6 +135,8 @@
       "prev": "Предыдущее",
       "next": "Следующее",
       "retry_download": "Повторить загрузку",
+      "redownload_media": "Скачать медиа заново",
+      "media_missing": "Файл не найден на сервере",
       "download_media": "Скачать медиа",
       "download_media_size": "Скачать медиа ({{size}})",
       "photo_alt": "Фото {{current}} из {{total}}",

@@ -135,6 +135,8 @@
       "prev": "Previous",
       "next": "Next",
       "retry_download": "Retry download",
+      "redownload_media": "Re-download media",
+      "media_missing": "Media file not found on server",
       "download_media": "Download media",
       "download_media_size": "Download media ({{size}})",
       "photo_alt": "Photo {{current}} of {{total}}",

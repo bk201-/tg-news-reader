@@ -125,8 +125,11 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
 
   if (!row) throw new Error(`News ${newsId} not found`);
 
-  // Already downloaded — skip (idempotent)
-  if (row.albumMsgIds ? row.localMediaPaths !== null : row.localMediaPath !== null) return;
+  // Already downloaded — skip for background tasks (idempotent).
+  // User-initiated (priority ≥ 10) always re-downloads — handles the case where
+  // files were lost (disk unmount, cleanup) but localMediaPath is still set in DB.
+  const alreadyDownloaded = row.albumMsgIds ? row.localMediaPaths !== null : row.localMediaPath !== null;
+  if (alreadyDownloaded && priority < 10) return;
 
   const ignoreLimit = priority >= 10;
 

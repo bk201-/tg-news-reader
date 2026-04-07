@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Typography } from 'antd';
 import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined, SoundOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -124,6 +124,16 @@ const useStyles = createStyles(({ css, token }) => ({
     display: block;
     margin-top: 8px;
   `,
+  brokenMedia: css`
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 16px;
+    color: ${token.colorTextSecondary};
+    font-size: 13px;
+  `,
 }));
 
 interface NewsDetailMediaProps {
@@ -163,6 +173,39 @@ export function NewsDetailMedia({
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
   const openLightbox = useUIStore((s) => s.openLightbox);
+  const [mediaBroken, setMediaBroken] = useState(false);
+
+  // Reset broken state when switching items or after successful re-download.
+  // Uses a derived key — when it changes, the `mediaBroken` state is stale
+  // and we reset it lazily on the next render.
+  const resetKey = `${item.id}:${firstMediaPath}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
+    setMediaBroken(false);
+  }
+
+  // When media file is missing on server (404), show re-download button
+  if (mediaBroken && firstMediaPath) {
+    return (
+      <div className={styles.brokenMedia}>
+        <span>{t('news.detail.media_missing')}</span>
+        <Button
+          icon={mediaLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+          onClick={onDownload}
+          loading={mediaLoading}
+          disabled={mediaQueued}
+        >
+          {mediaQueued ? t('news.detail.queued') : t('news.detail.redownload_media')}
+        </Button>
+        {mediaTaskStatus === 'failed' && (
+          <Text type="danger" className={styles.mediaError}>
+            {t('news.detail.error', { error: mediaTaskError })}
+          </Text>
+        )}
+      </div>
+    );
+  }
 
   if (isAlbum) {
     const paths = item.localMediaPaths!;
@@ -182,6 +225,7 @@ export function NewsDetailMedia({
             alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
             className={styles.mediaFile}
             onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
+            onError={() => setMediaBroken(true)}
           />
           <button
             className={cx(styles.carouselBtn, styles.carouselBtnNext, 'carousel-btn')}
@@ -213,7 +257,12 @@ export function NewsDetailMedia({
             <div className={styles.audioPlaceholder}>
               <SoundOutlined />
             </div>
-            <audio src={mediaUrl(firstMediaPath)} controls className={styles.audioPlayer} />
+            <audio
+              src={mediaUrl(firstMediaPath)}
+              controls
+              className={styles.audioPlayer}
+              onError={() => setMediaBroken(true)}
+            />
           </>
         ) : isVideo ? (
           <video
@@ -224,6 +273,7 @@ export function NewsDetailMedia({
             loop
             className={styles.mediaFile}
             onClick={() => openLightbox(item.id, 0, item.channelId)}
+            onError={() => setMediaBroken(true)}
             style={{ cursor: 'pointer' }}
           />
         ) : (
@@ -232,6 +282,7 @@ export function NewsDetailMedia({
             alt="media"
             className={styles.mediaFile}
             onClick={() => openLightbox(item.id, 0, item.channelId)}
+            onError={() => setMediaBroken(true)}
           />
         )}
       </div>
