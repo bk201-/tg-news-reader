@@ -84,6 +84,26 @@ export function useReorderChannels() {
   });
 }
 
+export function useMarkReadAndFetch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>(
+        '/channels/' + id + '/mark-read-and-fetch',
+        {},
+      ),
+    onSuccess: (data, channelId) => {
+      const now = Math.floor(Date.now() / 1000);
+      qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
+        old
+          ? old.map((ch) => (ch.id === channelId ? { ...ch, lastFetchedAt: now, unreadCount: data.inserted ?? 0 } : ch))
+          : old,
+      );
+      void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    },
+  });
+}
+
 export interface ChannelLookupResult {
   name: string;
   username: string | null;

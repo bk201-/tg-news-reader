@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
-import { eq, count, and } from 'drizzle-orm';
+import { eq, and, max } from 'drizzle-orm';
 import { rmSync, existsSync } from 'fs';
 import { join } from 'path';
-import { getChannelInfo } from '../services/telegram.js';
+import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
 import { mediaProgressEmitter, type MediaProgressEvent } from '../services/mediaProgress.js';
 import { fetchChannelNews } from '../services/channelFetchService.js';
 import type { ChannelType } from '../../shared/types.js';
@@ -32,29 +32,22 @@ router.get('/lookup', async (c) => {
 
 // GET /api/channels
 router.get('/', async (c) => {
-  const result = await db
-    .select({
-      id: channels.id,
-      telegramId: channels.telegramId,
-      name: channels.name,
-      description: channels.description,
-      channelType: channels.channelType,
-      groupId: channels.groupId,
-      sortOrder: channels.sortOrder,
-      lastFetchedAt: channels.lastFetchedAt,
-      lastReadAt: channels.lastReadAt,
-      isUnavailable: channels.isUnavailable,
-      createdAt: channels.createdAt,
-      unreadCount: count(news.id),
-    })
-    .from(channels)
-    .leftJoin(news, and(eq(news.channelId, channels.id), eq(news.isRead, 0)))
-    .groupBy(channels.id)
-    .orderBy(channels.sortOrder, channels.createdAt);
+  const result = await db.select().from(channels).orderBy(channels.sortOrder, channels.createdAt);
 
   return c.json(
     result.map((r) => ({
-      ...r,
+      id: r.id,
+      telegramId: r.telegramId,
+      name: r.name,
+      description: r.description,
+      channelType: r.channelType,
+      groupId: r.groupId,
+      sortOrder: r.sortOrder,
+      lastFetchedAt: r.lastFetchedAt,
+      lastReadAt: r.lastReadAt,
+      isUnavailable: r.isUnavailable,
+      createdAt: r.createdAt,
+      unreadCount: r.unreadCount,
       supportsDigest: r.channelType !== 'media',
     })),
   );
@@ -204,6 +197,50 @@ router.post('/:id/fetch', async (c) => {
       return c.json({ error: 'Channel not found' }, 404);
     }
     logger.error({ module: 'channels', channelId, err }, 'Fetch error');
+    return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
+  }
+});
+
+// POST /api/channels/:id/mark-read-and-fetch — bulk mark-read + fetch in one round-trip
+router.post('/:id/mark-read-and-fetch', async (c) => {
+  const channelId = parseInt(c.req.param('id'), 10);
+
+  const [channel] = await db.select().from(channels).where(eq(channels.id, channelId));
+  if (!channel) return c.json({ error: 'Channel not found' }, 404);
+
+  // 1. Mark all unread as read
+  await db
+    .update(news)
+    .set({ isRead: 1 })
+    .where(and(eq(news.channelId, channelId), eq(news.isRead, 0)));
+
+  // Reset unread_count to 0
+  await db.update(channels).set({ unreadCount: 0 }).where(eq(channels.id, channelId));
+
+  // 2. Sync read state to Telegram
+  try {
+    const [result] = await db
+      .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
+      .from(news)
+      .where(eq(news.channelId, channelId));
+
+    if (result?.maxMsgId) {
+      await readChannelHistory(channel.telegramId, result.maxMsgId);
+    }
+    if (result?.maxPostedAt) {
+      await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, channelId));
+    }
+  } catch (err) {
+    logger.warn({ module: 'channels', channelId, err }, 'failed to sync read state to Telegram');
+  }
+
+  // 3. Fetch new messages
+  try {
+    const fetchResult = await fetchChannelNews(channelId);
+    return c.json(fetchResult);
+  } catch (err: unknown) {
+    const error = err as { message?: string };
+    logger.error({ module: 'channels', channelId, err }, 'Fetch error after mark-read');
     return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
   }
 });

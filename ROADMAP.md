@@ -54,24 +54,6 @@
 
 ---
 
-## ⬜ Queue (new features)
-
-| # | Task | Description | Complexity |
-|---|------|-------------|------------|
-
----
-
-## ⬜ Performance Optimizations
-
-| # | Task | Description | Complexity |
-|---|------|-------------|------------|
-| 33 | Pagination for GET /api/news | All news for a channel loaded in one response. Add `?limit=&cursor=` pagination. Client already uses react-virtuoso — combine with infinite scroll. | ⭐⭐⭐ |
-| 34 | Denormalize unreadCount in channels | `GET /api/channels` does `LEFT JOIN + GROUP BY + count()` on every request. Store `unread_count` column in `channels`, increment/decrement on mark-read/fetch. | ⭐⭐ |
-| 35 | HTTP caching (ETag / Last-Modified) for news | API returns no cache headers. Add `ETag` based on max `postedAt` or row count hash — TanStack Query can send `If-None-Match` for 304 responses. | ⭐⭐ |
-| 36 | Bulk mark-read-and-fetch endpoint | `handleMarkAllReadAndAdvance` does 2 sequential HTTP calls + 1 Telegram fetch. Server endpoint `POST /api/channels/:id/mark-read-and-fetch` in one round-trip. | ⭐⭐ |
-
----
-
 ## ⬜ Security Hardening
 
 | # | Task | Description | Complexity |

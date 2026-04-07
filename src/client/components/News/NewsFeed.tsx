@@ -103,6 +103,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     activeFilterCount,
     effectiveViewMode,
     forceAccordion,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
     digestOpen,
     setDigestOpen,
     toolbarProps,
@@ -141,6 +144,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             onMarkedRead={handleMarkedRead}
             virtuosoRef={virtuosoRef}
             windowScroll
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onEndReached={() => hasNextPage && fetchNextPage()}
           />
         ) : (
           <>
@@ -155,6 +161,9 @@ export function NewsFeed({ channel }: NewsFeedProps) {
               onSelect={setSelectedNewsId}
               onTagClick={handleTagClick}
               virtuosoRef={virtuosoRef}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onEndReached={() => hasNextPage && fetchNextPage()}
             />
             <div className={styles.detail}>
               {selectedItem ? (

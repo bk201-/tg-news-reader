@@ -25,6 +25,7 @@ export const channels = sqliteTable('channels', {
   sortOrder: integer('sort_order').notNull().default(0),
   lastFetchedAt: integer('last_fetched_at'),
   lastReadAt: integer('last_read_at'),
+  unreadCount: integer('unread_count').notNull().default(0),
   isUnavailable: integer('is_unavailable').notNull().default(0),
   createdAt: integer('created_at')
     .notNull()

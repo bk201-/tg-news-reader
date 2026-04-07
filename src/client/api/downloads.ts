@@ -1,10 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from './client';
 import { useAuthStore } from '../store/authStore';
 import { logger } from '../logger';
 import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
-import type { NewsResponse } from './news';
+import { type NewsResponse, updatePaginatedItems } from './news';
 
 export const downloadsKeys = {
   all: ['downloads'] as const,
@@ -87,11 +87,9 @@ export function useDownloadsSSE() {
         if (task.type === 'media' && task.channelId) {
           // Update localMediaPath / localMediaPaths in-place — no refetch needed.
           // Same pattern as useMediaProgressSSE to avoid spammy GET /api/news.
-          qc.setQueriesData<NewsResponse>({ queryKey: ['news', task.channelId] }, (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              items: old.items.map((item: NewsItem) => {
+          qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
+            updatePaginatedItems(old, (items) =>
+              items.map((item: NewsItem) => {
                 if (item.id !== task.newsId) return item;
                 return {
                   ...item,
@@ -99,8 +97,8 @@ export function useDownloadsSSE() {
                   localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
                 };
               }),
-            };
-          });
+            ),
+          );
           qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => (old ?? []).filter((t) => t.id !== task.id));
           return;
         }

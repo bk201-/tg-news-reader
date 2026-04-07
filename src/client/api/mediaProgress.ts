@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { logger } from '../logger';
 import type { NewsItem } from '@shared/types.ts';
-import type { NewsResponse } from './news';
+import { type NewsResponse, updatePaginatedItems } from './news';
 
 interface MediaProgressEvent {
   type: 'item' | 'complete';
@@ -40,17 +40,15 @@ export function useMediaProgressSSE(
       const data = JSON.parse(e.data as string) as MediaProgressEvent;
       if (!data.newsId || !data.localMediaPath) return;
 
-      // Cache stores NewsResponse ({ items, filteredOut }), not NewsItem[] directly.
+      // Cache stores InfiniteData<NewsResponse> (paginated), not NewsItem[] directly.
       // Update only the affected item's localMediaPath — no refetch needed.
-      qc.setQueriesData<NewsResponse>({ queryKey: ['news', channelId] }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.map((item: NewsItem) =>
+      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+        updatePaginatedItems(old, (items) =>
+          items.map((item: NewsItem) =>
             item.id === data.newsId ? { ...item, localMediaPath: data.localMediaPath } : item,
           ),
-        };
-      });
+        ),
+      );
 
       onProgressRef.current?.(data.done, data.total);
     });

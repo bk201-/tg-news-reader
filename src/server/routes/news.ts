@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { news, channels } from '../db/schema.js';
-import { eq, and, asc, max, sql, type SQL } from 'drizzle-orm';
+import { eq, and, asc, max, sql, gt, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
@@ -42,6 +42,13 @@ router.post('/read-all', async (c) => {
     .update(news)
     .set({ isRead: 1 })
     .where(and(...conditions));
+
+  // Update denormalized unread_count
+  if (body.channelId) {
+    await db.update(channels).set({ unreadCount: 0 }).where(eq(channels.id, body.channelId));
+  } else {
+    await db.update(channels).set({ unreadCount: 0 });
+  }
 
   // Sync read state to Telegram if channelId provided
   if (body.channelId) {
@@ -86,12 +93,14 @@ router.delete('/read', async (c) => {
   return c.json({ deleted: deleted.length });
 });
 
-// GET /api/news?channelId=&isRead=&filtered=1
-// Response: { items: NewsItem[], filteredOut: number }
+// GET /api/news?channelId=&isRead=&filtered=1&limit=&cursor=
+// Response: { items: NewsItem[], filteredOut: number, nextCursor: number | null, hasMore: boolean }
 router.get('/', async (c) => {
   const channelId = c.req.query('channelId') ? parseInt(c.req.query('channelId')!, 10) : undefined;
   const isReadParam = c.req.query('isRead');
   const applyServerFilters = c.req.query('filtered') === '1';
+  const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!, 10) : 50;
+  const cursor = c.req.query('cursor') ? parseInt(c.req.query('cursor')!, 10) : undefined;
 
   // Base conditions (channelId + isRead) — used for total-count query
   const baseConditions: SQL[] = [];
@@ -117,11 +126,21 @@ router.get('/', async (c) => {
     }
   }
 
+  // Cursor condition: fetch items after the cursor (posted_at > cursor)
+  if (cursor !== undefined) {
+    conditions.push(gt(news.postedAt, cursor));
+  }
+
+  // Fetch limit+1 to detect if there are more items
   const rows = await db
     .select()
     .from(news)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(news.postedAt));
+    .orderBy(asc(news.postedAt))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
   // Count how many rows were excluded by user-defined filters (is_filtered=1)
   let filteredOut = 0;
@@ -134,9 +153,27 @@ router.get('/', async (c) => {
     filteredOut = result?.count ?? 0;
   }
 
-  const items: NewsItem[] = rows.map(toNewsItem);
+  const items: NewsItem[] = pageRows.map(toNewsItem);
+  const nextCursor = hasMore && pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : null;
 
-  return c.json({ items, filteredOut });
+  // ETag: based on item count + max postedAt for cache validation
+  const maxPostedAt = pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : 0;
+  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}"`;
+
+  const ifNoneMatch = c.req.header('If-None-Match');
+  if (ifNoneMatch === etag) {
+    c.header('Cache-Control', 'no-cache, must-revalidate, private');
+    c.header('ETag', etag);
+    return c.body(null, 304);
+  }
+
+  // Cache-Control lets the browser store the response in its HTTP cache but
+  // forces revalidation (If-None-Match) on every request. must-revalidate
+  // explicitly permits caching responses to requests with Authorization header.
+  // The browser handles ETag/304 transparently — JS fetch() sees a normal 200.
+  c.header('Cache-Control', 'no-cache, must-revalidate, private');
+  c.header('ETag', etag);
+  return c.json({ items, filteredOut, nextCursor, hasMore });
 });
 
 // GET /api/news/:id
@@ -155,6 +192,13 @@ router.patch('/:id/read', async (c) => {
 
   const [updated] = await db.update(news).set({ isRead }).where(eq(news.id, id)).returning();
   if (!updated) return c.json({ error: 'News not found' }, 404);
+
+  // Update denormalized unread_count: +1 if marking unread, -1 if marking read
+  const delta = isRead === 1 ? -1 : 1;
+  await db
+    .update(channels)
+    .set({ unreadCount: sql`max(0, ${channels.unreadCount} + ${delta})` })
+    .where(eq(channels.id, updated.channelId));
 
   // When marking as read — sync to Telegram and update lastReadAt in DB
   if (isRead === 1) {
