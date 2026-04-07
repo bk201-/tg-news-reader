@@ -24,7 +24,7 @@ export {
   clientLogSchema,
   loginSchema,
   totpConfirmSchema,
-} from '@shared/schemas.js';
+} from '../../shared/schemas.js';
 
 /**
  * Safely parse a JSON body and validate with Zod.
