@@ -85,6 +85,8 @@ export function NewsDetail({
   // openUrl: prefer the post's first link; fall back to the channel's Telegram message permalink
   const openUrl = firstLink ?? `https://t.me/${channelTelegramId}/${item.telegramMsgId}`;
   const isExternalLink = !!firstLink;
+  // shareUrl: always the Telegram message permalink (not an external website)
+  const shareUrl = `https://t.me/${channelTelegramId}/${item.telegramMsgId}`;
   const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
   // albumLength: how many images are already downloaded (can be less than expected)
   const albumLength = item.localMediaPaths?.length ?? 0;
@@ -117,12 +119,12 @@ export function NewsDetail({
     const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
     if (navigator.share && isTouchDevice) {
       // No title — it gets prepended by the OS share sheet and looks ugly ("News https://t.me/…")
-      await navigator.share({ url: openUrl });
+      await navigator.share({ url: shareUrl });
     } else {
-      await navigator.clipboard.writeText(openUrl);
+      await navigator.clipboard.writeText(shareUrl);
       void message.success(t('news.detail.share_copied'));
     }
-  }, [openUrl, message, t]);
+  }, [shareUrl, message, t]);
 
   // ── Hotkeys + driven state ────────────────────────────────────────────
   // Registered in the CAPTURE phase so this handler always fires before
