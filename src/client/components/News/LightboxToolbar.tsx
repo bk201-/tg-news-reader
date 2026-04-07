@@ -85,6 +85,8 @@ export function LightboxToolbar({
   const [sharing, setSharing] = useState(false);
 
   const openUrl = item ? (item.links?.[0] ?? `https://t.me/${channelTelegramId}/${item.telegramMsgId}`) : undefined;
+  // shareUrl: always the Telegram message permalink (not an external website)
+  const shareUrl = item ? `https://t.me/${channelTelegramId}/${item.telegramMsgId}` : undefined;
 
   const date = item ? dayjs.unix(item.postedAt).format('DD.MM.YY HH:mm') : '';
 
@@ -109,8 +111,8 @@ export function LightboxToolbar({
       }
 
       // Fallback: share the Telegram post URL
-      if (openUrl) {
-        await navigator.share({ url: openUrl, title: channelName });
+      if (shareUrl) {
+        await navigator.share({ url: shareUrl, title: channelName });
       }
     } catch (err) {
       // AbortError = user dismissed the share sheet — not an error
@@ -120,7 +122,7 @@ export function LightboxToolbar({
     } finally {
       setSharing(false);
     }
-  }, [currentMediaPath, openUrl, channelName]);
+  }, [currentMediaPath, shareUrl, channelName]);
 
   return (
     <div className={styles.toolbar}>
