@@ -1,11 +1,7 @@
 import { useAuthStore } from '../store/authStore';
+import type { CreateDigestInput } from '@shared/schemas.ts';
 
-export interface DigestParams {
-  channelIds?: number[];
-  groupId?: number | null;
-  since?: string;
-  until?: string;
-}
+export type DigestParams = CreateDigestInput;
 
 export type DigestEvent =
   | { type: 'chunk'; content: string }

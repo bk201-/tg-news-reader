@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Group } from '@shared/types.ts';
+import type { CreateGroupInput, UpdateGroupInput } from '@shared/schemas.ts';
 import { useAuthStore } from '../store/authStore';
 
 export const groupKeys = { all: ['groups'] as const };
@@ -12,8 +13,7 @@ export function useGroups() {
 export function useCreateGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; color?: string; pin?: string; sortOrder?: number }) =>
-      api.post<Group>('/groups', data),
+    mutationFn: (data: CreateGroupInput) => api.post<Group>('/groups', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: groupKeys.all }),
   });
 }
@@ -21,16 +21,7 @@ export function useCreateGroup() {
 export function useUpdateGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      ...data
-    }: {
-      id: number;
-      name?: string;
-      color?: string;
-      pin?: string | null;
-      sortOrder?: number;
-    }) => api.put<Group>('/groups/' + id, data),
+    mutationFn: ({ id, ...data }: UpdateGroupInput & { id: number }) => api.put<Group>('/groups/' + id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: groupKeys.all }),
   });
 }

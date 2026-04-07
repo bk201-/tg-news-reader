@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Channel, ChannelType } from '@shared/types.ts';
+import type { Channel } from '@shared/types.ts';
+import type { CreateChannelInput, UpdateChannelInput, FetchChannelInput } from '@shared/schemas.ts';
 
 export const channelKeys = { all: ['channels'] as const };
 
@@ -11,13 +12,7 @@ export function useChannels() {
 export function useCreateChannel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: {
-      telegramId: string;
-      name: string;
-      description?: string;
-      channelType?: ChannelType;
-      groupId?: number | null;
-    }) => api.post<Channel>('/channels', data),
+    mutationFn: (data: CreateChannelInput) => api.post<Channel>('/channels', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: channelKeys.all }),
   });
 }
@@ -25,17 +20,7 @@ export function useCreateChannel() {
 export function useUpdateChannel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      ...data
-    }: {
-      id: number;
-      name?: string;
-      description?: string;
-      channelType?: ChannelType;
-      groupId?: number | null;
-      lastFetchedAt?: number;
-    }) => api.put<Channel>('/channels/' + id, data),
+    mutationFn: ({ id, ...data }: UpdateChannelInput & { id: number }) => api.put<Channel>('/channels/' + id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: channelKeys.all }),
   });
 }
@@ -51,7 +36,7 @@ export function useDeleteChannel() {
 export function useFetchChannel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, since, limit }: { id: number; since?: string; limit?: number }) =>
+    mutationFn: ({ id, since, limit }: FetchChannelInput & { id: number }) =>
       api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>('/channels/' + id + '/fetch', {
         since,
         limit,

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { sign } from 'hono/jwt';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { db } from '../db/index.js';
@@ -11,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { authMiddleware } from '../middleware/auth.js';
 import { JWT_SECRET, JWT_ACCESS_EXPIRES_SEC, REFRESH_EXPIRES_DAYS } from '../config.js';
 import { logger } from '../logger.js';
+import { loginSchema, totpConfirmSchema } from './schemas.js';
 
 const router = new Hono();
 const isDev = process.env.NODE_ENV !== 'production';
@@ -44,8 +46,8 @@ export { issueAccessToken };
 // ─── Public routes ────────────────────────────────────────────────────────────
 
 // POST /api/auth/login
-router.post('/login', async (c) => {
-  const body = await c.req.json<{ email: string; password: string; totpCode?: string }>();
+router.post('/login', zValidator('json', loginSchema), async (c) => {
+  const body = c.req.valid('json');
   const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? 'unknown';
 
   const [user] = await db.select().from(users).where(eq(users.email, body.email.toLowerCase().trim()));
@@ -189,9 +191,9 @@ router.get('/totp/setup', async (c) => {
 });
 
 // POST /api/auth/totp/confirm — verify code and save TOTP secret
-router.post('/totp/confirm', async (c) => {
+router.post('/totp/confirm', zValidator('json', totpConfirmSchema), async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json<{ secret: string; code: string }>();
+  const body = c.req.valid('json');
 
   const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(body.secret) });
   const delta = totp.validate({ token: body.code.replace(/\s/g, ''), window: 1 });

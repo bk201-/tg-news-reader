@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import { db } from '../db/index.js';
 import { groups, channels, sessions, users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { issueAccessToken } from './auth.js';
+import { createGroupSchema, updateGroupSchema, reorderItemsSchema, verifyPinSchema } from './schemas.js';
 
 type HonoEnv = { Variables: { userId: number; userRole: string; sessionId: string } };
 
@@ -25,9 +27,8 @@ router.get('/', async (c) => {
 });
 
 // POST /api/groups
-router.post('/', async (c) => {
-  const body = await c.req.json<{ name: string; color?: string; pin?: string; sortOrder?: number }>();
-  if (!body.name) return c.json({ error: 'name is required' }, 400);
+router.post('/', zValidator('json', createGroupSchema), async (c) => {
+  const body = c.req.valid('json');
 
   const pinHash = body.pin ? await bcrypt.hash(body.pin, 10) : null;
 
@@ -55,9 +56,8 @@ router.post('/', async (c) => {
 });
 
 // PATCH /api/groups/reorder
-router.patch('/reorder', async (c) => {
-  const body = await c.req.json<{ items: { id: number; sortOrder: number }[] }>();
-  if (!Array.isArray(body.items)) return c.json({ error: 'items is required' }, 400);
+router.patch('/reorder', zValidator('json', reorderItemsSchema), async (c) => {
+  const body = c.req.valid('json');
   for (const item of body.items) {
     await db.update(groups).set({ sortOrder: item.sortOrder }).where(eq(groups.id, item.id));
   }
@@ -65,9 +65,9 @@ router.patch('/reorder', async (c) => {
 });
 
 // PUT /api/groups/:id
-router.put('/:id', async (c) => {
+router.put('/:id', zValidator('json', updateGroupSchema), async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{ name?: string; color?: string; pin?: string | null; sortOrder?: number }>();
+  const body = c.req.valid('json');
 
   const updates: Partial<typeof groups.$inferInsert> = {};
   if (body.name !== undefined) updates.name = body.name.trim();
@@ -124,9 +124,9 @@ router.post('/lock-all', async (c) => {
 });
 
 // POST /api/groups/:id/verify-pin
-router.post('/:id/verify-pin', async (c) => {
+router.post('/:id/verify-pin', zValidator('json', verifyPinSchema), async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{ pin: string }>();
+  const body = c.req.valid('json');
 
   const [group] = await db.select().from(groups).where(eq(groups.id, id));
   if (!group) return c.json({ error: 'Group not found' }, 404);
