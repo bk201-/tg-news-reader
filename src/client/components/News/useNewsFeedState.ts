@@ -1,23 +1,22 @@
-import { useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { App } from 'antd';
-import { useTranslation } from 'react-i18next';
-import type { Channel, NewsItem } from '../../../shared/types';
-import { useNews, useMarkAllRead, useMarkRead, flattenPaginatedItems } from '../../api/news';
-import { useFilters, useCreateFilter } from '../../api/filters';
-import { useFetchChannel, useChannels, useMarkReadAndFetch } from '../../api/channels';
+/**
+ * useNewsFeedState — thin coordinator composing data, actions, and scroll hooks.
+ *
+ * Split into:
+ *   Feed/useNewsFeedData.ts    — queries, filtering, derived values
+ *   Feed/useNewsFeedActions.ts — handlers: mark read, fetch, tag, auto-advance
+ *   Feed/useNewsFeedScroll.ts  — FAB, sentinel, scroll-to-index, auto-advance on filter
+ */
+
+import { useCallback } from 'react';
+import type { Channel } from '../../../shared/types';
 import { useUIStore } from '../../store/uiStore';
-import { applyFilters } from './filterUtils';
-import { useHashTagSync } from './Feed/useHashTagSync';
+import { useNewsFeedData } from './Feed/useNewsFeedData';
+import { useNewsFeedActions } from './Feed/useNewsFeedActions';
+import { useNewsFeedScroll } from './Feed/useNewsFeedScroll';
 import { useNewsHotkeys } from './Feed/useNewsHotkeys';
 import { useNewsFeedHotkeys } from './Feed/useNewsFeedHotkeys';
-import { useIsXl } from '../../hooks/breakpoints';
-import { useMediaProgressSSE } from '../../api/mediaProgress';
-import type { VirtuosoHandle } from 'react-virtuoso';
 
 export function useNewsFeedState(channel: Channel) {
-  const { message } = App.useApp();
-  const { t } = useTranslation();
-
   const {
     selectedNewsId,
     setSelectedNewsId,
@@ -26,305 +25,107 @@ export function useNewsFeedState(channel: Channel) {
     setFilterPanelOpen,
     newsViewMode,
     setNewsViewMode,
-    setSelectedChannelId,
     autoAdvance,
   } = useUIStore();
 
-  const forceAccordion = !useIsXl();
-  const effectiveViewMode = forceAccordion ? 'accordion' : newsViewMode;
-
-  const { hashTagFilter, setHashTagFilter } = useHashTagSync(channel.id);
-  const { data: allChannels = [] } = useChannels();
-
-  const { data: newsData, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useNews(channel.id, !showAll);
-  const newsItems = useMemo(() => flattenPaginatedItems(newsData), [newsData]);
-  const serverFilteredOut = newsData?.pages[0]?.filteredOut ?? 0;
-  const { data: filters = [] } = useFilters(channel.id);
-  const markAllRead = useMarkAllRead();
-  const markRead = useMarkRead();
-  const fetchChannel = useFetchChannel();
-  const createFilter = useCreateFilter(channel.id);
-  const markReadAndFetch = useMarkReadAndFetch();
-
-  // Advance to the next channel in order (circular), regardless of unread count.
-  const goToNextChannel = useCallback(() => {
-    const sameGroup = allChannels
-      .filter((ch) => (ch.groupId ?? null) === (channel.groupId ?? null))
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-
-    const currentIdx = sameGroup.findIndex((ch) => ch.id === channel.id);
-    if (currentIdx === -1 || sameGroup.length <= 1) return;
-
-    const next = sameGroup[(currentIdx + 1) % sameGroup.length];
-    setSelectedChannelId(next.id);
-  }, [allChannels, channel.id, channel.groupId, setSelectedChannelId]);
-
-  const selectedItem = useMemo(
-    () => newsItems.find((n) => n.id === selectedNewsId) || null,
-    [newsItems, selectedNewsId],
-  );
-  const filteredIds = useMemo(() => applyFilters(newsItems, filters), [newsItems, filters]);
-  const activeFilterCount = filters.filter((f) => f.isActive === 1).length;
-
-  const displayItems = useMemo(() => {
-    const base = showAll ? newsItems : newsItems.filter((item) => filteredIds.has(item.id));
-    if (!hashTagFilter) return base;
-    const normalized = hashTagFilter.toLowerCase().replace(/^#/, '');
-    return base.filter((item) => (item.hashtags || []).some((h) => h.toLowerCase().replace(/^#/, '') === normalized));
-  }, [newsItems, filteredIds, showAll, hashTagFilter]);
-
-  const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
-  const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
-  const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
-
-  const [digestOpen, setDigestOpen] = useState(false);
-  const [fetchPeriod, setFetchPeriod] = useState<string>('');
-  const [mediaProgressKey, setMediaProgressKey] = useState(0);
-
-  useEffect(() => {
-    setFetchPeriod('');
-  }, [channel.id]);
-
-  // Called after a USER-TRIGGERED fetch (button, double-space at end).
-  // Auto-advance only fires here — NOT on the automatic fetch when opening a channel.
-  const onUserFetchSuccess = useCallback(
-    (data: { inserted: number; mediaProcessing?: boolean }) => {
-      if (data.mediaProcessing) {
-        setMediaProgressKey((k) => k + 1);
-      }
-      if (autoAdvance && data.inserted === 0 && unreadCount === 0) {
-        goToNextChannel();
-      }
-    },
-    [goToNextChannel, unreadCount, autoAdvance],
+  const data = useNewsFeedData(channel);
+  const actions = useNewsFeedActions(
+    channel,
+    data.displayItems,
+    data.unreadCount,
+    data.serverFilteredOut,
+    data.setMediaProgressKey,
   );
 
-  const handleMarkedRead = useCallback(
-    (currentId: number) => {
-      const currentIndex = displayItems.findIndex((item) => item.id === currentId);
-      const nextUnread = displayItems.slice(currentIndex + 1).find((item) => item.isRead === 0);
-      if (nextUnread) {
-        setSelectedNewsId(nextUnread.id);
-      } else {
-        const remainingVisible = displayItems.filter((item) => item.id !== currentId && item.isRead === 0);
-        if (!showAll && remainingVisible.length === 0 && serverFilteredOut > 0) markAllRead.mutate(channel.id);
-      }
-    },
-    [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id],
-  );
-
+  // Tag click needs setHashTagFilter from data + createFilter from actions
+  const { setHashTagFilter } = data;
+  const { handleTagClick: actionsHandleTagClick } = actions;
   const handleTagClick = useCallback(
     (tag: string, action: 'show' | 'addFilter') => {
       if (action === 'show') {
         setHashTagFilter(tag);
         setShowAll(false);
       } else {
-        void createFilter
-          .mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() })
-          .then(() => void message.success(t('news.list.tag_added_toast', { tag })));
+        actionsHandleTagClick(tag, action);
       }
     },
-    [setHashTagFilter, setShowAll, createFilter, message, t],
+    [setHashTagFilter, setShowAll, actionsHandleTagClick],
   );
 
-  const handleFetchDefault = useCallback(() => {
-    setFetchPeriod('');
-    fetchChannel.mutate({ id: channel.id }, { onSuccess: onUserFetchSuccess });
-  }, [channel.id, fetchChannel, onUserFetchSuccess]);
-
-  // ── Refs ──────────────────────────────────────────────────────────────
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const scrollTopBtnRef = useRef<HTMLButtonElement>(null);
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-
-  // ── Scroll-to-top FAB visibility via viewport IO on post-toolbar sentinel ─
-  useEffect(() => {
-    if (!forceAccordion) return;
-    const sentinel = topSentinelRef.current;
-    const btn = scrollTopBtnRef.current;
-    if (!sentinel || !btn) return;
-    const show = () => {
-      btn.style.opacity = '1';
-      btn.style.pointerEvents = 'auto';
-      btn.style.transform = 'translateY(0)';
-    };
-    const hide = () => {
-      btn.style.opacity = '0';
-      btn.style.pointerEvents = 'none';
-      btn.style.transform = 'translateY(8px)';
-    };
-    const observer = new IntersectionObserver(([entry]) => (entry.isIntersecting ? hide() : show()), {
-      root: null,
-      threshold: 0,
-    });
-    observer.observe(sentinel);
-    return () => {
-      observer.disconnect();
-      hide();
-    };
-  }, [forceAccordion]);
-
-  // ── Media progress SSE ─────────────────────────────────────────────────
-  useMediaProgressSSE(channel.id, mediaProgressKey);
-
-  // ── Auto-fetch on channel open ────────────────────────────────────────
-  useEffect(() => {
-    fetchChannel.mutate(
-      { id: channel.id },
-      {
-        onSuccess: (data) => {
-          if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
-        },
-      },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel.id]);
-
-  const handleFetchPeriod = useCallback(
-    (val: string | number) => {
-      const v = String(val);
-      setFetchPeriod(v);
-      const since = new Date();
-      since.setDate(since.getDate() - parseInt(v, 10));
-      since.setHours(0, 0, 0, 0);
-      fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onUserFetchSuccess });
-    },
-    [channel.id, fetchChannel, onUserFetchSuccess],
+  const scroll = useNewsFeedScroll(
+    data.displayItems,
+    data.newsItems,
+    data.effectiveViewMode,
+    data.forceAccordion,
+    (args) => actions.markRead.mutate(args),
   );
 
-  const handleSpaceKey = useCallback(
-    (item: NewsItem) => {
-      if (item.isRead === 0) {
-        markRead.mutate(
-          { id: item.id, isRead: 1, channelId: item.channelId },
-          { onSuccess: () => handleMarkedRead(item.id) },
-        );
-      } else {
-        const idx = displayItems.findIndex((n) => n.id === item.id);
-        const next = displayItems.slice(idx + 1).find((n) => n.isRead === 0);
-        if (next) setSelectedNewsId(next.id);
-        else handleFetchDefault();
-      }
-    },
-    [displayItems, markRead, handleMarkedRead, setSelectedNewsId, handleFetchDefault],
-  );
-
-  // ── Mark all read (+ auto-advance when enabled) ─────────────────────
-  const handleMarkAllReadAndAdvance = useCallback(() => {
-    if (!autoAdvance) {
-      markAllRead.mutate(channel.id);
-      return;
-    }
-    // Combined mark-read + fetch in one round-trip
-    markReadAndFetch.mutate(channel.id, {
-      onSuccess: (data) => {
-        if (data.mediaProcessing) setMediaProgressKey((k) => k + 1);
-        if (data.inserted === 0) goToNextChannel();
-      },
-    });
-  }, [autoAdvance, markAllRead, channel.id, markReadAndFetch, goToNextChannel]);
-
-  useNewsHotkeys(displayItems, selectedNewsId, setSelectedNewsId, handleSpaceKey);
+  useNewsHotkeys(data.displayItems, selectedNewsId, setSelectedNewsId, actions.handleSpaceKey);
   useNewsFeedHotkeys({
-    onFetch: handleFetchDefault,
+    onFetch: actions.handleFetchDefault,
     onToggleShowAll: () => setShowAll(!showAll),
-    onMarkAllRead: handleMarkAllReadAndAdvance,
+    onMarkAllRead: actions.handleMarkAllReadAndAdvance,
     onOpenFilters: () => setFilterPanelOpen(true),
   });
 
-  // ── Auto-advance selected news when filtered out ───────────────────────
-  useEffect(() => {
-    if (showAll || !selectedNewsId) return;
-    if (displayItems.some((n) => n.id === selectedNewsId)) return;
-    const item = newsItems.find((n) => n.id === selectedNewsId);
-    if (item && item.isRead === 0) markRead.mutate({ id: item.id, isRead: 1, channelId: item.channelId });
-    const currentIndex = newsItems.findIndex((n) => n.id === selectedNewsId);
-    const nextUnread =
-      displayItems.find((n) => newsItems.findIndex((m) => m.id === n.id) > currentIndex && n.isRead === 0) ??
-      displayItems.find((n) => n.isRead === 0) ??
-      null;
-    setSelectedNewsId(nextUnread?.id ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayItems]);
-
-  // ── Scroll selected item into view ────────────────────────────────────
-  useEffect(() => {
-    if (!selectedNewsId) return;
-    const index = displayItems.findIndex((n) => n.id === selectedNewsId);
-    if (index === -1) return;
-    if (effectiveViewMode === 'accordion') {
-      const id = setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'start' });
-      }, 50);
-      return () => clearTimeout(id);
-    } else {
-      virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'center' });
-    }
-  }, [selectedNewsId, displayItems, effectiveViewMode]);
-
-  const scrollToTop = useCallback(() => {
-    if (forceAccordion) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      virtuosoRef.current?.scrollToIndex({ index: 0, behavior: 'smooth', align: 'start' });
-    }
-  }, [forceAccordion]);
-
   // ── Toolbar props ─────────────────────────────────────────────────────
   const toolbarProps = {
-    fetchPending: fetchChannel.isPending,
-    fetchPeriod,
-    onFetchDefault: handleFetchDefault,
-    onFetchPeriod: handleFetchPeriod,
+    fetchPending: actions.fetchChannel.isPending,
+    fetchPeriod: actions.fetchPeriod,
+    onFetchDefault: actions.handleFetchDefault,
+    onFetchPeriod: actions.handleFetchPeriod,
     showAll,
     onToggleShowAll: () => setShowAll(!showAll),
-    markAllPending: markAllRead.isPending || markReadAndFetch.isPending || (autoAdvance && fetchChannel.isPending),
-    onMarkAllRead: handleMarkAllReadAndAdvance,
-    activeFilterCount,
+    markAllPending:
+      actions.markAllRead.isPending ||
+      actions.markReadAndFetch.isPending ||
+      (autoAdvance && actions.fetchChannel.isPending),
+    onMarkAllRead: actions.handleMarkAllReadAndAdvance,
+    activeFilterCount: data.activeFilterCount,
     onOpenFilters: () => setFilterPanelOpen(true),
-    hashTagFilter,
-    onClearHashTag: () => setHashTagFilter(null),
-    shownCount: displayItems.length,
-    hiddenCount: hiddenByFilters,
-    totalCount,
-    unreadCount,
+    hashTagFilter: data.hashTagFilter,
+    onClearHashTag: () => data.setHashTagFilter(null),
+    shownCount: data.displayItems.length,
+    hiddenCount: data.hiddenByFilters,
+    totalCount: data.totalCount,
+    unreadCount: data.unreadCount,
     newsViewMode,
     onSetViewMode: setNewsViewMode,
-    isMobile: forceAccordion,
-    onOpenDigest: () => setDigestOpen(true),
+    isMobile: data.forceAccordion,
+    onOpenDigest: () => data.setDigestOpen(true),
     showDigest: channel.supportsDigest,
     channelTelegramId: channel.telegramId,
   };
 
   return {
     // Data
-    isLoading,
-    displayItems,
-    filteredIds,
+    isLoading: data.isLoading,
+    displayItems: data.displayItems,
+    filteredIds: data.filteredIds,
     selectedNewsId,
-    selectedItem,
+    selectedItem: data.selectedItem,
     showAll,
-    hashTagFilter,
-    activeFilterCount,
-    effectiveViewMode,
-    forceAccordion,
+    hashTagFilter: data.hashTagFilter,
+    activeFilterCount: data.activeFilterCount,
+    effectiveViewMode: data.effectiveViewMode,
+    forceAccordion: data.forceAccordion,
     // Pagination
-    hasNextPage: hasNextPage ?? false,
-    fetchNextPage,
-    isFetchingNextPage,
+    hasNextPage: data.hasNextPage,
+    fetchNextPage: data.fetchNextPage,
+    isFetchingNextPage: data.isFetchingNextPage,
     // Digest
-    digestOpen,
-    setDigestOpen,
+    digestOpen: data.digestOpen,
+    setDigestOpen: data.setDigestOpen,
     // Toolbar
     toolbarProps,
     // Handlers
     setSelectedNewsId,
-    handleMarkedRead,
+    handleMarkedRead: actions.handleMarkedRead,
     handleTagClick,
-    scrollToTop,
+    scrollToTop: scroll.scrollToTop,
     // Refs
-    virtuosoRef,
-    scrollTopBtnRef,
-    topSentinelRef,
+    virtuosoRef: scroll.virtuosoRef,
+    scrollTopBtnRef: scroll.scrollTopBtnRef,
+    topSentinelRef: scroll.topSentinelRef,
   };
 }

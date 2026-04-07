@@ -10,16 +10,7 @@
 
 | # | Task | Description | Complexity |
 |---|------|-------------|------------|
-| 11 | Split `telegram.ts` (617 lines) | Exceeds 200-line rule. Split into: `telegramClient.ts` (connection, mutex, delay, disconnect), `telegramParser.ts` (parseMessageFields, extractLinks, extractHashtags, InstantView), `telegramApi.ts` (public API: fetch, getInfo, read, download). | ⭐⭐ |
-| 12 | Split `useNewsFeedState.ts` (333 lines) | Exceeds 200-line rule. Split into: `useNewsFeedData` (queries, filtering, derived values), `useNewsFeedActions` (handlers: mark read, fetch, tag), `useNewsFeedScroll` (FAB, sentinel, scroll-to-index). | ⭐⭐ |
-| 13 | Split `downloadManager.ts` (355 lines) | Exceeds 200-line rule. Extract `DownloadCoordinator` class into its own file, keep public API + `startWorkerPool` in `downloadManager.ts`. | ⭐⭐ |
-| 14 | Split `AppHeader.tsx` (265 lines) | Exceeds 200-line rule. Extract `UserMenu` component (menu items, TOTP toggle, cache clear, language switcher). | ⭐⭐ |
-| 15 | Extract `NewsDetail` derivations (246 lines) | On the limit. Move derived values (links, isVideo, isAlbum, albumLength, etc.) + handlers into a `useNewsDetailState` hook. | ⭐ |
 | 16 | Runtime request body validation (Zod) | All route handlers use `c.req.json<T>()` — type assertion only, no runtime check. Add `zod` + Hono's `zValidator` middleware for input validation on all POST/PUT/PATCH endpoints. | ⭐⭐⭐ |
-| 17 | Review `eslint-disable react-hooks/exhaustive-deps` | `useNewsFeedState.ts` lines 179, 253 suppress deps warnings — potential stale closure bugs. Audit each case and either add deps or restructure. | ⭐ |
-| 18 | `logBuffer.ts` — Array.shift() is O(n) | Replace `_entries.shift()` with a circular buffer (head/tail pointer) for O(1) writes at MAX_ENTRIES=2000. | ⭐ |
-| 19 | Album sort stability | `telegram.ts` line 431: `sort((a, b) => a.date - b.date)` — albums have same `date`, order is undefined. Add secondary sort by `id`. | ⭐ |
-| 20 | N+1 updates in channelFetchService | `channelFetchService.ts` lines 176–182: each `toUpdateValues` item = separate SQL UPDATE in a loop. Batch via SQL `CASE WHEN` or `VALUES` join for fewer round-trips. | ⭐⭐ |
 | 21 | Unit tests: server services | `channelFetchService`, `filterEngine`, `downloadManager`, `channelStrategies`, `toNewsItem` mapper, `readability` — pure logic, testable with in-memory SQLite (`:memory:` libsql). Stack: **Vitest**. | ⭐⭐ |
 | 22 | Unit tests: client hooks & stores | `uiStore`, `authStore` (Zustand), `useNewsFeedState`, `useNewsHotkeys`, `filterUtils`, `applyFilters` — no DOM needed. Stack: **Vitest** + `@testing-library/react` for hooks. | ⭐⭐ |
 | 23 | Unit tests: shared utilities | `retry.ts` policies, `telegramCircuitBreaker` state machine, `alertBot` dedup logic, `mediaUrl` builder — small pure functions. Stack: **Vitest**. | ⭐ |

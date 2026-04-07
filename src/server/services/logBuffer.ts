@@ -28,21 +28,26 @@ export const LEVEL_MAP: Record<string, number> = {
   fatal: 60,
 };
 
-// ─── Circular buffer ──────────────────────────────────────────────────────────
+// ─── Circular buffer (O(1) push, no Array.shift) ─────────────────────────────
 
 const MAX_ENTRIES = 2000;
-const _entries: LogEntry[] = [];
+const _buf: (LogEntry | undefined)[] = Array.from<LogEntry | undefined>({ length: MAX_ENTRIES });
+let _head = 0; // next write position
+let _size = 0; // current number of entries
 
 export function getLogEntries(sinceMs: number, minLevel: number): LogEntry[] {
   const result: LogEntry[] = [];
-  for (const e of _entries) {
+  // Read oldest → newest
+  const start = _size < MAX_ENTRIES ? 0 : _head;
+  for (let i = 0; i < _size; i++) {
+    const e = _buf[(start + i) % MAX_ENTRIES]!;
     if (e.time >= sinceMs && e.level >= minLevel) result.push(e);
   }
   return result;
 }
 
 export function getBufferSize(): number {
-  return _entries.length;
+  return _size;
 }
 
 // ─── Writable stream consumed by pino multistream ────────────────────────────
@@ -53,8 +58,9 @@ export const logBufferStream = new Writable({
       const line = chunk.toString().trim();
       if (line) {
         const entry = JSON.parse(line) as LogEntry;
-        _entries.push(entry);
-        if (_entries.length > MAX_ENTRIES) _entries.shift();
+        _buf[_head] = entry;
+        _head = (_head + 1) % MAX_ENTRIES;
+        if (_size < MAX_ENTRIES) _size++;
       }
     } catch {
       // ignore JSON parse errors (e.g. partial writes)
