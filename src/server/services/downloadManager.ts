@@ -90,9 +90,15 @@ class DownloadCoordinator {
   private readonly crashLog: number[] = [];
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly concurrency: number;
+  private _stopped = false;
 
   constructor(concurrency: number) {
     this.concurrency = concurrency;
+  }
+
+  /** Whether the pool has been stopped by the circuit breaker. Exposed for health checks. */
+  get stopped(): boolean {
+    return this._stopped;
   }
 
   async start(): Promise<void> {
@@ -106,6 +112,7 @@ class DownloadCoordinator {
   }
 
   private spawnWorker(id: number): void {
+    if (this._stopped) return;
     const isDev = process.env.NODE_ENV !== 'production';
     // Dev:  use a plain .mjs shim that calls register('tsx/esm') then
     //       dynamically imports downloadWorker.ts — the only reliable way
@@ -146,13 +153,28 @@ class DownloadCoordinator {
     if (this.crashLog.length >= threshold) {
       logger.fatal(
         { module: 'download', crashCount: this.crashLog.length, windowMs: WORKER_POOL_CRASH_WINDOW_MS, threshold },
-        'worker pool circuit breaker — too many crashes, shutting down',
+        'worker pool circuit breaker — too many crashes, stopping pool (server stays alive)',
       );
       void sendAlert(
-        `Download worker pool FATAL: ${this.crashLog.length} crashes in ${WORKER_POOL_CRASH_WINDOW_MS / 1000}s (threshold ${threshold}/${this.concurrency})`,
+        `Download worker pool STOPPED: ${this.crashLog.length} crashes in ${WORKER_POOL_CRASH_WINDOW_MS / 1000}s (threshold ${threshold}/${this.concurrency}). Pool disabled — downloads unavailable until restart.`,
         'worker-pool-fatal',
       );
-      process.exit(1);
+      this._stopped = true;
+      // Terminate all remaining workers
+      for (const [wId, w] of this.workers) {
+        try {
+          void w.terminate();
+        } catch {
+          /* ignore */
+        }
+        this.available.delete(wId);
+      }
+      this.workers.clear();
+      if (this.pollTimer) {
+        clearTimeout(this.pollTimer);
+        this.pollTimer = null;
+      }
+      return;
     }
 
     const delay = WORKER_RESTART_BASE_MS + Math.floor(Math.random() * WORKER_RESTART_JITTER_MS);
@@ -198,6 +220,7 @@ class DownloadCoordinator {
   }
 
   private async tryDispatch(): Promise<void> {
+    if (this._stopped) return;
     if (this.available.size === 0) return;
 
     if (this.pollTimer !== null) {
@@ -348,7 +371,14 @@ export async function getActiveTasks(): Promise<DownloadTask[]> {
   }));
 }
 
+let _coordinator: DownloadCoordinator | null = null;
+
 export function startWorkerPool(concurrency: number): void {
-  const c = new DownloadCoordinator(concurrency);
-  void c.start();
+  _coordinator = new DownloadCoordinator(concurrency);
+  void _coordinator.start();
+}
+
+/** Returns true if the worker pool was stopped by the pool-level circuit breaker. */
+export function isWorkerPoolStopped(): boolean {
+  return _coordinator?.stopped ?? false;
 }

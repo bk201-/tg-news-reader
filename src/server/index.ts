@@ -18,7 +18,7 @@ import logsRouter from './routes/logs.js';
 import { authMiddleware } from './middleware/auth.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
-import { startWorkerPool } from './services/downloadManager.js';
+import { startWorkerPool, isWorkerPoolStopped } from './services/downloadManager.js';
 import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
 import { logger } from './logger.js';
 import { getTelegramCircuitState, getTelegramSessionExpired } from './services/telegramCircuitBreaker.js';
@@ -153,7 +153,8 @@ app.get('/api/health', async (c) => {
   const telegramCircuit = getTelegramCircuitState();
   const sessionExpired = getTelegramSessionExpired();
   const connectDelayed = isTelegramDelayed();
-  const status = !dbOk || telegramCircuit === 'open' ? 'degraded' : 'ok';
+  const workerPoolStopped = isWorkerPoolStopped();
+  const status = !dbOk || telegramCircuit === 'open' || workerPoolStopped ? 'degraded' : 'ok';
 
   return c.json({
     status,
@@ -161,6 +162,7 @@ app.get('/api/health', async (c) => {
     uptime: Math.floor(process.uptime()),
     db: dbOk ? 'ok' : 'error',
     telegram: { circuit: telegramCircuit, sessionExpired, connectDelayed },
+    downloads: { workerPoolStopped },
   });
 });
 

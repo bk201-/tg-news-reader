@@ -27,7 +27,7 @@ export function toNewsItem(row: NewsRow): NewsItem {
     localMediaPath: row.localMediaPath || undefined,
     localMediaPaths: row.localMediaPaths || undefined,
     albumMsgIds: row.albumMsgIds || undefined,
-    mediaSize: row.mediaSize || undefined,
+    mediaSize: row.mediaSize ?? undefined,
     textInPanel: row.textInPanel ?? 0,
     canLoadArticle: row.canLoadArticle ?? 0,
     fullContentFormat: row.fullContentFormat ?? 'text',

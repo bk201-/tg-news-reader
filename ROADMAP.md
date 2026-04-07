@@ -17,18 +17,6 @@
 
 ---
 
-## 🟡 Should Fix (quality / correctness)
-
-| # | Task | Description | Complexity |
-|---|------|-------------|------------|
-| 5 | `toNewsItem` — mediaSize=0 treated as undefined | `db/mappers.ts` line 30: `row.mediaSize \|\| undefined` falsifies `0`. Change to `row.mediaSize ?? undefined`. | ⭐ |
-| 6 | Hardcoded `rgba(255,255,255,0.85)` in AppHeader | `AppHeader.tsx` line 55 (`channelName` style) violates token-only CSS rule. Use `token.colorTextLightSolid` with opacity via `color-mix`. | ⭐ |
-| 7 | `aria-label="Scroll to top"` hardcoded English | `NewsFeed.tsx` line 189 — must use `t('news.scroll_to_top')` + add key to both locale files. | ⭐ |
-| 8 | `fetchMessageById` duplicates `parseMessageFields` | `telegram.ts` lines 566–616 repeat the same media type detection from `parseMessageFields` (290–346). Refactor `fetchMessageById` to call `parseMessageFields` internally. | ⭐ |
-| 9 | Close SSE connections on logout | `handleLogout` in `AppHeader.tsx` calls `clearAuth()` but doesn't close `EventSource` instances (`useDownloadsSSE`, `useMediaProgressSSE`). They keep reconnecting with expired token. Add cleanup on auth state change. | ⭐⭐ |
-| 10 | `process.exit(1)` in worker pool circuit breaker | `downloadManager.ts` line 155 kills the entire server. Consider: stop the pool, mark health as degraded, send alert — let Azure health probes decide on restart. | ⭐⭐ |
-
----
 
 ## ⬜ Technical Debt
 
