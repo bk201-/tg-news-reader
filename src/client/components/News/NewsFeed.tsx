@@ -9,7 +9,7 @@ import { useNews, useMarkAllRead, useMarkRead } from '../../api/news';
 import { useFilters, useCreateFilter } from '../../api/filters';
 import { useFetchChannel, useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
-import { applyFilters } from './NewsListItem';
+import { applyFilters } from './filterUtils';
 import { NewsDetail } from './NewsDetail';
 import { FilterPanel } from '../Filters/FilterPanel';
 import { NewsFeedToolbar } from './NewsFeedToolbar';
@@ -122,7 +122,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const { data: allChannels = [] } = useChannels();
 
   const { data: newsData, isLoading } = useNews(channel.id, !showAll);
-  const newsItems = newsData?.items ?? [];
+  const newsItems = useMemo(() => newsData?.items ?? [], [newsData?.items]);
   const serverFilteredOut = newsData?.filteredOut ?? 0;
   const { data: filters = [] } = useFilters(channel.id);
   const markAllRead = useMarkAllRead();
@@ -200,7 +200,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
           .then(() => void message.success(t('news.list.tag_added_toast', { tag })));
       }
     },
-    [setHashTagFilter, setShowAll, createFilter, message],
+    [setHashTagFilter, setShowAll, createFilter, message, t],
   );
 
   const [digestOpen, setDigestOpen] = useState(false);

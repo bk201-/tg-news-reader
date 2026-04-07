@@ -5,6 +5,8 @@ import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { FormInstance } from 'antd';
 import type { Group } from '@shared/types.ts';
+import { PRESET_COLORS } from './groupFormConstants';
+import type { GroupFormValues } from './groupFormConstants';
 
 const useStyles = createStyles(({ css }) => ({
   form: css`
@@ -33,26 +35,6 @@ const useStyles = createStyles(({ css }) => ({
     cursor: pointer;
   `,
 }));
-
-export const PRESET_COLORS = [
-  '#1677ff', // blue (default)
-  '#52c41a', // green
-  '#fa8c16', // orange
-  '#eb2f96', // pink
-  '#722ed1', // purple
-  '#13c2c2', // cyan
-  '#f5222d', // red
-  '#faad14', // gold
-  '#8c8c8c', // gray
-  '#2f54eb', // geekblue
-];
-
-export interface GroupFormValues {
-  name: string;
-  color: string;
-  pin?: string;
-  removePin?: boolean;
-}
 
 interface GroupFormModalProps {
   open: boolean;

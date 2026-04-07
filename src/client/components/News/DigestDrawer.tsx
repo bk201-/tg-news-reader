@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Progress, Spin, Typography, Alert } from 'antd';
-import { CopyOutlined, CloseOutlined } from '@ant-design/icons';
+import { CopyOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { message } from 'antd';
@@ -52,6 +52,10 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 12px;
     color: ${token.colorTextSecondary};
   `,
+  footerActions: css`
+    display: flex;
+    gap: 8px;
+  `,
 }));
 
 interface DigestDrawerProps {
@@ -73,7 +77,10 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     errors: number;
   } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const generatedParamsRef = useRef<string>('');
   const { setSelectedNewsId } = useUIStore();
+
+  const paramsKey = JSON.stringify(params);
 
   const run = useCallback(async () => {
     abortRef.current?.abort();
@@ -97,33 +104,45 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
           setPrefetchProgress({ done: event.done, total: event.total, errors: event.errors });
         }
       }
+      generatedParamsRef.current = paramsKey;
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       setError((err as Error).message ?? t('digest.error_generic'));
     } finally {
       setLoading(false);
     }
-  }, [params, t]);
+  }, [params, paramsKey, t]);
 
+  // Reset content when params change (e.g. different channel selected)
   useEffect(() => {
-    if (open) {
-      void run();
-    } else {
+    if (generatedParamsRef.current && generatedParamsRef.current !== paramsKey) {
       abortRef.current?.abort();
       setText('');
       setRefMap({});
       setError(null);
       setPrefetchProgress(null);
       setLoading(false);
+      generatedParamsRef.current = '';
     }
-  }, [open, run]);
+  }, [paramsKey]);
+
+  // Auto-run only on first open when there's no content yet
+  useEffect(() => {
+    if (open && !text && !loading && !error) {
+      void run();
+    }
+  }, [open, paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Abort on unmount
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   const handleRefClick = useCallback(
     (newsId: number) => {
       setSelectedNewsId(newsId);
-      onClose();
     },
-    [setSelectedNewsId, onClose],
+    [setSelectedNewsId],
   );
 
   const handleCopy = async () => {
@@ -181,9 +200,14 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
         {text && !loading && (
           <div className={styles.footer}>
             <span className={styles.poweredBy}>{t('digest.powered_by')}</span>
-            <Button icon={<CopyOutlined />} size="small" onClick={() => void handleCopy()}>
-              {t('digest.copy')}
-            </Button>
+            <div className={styles.footerActions}>
+              <Button icon={<ReloadOutlined />} size="small" onClick={() => void run()}>
+                {t('digest.refresh')}
+              </Button>
+              <Button icon={<CopyOutlined />} size="small" onClick={() => void handleCopy()}>
+                {t('digest.copy')}
+              </Button>
+            </div>
           </div>
         )}
       </div>

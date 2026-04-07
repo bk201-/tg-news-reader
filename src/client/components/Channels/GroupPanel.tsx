@@ -16,9 +16,11 @@ import {
 import { useChannels } from '../../api/channels';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
-import { GroupItem, useGroupItemStyles } from './GroupItem';
-import { GroupFormModal, PRESET_COLORS } from './GroupFormModal';
-import type { GroupFormValues } from './GroupFormModal';
+import { GroupItem } from './GroupItem';
+import { useGroupItemStyles } from './groupItemStyles';
+import { GroupFormModal } from './GroupFormModal';
+import { PRESET_COLORS } from './groupFormConstants';
+import type { GroupFormValues } from './groupFormConstants';
 import { GroupPinModal } from './GroupPinModal';
 import { SortModal } from './SortModal';
 
