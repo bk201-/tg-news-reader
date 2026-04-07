@@ -38,7 +38,7 @@ const useStyles = createStyles(({ css }) => ({
   navBtn: css`
     position: absolute;
     top: 0;
-    bottom: 0;
+    bottom: 48px; /* leave room for video controls at the bottom */
     z-index: 3;
     width: 64px;
     display: flex;

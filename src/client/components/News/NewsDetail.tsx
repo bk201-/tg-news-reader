@@ -93,7 +93,7 @@ export function NewsDetail({
   // isAlbum controls the carousel UI — only active when ≥2 images are actually downloaded.
   // albumExpectedLength is used separately for Space-key blocking (see hotkey handler).
   const isAlbum = albumLength > 1;
-  const isVideo = /\.(mp4|webm)$/i.test(firstMediaPath ?? '');
+  const isVideo = /\.(mp4|webm|mov)$/i.test(firstMediaPath ?? '');
   const isAudio = item.mediaType === 'audio';
   const articleLoading = extractContent.isPending || articleTask?.status === 'processing';
   const articleQueued = articleTask?.status === 'pending';
