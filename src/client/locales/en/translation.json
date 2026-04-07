@@ -271,6 +271,7 @@
     "prefetching_errors": "{{errors}} failed, will use preview text",
     "empty": "No digest yet. Click the button to generate.",
     "copy": "Copy",
+    "refresh": "Refresh",
     "copied": "Copied to clipboard",
     "powered_by": "Powered by Azure OpenAI · gpt-4o-mini",
     "error_generic": "Failed to generate digest"
