@@ -174,16 +174,35 @@ export function NewsDetailMedia({
   const { t } = useTranslation();
   const openLightbox = useUIStore((s) => s.openLightbox);
   const [mediaBroken, setMediaBroken] = useState(false);
+  // Cache-buster: incremented after a successful re-download so the browser
+  // doesn't serve the previously-cached 404 response for the same URL.
+  const [cacheBuster, setCacheBuster] = useState(0);
 
   // Reset broken state when switching items or after successful re-download.
-  // Uses a derived key — when it changes, the `mediaBroken` state is stale
-  // and we reset it lazily on the next render.
   const resetKey = `${item.id}:${firstMediaPath}`;
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
   if (resetKey !== prevResetKey) {
     setPrevResetKey(resetKey);
     setMediaBroken(false);
   }
+
+  // Detect when a download task completes: status transitions from
+  // 'processing'/'pending' to undefined (task cleaned up after done).
+  // At that point reset the broken state and bump cache-buster.
+  const [prevTaskStatus, setPrevTaskStatus] = useState(mediaTaskStatus);
+  if (mediaTaskStatus !== prevTaskStatus) {
+    setPrevTaskStatus(mediaTaskStatus);
+    if (!mediaTaskStatus && prevTaskStatus && mediaBroken) {
+      setMediaBroken(false);
+      setCacheBuster((n) => n + 1);
+    }
+  }
+
+  /** mediaUrl with cache-buster appended after re-downloads */
+  const murl = (path: string) => {
+    const base = mediaUrl(path);
+    return cacheBuster > 0 ? `${base}&_r=${cacheBuster}` : base;
+  };
 
   // When media file is missing on server (404), show re-download button
   if (mediaBroken && firstMediaPath) {
@@ -221,7 +240,7 @@ export function NewsDetailMedia({
             <LeftOutlined />
           </button>
           <img
-            src={mediaUrl(paths[albumIndex])}
+            src={murl(paths[albumIndex])}
             alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
             className={styles.mediaFile}
             onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
@@ -258,7 +277,7 @@ export function NewsDetailMedia({
               <SoundOutlined />
             </div>
             <audio
-              src={mediaUrl(firstMediaPath)}
+              src={murl(firstMediaPath)}
               controls
               className={styles.audioPlayer}
               onError={() => setMediaBroken(true)}
@@ -266,7 +285,7 @@ export function NewsDetailMedia({
           </>
         ) : isVideo ? (
           <video
-            src={mediaUrl(firstMediaPath)}
+            src={murl(firstMediaPath)}
             controls
             muted
             autoPlay
@@ -278,7 +297,7 @@ export function NewsDetailMedia({
           />
         ) : (
           <img
-            src={mediaUrl(firstMediaPath)}
+            src={murl(firstMediaPath)}
             alt="media"
             className={styles.mediaFile}
             onClick={() => openLightbox(item.id, 0, item.channelId)}
