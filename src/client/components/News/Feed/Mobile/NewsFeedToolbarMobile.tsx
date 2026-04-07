@@ -7,14 +7,13 @@ import {
   CheckSquareOutlined,
   SyncOutlined,
   CloseCircleOutlined,
-  HistoryOutlined,
   BulbOutlined,
   LinkOutlined,
   MoreOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsFeedToolbarProps } from './newsFeedToolbarTypes';
+import type { NewsFeedToolbarProps } from '../newsFeedToolbarTypes';
 
 const { Text } = Typography;
 
@@ -88,12 +87,6 @@ export function NewsFeedToolbarMobile({
     { key: 'p5', label: t('news.period.5d'), onClick: () => handleFetchPeriod('5') },
     { key: 'p7', label: t('news.period.7d'), onClick: () => handleFetchPeriod('7') },
     { key: 'p14', label: t('news.period.14d'), onClick: () => handleFetchPeriod('14') },
-    {
-      key: 'sync',
-      icon: <HistoryOutlined />,
-      label: t('news.period.sync_tooltip'),
-      onClick: () => handleFetchPeriod('sync'),
-    },
     { type: 'divider' },
     {
       key: 'toggle_all',

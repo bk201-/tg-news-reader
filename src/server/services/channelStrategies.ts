@@ -55,16 +55,10 @@ class NewsLinkStrategy implements ChannelStrategy {
   }
 }
 
-// ─── Media ────────────────────────────────────────────────────────────────────
-class MediaStrategy implements ChannelStrategy {
-  getItemFlags(): ItemFlags {
-    return { textInPanel: true, canLoadArticle: false };
-  }
-
-  shouldSkipMessage(msg: TelegramMessage): boolean {
-    // Keep photo, document (videos/files), audio. Drop text-only and webpage-only.
-    return !msg.rawMedia || (msg.mediaType !== 'photo' && msg.mediaType !== 'document' && msg.mediaType !== 'audio');
-  }
+// ─── Base class for strategies that auto-download media ───────────────────────
+abstract class MediaDownloadStrategy implements ChannelStrategy {
+  abstract getItemFlags(msg: TelegramMessage): ItemFlags;
+  abstract shouldSkipMessage(msg: TelegramMessage): boolean;
 
   async postProcess({ messages, insertedMap }: PostProcessArgs): Promise<void> {
     const toQueue = messages.filter(
@@ -80,26 +74,25 @@ class MediaStrategy implements ChannelStrategy {
   }
 }
 
+// ─── Media ────────────────────────────────────────────────────────────────────
+class MediaStrategy extends MediaDownloadStrategy {
+  getItemFlags(): ItemFlags {
+    return { textInPanel: true, canLoadArticle: false };
+  }
+
+  shouldSkipMessage(msg: TelegramMessage): boolean {
+    // Keep photo, document (videos/files), audio. Drop text-only and webpage-only.
+    return !msg.rawMedia || (msg.mediaType !== 'photo' && msg.mediaType !== 'document' && msg.mediaType !== 'audio');
+  }
+}
+
 // ─── Blog ─────────────────────────────────────────────────────────────────────
-class BlogStrategy implements ChannelStrategy {
+class BlogStrategy extends MediaDownloadStrategy {
   getItemFlags(): ItemFlags {
     return { textInPanel: false, canLoadArticle: false };
   }
   shouldSkipMessage(): boolean {
     return false;
-  }
-
-  async postProcess({ messages, insertedMap }: PostProcessArgs): Promise<void> {
-    const toQueue = messages.filter(
-      (m) => (m.mediaType === 'photo' || m.mediaType === 'document') && insertedMap.has(m.id),
-    );
-    for (const msg of toQueue) {
-      await enqueueTask(insertedMap.get(msg.id)!, 'media', undefined, 0);
-    }
-  }
-
-  requiresMediaProcessing(messages: TelegramMessage[]): boolean {
-    return messages.some((m) => m.mediaType === 'photo' || m.mediaType === 'document');
   }
 }
 

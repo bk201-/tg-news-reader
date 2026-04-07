@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useUIStore } from '../../store/uiStore';
+import { useUIStore } from '../../../store/uiStore';
 
 /**
  * Syncs the hashTagFilter in uiStore ↔ URL hash (#tag=...).

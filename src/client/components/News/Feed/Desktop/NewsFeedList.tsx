@@ -4,7 +4,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsListItem } from './NewsListItem';
+import { NewsListItem } from '../NewsListItem';
 
 const useStyles = createStyles(({ css, token }) => ({
   list: css`

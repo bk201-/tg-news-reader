@@ -1,4 +1,4 @@
-import type { NewsViewMode } from '../../store/uiStore';
+import type { NewsViewMode } from '../../../store/uiStore';
 
 export interface NewsFeedToolbarProps {
   fetchPending: boolean;

@@ -1,13 +1,12 @@
 import React from 'react';
 import { Button, Space, Typography, Tag, Segmented } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
 import {
   FilterOutlined,
   EyeOutlined,
   CheckSquareOutlined,
   SyncOutlined,
   CloseCircleOutlined,
-  HistoryOutlined,
   LayoutOutlined,
   ProfileOutlined,
   BulbOutlined,
@@ -15,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import type { NewsFeedToolbarProps } from './newsFeedToolbarTypes';
+import type { NewsFeedToolbarProps } from '../newsFeedToolbarTypes';
 
 const { Text } = Typography;
 
@@ -79,14 +78,6 @@ export function NewsFeedToolbarDesktop({
     { value: '5', label: t('news.period.5d') },
     { value: '7', label: t('news.period.7d') },
     { value: '14', label: t('news.period.14d') },
-    {
-      value: 'sync',
-      label: (
-        <Tooltip title={t('news.period.sync_tooltip')}>
-          <HistoryOutlined />
-        </Tooltip>
-      ),
-    },
   ];
 
   return (

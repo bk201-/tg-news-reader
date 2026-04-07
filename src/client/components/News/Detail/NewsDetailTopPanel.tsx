@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import { CloseOutlined, LinkOutlined } from '@ant-design/icons';
 import { createStyles, keyframes } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import { getLinkLabel } from './newsUtils';
+import { getLinkLabel } from '../newsUtils';
 
 const panelIn = keyframes`
   from { opacity: 0; transform: translateY(-6px); }

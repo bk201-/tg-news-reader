@@ -4,9 +4,9 @@ import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined, SoundOu
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { mediaUrl } from '../../api/mediaUrl';
-import { formatBytes } from './newsUtils';
-import { useUIStore } from '../../store/uiStore';
+import { mediaUrl } from '../../../api/mediaUrl';
+import { formatBytes } from '../newsUtils';
+import { useUIStore } from '../../../store/uiStore';
 
 const { Text } = Typography;
 

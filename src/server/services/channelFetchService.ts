@@ -1,0 +1,217 @@
+/**
+ * Channel Fetch Service — encapsulates the entire fetch-news-for-channel workflow.
+ *
+ * Extracted from routes/channels.ts to keep the route handler thin and
+ * make the business logic framework-agnostic (no Hono dependency).
+ */
+
+import { db } from '../db/index.js';
+import { channels, news } from '../db/schema.js';
+import { eq, and, inArray } from 'drizzle-orm';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
+import { getChannelStrategy, type PostProcessArgs } from './channelStrategies.js';
+import { applyFiltersToInserted } from './filterEngine.js';
+import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
+import type { ChannelType } from '../../shared/types.js';
+import { logger } from '../logger.js';
+
+// ─── Public types ─────────────────────────────────────────────────────────────
+
+export interface FetchChannelOpts {
+  since?: string; // ISO date string
+  limit?: number;
+}
+
+export interface FetchChannelResult {
+  inserted: number;
+  total: number;
+  mediaProcessing: boolean;
+}
+
+// ─── Private helpers ──────────────────────────────────────────────────────────
+
+type ChannelRow = typeof channels.$inferSelect;
+
+/**
+ * Compute the "since" date for fetching messages.
+ *
+ * Three branches:
+ * 1. Explicit `since` from the caller (period dropdown) → use as-is
+ * 2. First-ever fetch (no lastFetchedAt) → sync Telegram read position
+ * 3. Subsequent fetch → use lastFetchedAt as boundary
+ */
+async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Date> {
+  if (since) {
+    return new Date(since);
+  }
+
+  if (!channel.lastFetchedAt) {
+    // First-ever fetch — sync read position from Telegram so we only show
+    // messages the user hasn't read yet (avoids loading the entire channel history).
+    const readMaxId = await getReadInboxMaxId(channel.telegramId);
+    if (readMaxId) {
+      const readMsg = await fetchMessageById(channel.telegramId, readMaxId);
+      if (readMsg) {
+        await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channel.id));
+        return new Date(readMsg.date * 1000);
+      }
+    }
+    // Fallback: configured days ago
+    return new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
+  }
+
+  // Subsequent fetches: lastFetchedAt is the DB boundary — everything before it
+  // is already stored. No Telegram readInboxMaxId round-trip needed.
+  return new Date(channel.lastFetchedAt * 1000);
+}
+
+/**
+ * Delete all read news for a channel and remove their media files from disk.
+ */
+async function deleteReadNewsMedia(channelId: number): Promise<void> {
+  const deletedRead = await db
+    .delete(news)
+    .where(and(eq(news.channelId, channelId), eq(news.isRead, 1)))
+    .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
+
+  for (const row of deletedRead) {
+    const paths: string[] = row.localMediaPaths ? row.localMediaPaths : row.localMediaPath ? [row.localMediaPath] : [];
+    for (const p of paths) {
+      const filepath = join(process.cwd(), 'data', p);
+      if (existsSync(filepath)) {
+        try {
+          unlinkSync(filepath);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+/**
+ * Fetch news for a channel: clean up read items, pull from Telegram,
+ * upsert into DB, apply filters, and kick off background post-processing.
+ *
+ * @throws Error with message 'Channel not found' if channelId doesn't exist.
+ * @throws Re-throws any Telegram / DB error for the caller to handle.
+ */
+export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts = {}): Promise<FetchChannelResult> {
+  const [channel] = await db.select().from(channels).where(eq(channels.id, channelId));
+  if (!channel) throw new Error('Channel not found');
+
+  const sinceDate = await computeSinceDate(channel, opts.since);
+
+  // Clean up read news (and their media files) before fetching new ones
+  await deleteReadNewsMedia(channelId);
+
+  const messages = await fetchChannelMessages(channel.telegramId, {
+    sinceDate,
+    limit: opts.limit || NEWS_FETCH_LIMIT,
+  });
+
+  const strategy = getChannelStrategy(channel.channelType as ChannelType);
+
+  // Build rows to insert (filter via strategy, derive flags)
+  const valuesToInsert = messages
+    .filter((msg) => !strategy.shouldSkipMessage(msg))
+    .map((msg) => {
+      const flags = strategy.getItemFlags(msg);
+      return {
+        channelId,
+        telegramMsgId: msg.id,
+        text: msg.message,
+        links: msg.links,
+        hashtags: msg.hashtags,
+        mediaType: msg.mediaType,
+        postedAt: msg.date,
+        mediaSize: msg.mediaSizeBytes,
+        albumMsgIds: msg.albumTelegramIds ?? null,
+        ...(msg.instantViewContent
+          ? { fullContent: msg.instantViewContent, fullContentFormat: 'markdown' as const }
+          : {}),
+        textInPanel: flags.textInPanel ? 1 : 0,
+        canLoadArticle: flags.canLoadArticle ? 1 : 0,
+      };
+    });
+
+  // ── Batch upsert ──────────────────────────────────────────────────────────
+  // Pre-split into new vs existing rows so we never need the `excluded`
+  // pseudo-table (avoids WebStorm SQL injection false positives).
+  const BATCH_SIZE = 50;
+
+  const allMsgIds = valuesToInsert.map((v) => v.telegramMsgId);
+  const existingMsgIds = new Set(
+    allMsgIds.length
+      ? (
+          await db
+            .select({ telegramMsgId: news.telegramMsgId })
+            .from(news)
+            .where(and(eq(news.channelId, channelId), inArray(news.telegramMsgId, allMsgIds)))
+        ).map((r) => r.telegramMsgId)
+      : [],
+  );
+
+  const toInsertValues = valuesToInsert.filter((v) => !existingMsgIds.has(v.telegramMsgId));
+  const toUpdateValues = valuesToInsert.filter((v) => existingMsgIds.has(v.telegramMsgId));
+
+  const insertedMap = new Map<number, number>(); // telegramMsgId → news.id
+  let updatedCount = 0;
+
+  await db.transaction(async (tx) => {
+    // INSERT new rows in chunks
+    for (let i = 0; i < toInsertValues.length; i += BATCH_SIZE) {
+      const chunk = toInsertValues.slice(i, i + BATCH_SIZE);
+      const rows = await tx.insert(news).values(chunk).returning({ id: news.id, telegramMsgId: news.telegramMsgId });
+      for (const row of rows) {
+        insertedMap.set(row.telegramMsgId, row.id);
+      }
+    }
+
+    // UPDATE mutable content fields for existing rows (edited Telegram messages)
+    for (const v of toUpdateValues) {
+      await tx
+        .update(news)
+        .set({ text: v.text, links: v.links, hashtags: v.hashtags })
+        .where(and(eq(news.channelId, channelId), eq(news.telegramMsgId, v.telegramMsgId)));
+      updatedCount++;
+    }
+  });
+
+  const inserted = insertedMap.size;
+  const updated = updatedCount;
+
+  // ── Post-upsert bookkeeping ───────────────────────────────────────────────
+
+  const now = Math.floor(Date.now() / 1000);
+  await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
+
+  // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
+  const insertedItems = messages
+    .filter((msg) => insertedMap.has(msg.id))
+    .map((msg) => ({ newsId: insertedMap.get(msg.id)!, text: msg.message, hashtags: msg.hashtags }));
+  await applyFiltersToInserted(channelId, insertedItems);
+
+  const mediaProcessing = strategy.requiresMediaProcessing(messages);
+
+  const args: PostProcessArgs = {
+    channelId,
+    channelTelegramId: channel.telegramId,
+    messages,
+    insertedMap,
+  };
+
+  // Fire post-processing in background — just queues tasks, returns immediately
+  void strategy.postProcess(args);
+
+  logger.info(
+    { module: 'channels', channelId, inserted, updated, total: messages.length, mediaProcessing },
+    `fetch done: ${inserted} inserted, ${updated} updated / ${messages.length} total`,
+  );
+
+  return { inserted, total: messages.length, mediaProcessing };
+}

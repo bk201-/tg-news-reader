@@ -5,7 +5,7 @@ import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { mediaUrl } from '../../api/mediaUrl';
+import { mediaUrl } from '../../../api/mediaUrl';
 
 interface LightboxToolbarProps {
   item: NewsItem | null | undefined;

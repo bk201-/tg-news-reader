@@ -135,7 +135,7 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
 
   if (row.albumMsgIds) {
     // ── Album: download each member via IPC ───────────────────────────────────
-    const albumIds = JSON.parse(row.albumMsgIds) as number[];
+    const albumIds = row.albumMsgIds;
     const paths: string[] = [];
 
     for (const msgId of albumIds) {
@@ -150,10 +150,7 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
       return;
     }
 
-    await db
-      .update(news)
-      .set({ localMediaPath: paths[0], localMediaPaths: JSON.stringify(paths) })
-      .where(eq(news.id, newsId));
+    await db.update(news).set({ localMediaPath: paths[0], localMediaPaths: paths }).where(eq(news.id, newsId));
   } else {
     // ── Single media ──────────────────────────────────────────────────────────
     const { path, reason } = await ipcDownloadMedia(row.channelTelegramId, row.telegramMsgId, ignoreLimit);

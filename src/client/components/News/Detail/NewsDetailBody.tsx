@@ -4,7 +4,7 @@ import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { isYouTubeUrl } from './newsUtils';
+import { isYouTubeUrl } from '../newsUtils';
 import { NewsDetailMedia } from './NewsDetailMedia';
 import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
 import { NewsTextBlock } from './NewsTextBlock';
