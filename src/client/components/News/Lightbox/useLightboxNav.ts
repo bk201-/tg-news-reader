@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { NewsItem } from '@shared/types.ts';
 import type { NewsResponse } from '../../../api/news';
 
 /** Media types that appear in the lightbox (photo + document covers images and videos) */
 const LIGHTBOX_MEDIA_TYPES = new Set(['photo', 'document']);
+
+/** How many entries before the end of the list to trigger fetchNextPage */
+const PREFETCH_THRESHOLD = 5;
 
 export interface LightboxEntry {
   newsId: number;
@@ -27,7 +30,9 @@ export interface UseLightboxNavResult {
   albumExpectedLength: number;
   /** First media path of the current entry */
   firstMediaPath: string | undefined;
+  /** Navigate forward/backward through the unified flat list (albums included) */
   go: (delta: -1 | 1) => void;
+  /** Navigate within album only (Left/Right arrows) */
   goToAlbumImage: (delta: -1 | 1) => void;
   totalCount: number;
   /** 1-based position string for display: "3 / 12" */
@@ -39,6 +44,8 @@ export function useLightboxNav(
   newsId: number,
   albumIndex: number,
   onNavigate: (newsId: number, albumIndex: number) => void,
+  fetchNextPage?: () => void,
+  hasNextPage?: boolean,
 ): UseLightboxNavResult {
   const qc = useQueryClient();
 
@@ -73,11 +80,43 @@ export function useLightboxNav(
     return itemPos;
   }, [cursor, totalCount, isAlbum, albumIndex, albumExpectedLength]);
 
+  // ── Auto-fetch next page when near the end of loaded entries ──────────
+  useEffect(() => {
+    if (cursor >= 0 && totalCount - cursor <= PREFETCH_THRESHOLD && hasNextPage) {
+      fetchNextPage?.();
+    }
+  }, [cursor, totalCount, hasNextPage, fetchNextPage]);
+
+  // ── Unified navigation: albums are part of the flat list ──────────────
+  // Forward (delta=1): advance album image first, then next item.
+  // Backward (delta=-1): go to previous album image first; when entering a
+  // new item that is an album, land on its LAST image.
   const go = (delta: -1 | 1) => {
     if (entries.length === 0) return;
-    // Circular navigation
+
+    // Try to advance within the current album first
+    if (isAlbum) {
+      const nextAlbumIdx = albumIndex + delta;
+      if (nextAlbumIdx >= 0 && nextAlbumIdx < albumLength) {
+        onNavigate(newsId, nextAlbumIdx);
+        return;
+      }
+    }
+
+    // Move to next/previous news item (circular)
     const next = (cursor + delta + entries.length) % entries.length;
-    onNavigate(entries[next].newsId, 0);
+    const nextEntry = entries[next];
+
+    // When going backward into an album, land on its last image
+    if (delta === -1) {
+      const nextAlbumLen = nextEntry.item.localMediaPaths?.length ?? 0;
+      if (nextAlbumLen > 1) {
+        onNavigate(nextEntry.newsId, nextAlbumLen - 1);
+        return;
+      }
+    }
+
+    onNavigate(nextEntry.newsId, 0);
   };
 
   const goToAlbumImage = (delta: -1 | 1) => {

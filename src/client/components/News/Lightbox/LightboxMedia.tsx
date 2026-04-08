@@ -24,6 +24,7 @@ const useStyles = createStyles(({ css, token }) => ({
     justify-content: center;
     flex: 1;
     min-height: 0;
+    height: 100%;
     user-select: none;
     position: relative;
     z-index: 1;
