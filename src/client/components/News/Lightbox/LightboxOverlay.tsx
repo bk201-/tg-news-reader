@@ -6,8 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '../../../store/uiStore';
 import { useChannels, channelKeys } from '../../../api/channels';
-import { useMarkRead } from '../../../api/news';
-import { useDownloadMedia } from '../../../api/news';
+import { useMarkRead, useDownloadMedia, useNews } from '../../../api/news';
 import { useLightboxNav } from './useLightboxNav';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
@@ -86,12 +85,19 @@ export function LightboxOverlay() {
   const { t } = useTranslation();
   const qc = useQueryClient();
 
-  const { lightbox, closeLightbox, openLightbox, setLightboxAlbumIndex } = useUIStore();
+  const { lightbox, closeLightbox, openLightbox, showAll } = useUIStore();
   const { data: channels = [] } = useChannels();
   const markRead = useMarkRead();
   const downloadMedia = useDownloadMedia();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  const channelId = lightbox?.channelId ?? 0;
+  const newsId = lightbox?.newsId ?? 0;
+  const albumIndex = lightbox?.albumIndex ?? 0;
+
+  // Reuse the active infinite query so we can fetch more pages from the lightbox
+  const { fetchNextPage, hasNextPage } = useNews(channelId, !showAll);
 
   // ── Album index memory (Issue 10) ────────────────────────────────────
   // Remembers the last-viewed album image index per newsId so that navigating
@@ -119,10 +125,6 @@ export function LightboxOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!lightbox]);
 
-  const channelId = lightbox?.channelId ?? 0;
-  const newsId = lightbox?.newsId ?? 0;
-  const albumIndex = lightbox?.albumIndex ?? 0;
-
   const channel = channels.find((c) => c.id === channelId);
 
   // Track albumIndex per newsId
@@ -144,7 +146,7 @@ export function LightboxOverlay() {
     [openLightbox, channelId, channels, markRead],
   );
 
-  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate);
+  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, () => void fetchNextPage(), hasNextPage);
 
   // ── Prefetch adjacent images (Issue 8) ───────────────────────────────
   useEffect(() => {
@@ -236,6 +238,7 @@ export function LightboxOverlay() {
     let accumulated = 0;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
     let navigated = false;
+    // ── Wheel handler — uses unified go() which steps through album images ──
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       accumulated += e.deltaY;
@@ -292,7 +295,7 @@ export function LightboxOverlay() {
 
   if (!lightbox || !channel) return null;
 
-  const { currentEntry, isVideo, isAlbum, albumLength, firstMediaPath } = nav;
+  const { currentEntry, isVideo, isAlbum, firstMediaPath } = nav;
   const item = currentEntry?.item;
   const albumPaths = item?.localMediaPaths;
   const currentMediaPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? firstMediaPath) : firstMediaPath;
@@ -334,8 +337,7 @@ export function LightboxOverlay() {
           className={cx(styles.navBtn, styles.navPrev)}
           onClick={(e) => {
             e.stopPropagation();
-            if (nav.isAlbum && albumIndex > 0) setLightboxAlbumIndex(albumIndex - 1);
-            else nav.go(-1);
+            nav.go(-1);
           }}
           title={t('lightbox.prev')}
         >
@@ -357,8 +359,7 @@ export function LightboxOverlay() {
           className={cx(styles.navBtn, styles.navNext)}
           onClick={(e) => {
             e.stopPropagation();
-            if (nav.isAlbum && albumIndex < albumLength - 1) setLightboxAlbumIndex(albumIndex + 1);
-            else nav.go(1);
+            nav.go(1);
           }}
           title={t('lightbox.next')}
         >

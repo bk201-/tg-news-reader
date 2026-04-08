@@ -36,5 +36,6 @@ VOLUME /app/data
 EXPOSE 3173
 
 # node dist/server/index.js also serves dist/client/ as static files
-CMD ["node", "dist/server/index.js"]
+# --disable-warning=DEP0040: suppress punycode deprecation noise from gramjs/qrcode
+CMD ["node", "--disable-warning=DEP0040", "dist/server/index.js"]
 
