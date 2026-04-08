@@ -32,9 +32,18 @@ window.addEventListener('unhandledrejection', (e) => {
 
 // ─── QueryClient with global error reporting ──────────────────────────────────
 
+/** If the error message mentions AUTH_KEY, immediately refetch health so
+ *  TelegramSessionBanner appears without waiting for the next 5-min poll. */
+function triggerHealthRefetchOnAuthKey(err: Error): void {
+  if (err.message.includes('AUTH_KEY')) {
+    void queryClient.invalidateQueries({ queryKey: ['health'] });
+  }
+}
+
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (err, query) => {
+      triggerHealthRefetchOnAuthKey(err);
       // Only report queries that have no dedicated onError — avoid double-logging
       if (query.observers.some((o) => o.hasListeners())) return;
       logger.warn({ module: 'query', queryKey: query.queryKey, err }, `Query error: ${err.message}`);
@@ -42,6 +51,7 @@ const queryClient = new QueryClient({
   }),
   mutationCache: new MutationCache({
     onError: (err) => {
+      triggerHealthRefetchOnAuthKey(err);
       logger.warn({ module: 'query', err }, `Mutation error: ${err.message}`);
     },
   }),

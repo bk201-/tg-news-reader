@@ -1,6 +1,6 @@
 {
   "name": "tg-news-reader",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --tsconfig tsconfig.server.json src/server/db/migrate.ts",
     "tg:auth": "tsx --tsconfig tsconfig.server.json scripts/tg-auth.ts",
+    "tg:auth:deploy": "tsx --tsconfig tsconfig.server.json scripts/tg-auth-deploy.ts",
     "auth:create-user": "tsx --tsconfig tsconfig.server.json scripts/create-user.ts",
     "lint": "eslint src scripts",
     "lint:fix": "eslint src scripts --fix",
