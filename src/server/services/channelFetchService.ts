@@ -212,11 +212,14 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
   const now = Math.floor(Date.now() / 1000);
   await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
 
-  // Increment denormalized unread_count by the number of newly inserted items
+  // Increment denormalized unread_count and total_news_count by the number of newly inserted items
   if (inserted > 0) {
     await db
       .update(channels)
-      .set({ unreadCount: sql`${channels.unreadCount} + ${inserted}` })
+      .set({
+        unreadCount: sql`${channels.unreadCount} + ${inserted}`,
+        totalNewsCount: sql`${channels.totalNewsCount} + ${inserted}`,
+      })
       .where(eq(channels.id, channelId));
   }
 
