@@ -55,6 +55,7 @@ router.get('/', async (c) => {
       isUnavailable: r.isUnavailable,
       createdAt: r.createdAt,
       unreadCount: r.unreadCount,
+      totalNewsCount: r.totalNewsCount,
       supportsDigest: r.channelType !== 'media',
     })),
   );

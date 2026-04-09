@@ -97,6 +97,7 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE news ADD COLUMN can_load_article INTEGER NOT NULL DEFAULT 0',
     "ALTER TABLE news ADD COLUMN full_content_format TEXT NOT NULL DEFAULT 'text'",
     'ALTER TABLE channels ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE channels ADD COLUMN total_news_count INTEGER NOT NULL DEFAULT 0',
   ];
   for (const sql of alterMigrations) {
     try {
@@ -152,6 +153,13 @@ export async function runMigration(): Promise<void> {
   await client.execute(`
     UPDATE channels SET unread_count = (
       SELECT count(*) FROM news WHERE news.channel_id = channels.id AND news.is_read = 0
+    )
+  `);
+
+  // Backfill total_news_count from actual news counts
+  await client.execute(`
+    UPDATE channels SET total_news_count = (
+      SELECT count(*) FROM news WHERE news.channel_id = channels.id
     )
   `);
 

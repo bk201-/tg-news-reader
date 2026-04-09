@@ -43,6 +43,7 @@ export interface Channel {
   lastReadAt?: number;
   isUnavailable: number;
   unreadCount: number;
+  totalNewsCount: number;
   createdAt: number;
   /** Computed server-side: false for media channels where digest is not meaningful */
   supportsDigest: boolean;

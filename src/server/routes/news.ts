@@ -89,8 +89,25 @@ router.delete('/read', async (c) => {
   const deleted = await db
     .delete(news)
     .where(and(...conditions))
-    .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
+    .returning({
+      channelId: news.channelId,
+      localMediaPath: news.localMediaPath,
+      localMediaPaths: news.localMediaPaths,
+    });
   deleted.forEach((r) => deleteAllMediaFiles(r.localMediaPath, r.localMediaPaths));
+
+  // Decrement totalNewsCount per channel
+  const countsByChannel = new Map<number, number>();
+  for (const r of deleted) {
+    countsByChannel.set(r.channelId, (countsByChannel.get(r.channelId) ?? 0) + 1);
+  }
+  for (const [chId, count] of countsByChannel) {
+    await db
+      .update(channels)
+      .set({ totalNewsCount: sql`max(0, ${channels.totalNewsCount} - ${count})` })
+      .where(eq(channels.id, chId));
+  }
+
   return c.json({ deleted: deleted.length });
 });
 
@@ -143,9 +160,9 @@ router.get('/', async (c) => {
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-  // Count how many rows were excluded by user-defined filters (is_filtered=1)
+  // Count queries only on the first page (no cursor) — subsequent pages reuse page[0] values on the client
   let filteredOut = 0;
-  if (filtersApplied && channelId !== undefined) {
+  if (!cursor && filtersApplied && channelId !== undefined) {
     const filteredConditions = [...baseConditions, eq(news.isFiltered, 1)];
     const [result] = await db
       .select({ count: sql<number>`count(*)` })

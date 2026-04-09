@@ -39,9 +39,9 @@ export function useNewsFeedData(channel: Channel) {
     return base.filter((item) => (item.hashtags || []).some((h) => h.toLowerCase().replace(/^#/, '') === normalized));
   }, [newsItems, filteredIds, showAll, hashTagFilter]);
 
-  const unreadCount = displayItems.filter((n) => n.isRead === 0).length;
+  const unreadCount = channel.unreadCount;
   const hiddenByFilters = showAll ? newsItems.length - filteredIds.size : serverFilteredOut;
-  const totalCount = newsItems.length + (showAll ? 0 : serverFilteredOut);
+  const totalCount = channel.totalNewsCount;
 
   const [digestOpen, setDigestOpen] = useState(false);
   const [mediaProgressKey, setMediaProgressKey] = useState(0);

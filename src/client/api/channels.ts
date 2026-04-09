@@ -48,7 +48,12 @@ export function useFetchChannel() {
         old
           ? old.map((ch) =>
               ch.id === variables.id
-                ? { ...ch, lastFetchedAt: now, unreadCount: ch.unreadCount + (data.inserted ?? 0) }
+                ? {
+                    ...ch,
+                    lastFetchedAt: now,
+                    unreadCount: ch.unreadCount + (data.inserted ?? 0),
+                    totalNewsCount: ch.totalNewsCount + (data.inserted ?? 0),
+                  }
                 : ch,
             )
           : old,
@@ -81,7 +86,16 @@ export function useMarkReadAndFetch() {
       const now = Math.floor(Date.now() / 1000);
       qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
         old
-          ? old.map((ch) => (ch.id === channelId ? { ...ch, lastFetchedAt: now, unreadCount: data.inserted ?? 0 } : ch))
+          ? old.map((ch) =>
+              ch.id === channelId
+                ? {
+                    ...ch,
+                    lastFetchedAt: now,
+                    unreadCount: data.inserted ?? 0,
+                    totalNewsCount: ch.totalNewsCount + (data.inserted ?? 0),
+                  }
+                : ch,
+            )
           : old,
       );
       void qc.invalidateQueries({ queryKey: ['news', channelId] });
