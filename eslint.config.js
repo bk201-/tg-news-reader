@@ -11,7 +11,7 @@ const sharedRules = {
 };
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'data'] },
+  { ignores: ['dist', 'node_modules', 'data', '**/*.test.ts', '**/*.test.tsx', 'src/client/test-setup.ts'] },
 
   // Base JS rules
   js.configs.recommended,
