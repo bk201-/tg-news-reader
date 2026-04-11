@@ -42,6 +42,9 @@ jobs:
       - name: Prettier
         run: npm run format:check
 
+      - name: Unit tests
+        run: npx vitest run
+
   # ── 2. Auto-merge owner PRs ───────────────────────────────────────────────
   # Runs only after `checks` passes, and only for PRs opened by dshilov.
   # Uses squash-merge for a clean linear history on main.
