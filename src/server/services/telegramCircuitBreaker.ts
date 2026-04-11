@@ -19,7 +19,7 @@ export function setReconnectCallback(fn: ReconnectFn): void {
 
 type CircuitState = 'closed' | 'open' | 'half-open';
 
-class TelegramCircuitBreaker {
+export class TelegramCircuitBreaker {
   private _state: CircuitState = 'closed';
   private consecutiveFailures = 0;
   private openedAt = 0;

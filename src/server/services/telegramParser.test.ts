@@ -1,0 +1,382 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Create mock Api classes
+class MockMessageEntityUrl {
+  offset: number;
+  length: number;
+  constructor(o: { offset: number; length: number }) {
+    this.offset = o.offset;
+    this.length = o.length;
+  }
+}
+class MockMessageEntityTextUrl {
+  offset: number;
+  length: number;
+  url: string;
+  constructor(o: { offset: number; length: number; url: string }) {
+    this.offset = o.offset;
+    this.length = o.length;
+    this.url = o.url;
+  }
+}
+class MockMessageEntityHashtag {
+  offset: number;
+  length: number;
+  constructor(o: { offset: number; length: number }) {
+    this.offset = o.offset;
+    this.length = o.length;
+  }
+}
+class MockMessageMediaPhoto {}
+class MockMessageMediaDocument {}
+class MockMessageMediaWebPage {}
+class MockPhoto {
+  sizes: unknown[];
+  constructor(
+    public id: number,
+    sizes: unknown[],
+  ) {
+    this.sizes = sizes;
+  }
+}
+class MockPhotoSize {
+  size: number;
+  constructor(size: number) {
+    this.size = size;
+  }
+}
+class MockDocument {
+  size: bigint;
+  mimeType: string;
+  constructor(o: { size: bigint; mimeType: string }) {
+    this.size = o.size;
+    this.mimeType = o.mimeType;
+  }
+}
+class MockWebPage {
+  cachedPage: unknown;
+  constructor(cachedPage?: unknown) {
+    this.cachedPage = cachedPage;
+  }
+}
+class MockPage {
+  blocks: unknown[];
+  constructor(blocks: unknown[]) {
+    this.blocks = blocks;
+  }
+}
+class MockTextPlain {
+  text: string;
+  constructor(text: string) {
+    this.text = text;
+  }
+}
+class MockTextEmpty {}
+class MockTextConcat {
+  texts: unknown[];
+  constructor(texts: unknown[]) {
+    this.texts = texts;
+  }
+}
+class MockTextImage {}
+class MockPageBlockParagraph {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockTitle {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockHeader {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockSubheader {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockSubtitle {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockKicker {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockFooter {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockPreformatted {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockDivider {}
+class MockPageBlockBlockquote {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockPullquote {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageBlockList {
+  items: unknown[];
+  constructor(items: unknown[]) {
+    this.items = items;
+  }
+}
+class MockPageListItemText {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageListItemBlocks {
+  blocks: unknown[];
+  constructor(blocks: unknown[]) {
+    this.blocks = blocks;
+  }
+}
+class MockPageBlockOrderedList {
+  items: unknown[];
+  constructor(items: unknown[]) {
+    this.items = items;
+  }
+}
+class MockPageListOrderedItemText {
+  text: unknown;
+  constructor(text: unknown) {
+    this.text = text;
+  }
+}
+class MockPageListOrderedItemBlocks {
+  blocks: unknown[];
+  constructor(blocks: unknown[]) {
+    this.blocks = blocks;
+  }
+}
+class MockPageBlockDetails {
+  title: unknown;
+  blocks: unknown[];
+  constructor(title: unknown, blocks: unknown[]) {
+    this.title = title;
+    this.blocks = blocks;
+  }
+}
+
+const mockApi = {
+  MessageEntityUrl: MockMessageEntityUrl,
+  MessageEntityTextUrl: MockMessageEntityTextUrl,
+  MessageEntityHashtag: MockMessageEntityHashtag,
+  MessageMediaPhoto: MockMessageMediaPhoto,
+  MessageMediaDocument: MockMessageMediaDocument,
+  MessageMediaWebPage: MockMessageMediaWebPage,
+  Photo: MockPhoto,
+  PhotoSize: MockPhotoSize,
+  Document: MockDocument,
+  WebPage: MockWebPage,
+  Page: MockPage,
+  TextPlain: MockTextPlain,
+  TextEmpty: MockTextEmpty,
+  TextConcat: MockTextConcat,
+  TextImage: MockTextImage,
+  PageBlockParagraph: MockPageBlockParagraph,
+  PageBlockTitle: MockPageBlockTitle,
+  PageBlockHeader: MockPageBlockHeader,
+  PageBlockSubheader: MockPageBlockSubheader,
+  PageBlockSubtitle: MockPageBlockSubtitle,
+  PageBlockKicker: MockPageBlockKicker,
+  PageBlockFooter: MockPageBlockFooter,
+  PageBlockPreformatted: MockPageBlockPreformatted,
+  PageBlockDivider: MockPageBlockDivider,
+  PageBlockBlockquote: MockPageBlockBlockquote,
+  PageBlockPullquote: MockPageBlockPullquote,
+  PageBlockList: MockPageBlockList,
+  PageListItemText: MockPageListItemText,
+  PageListItemBlocks: MockPageListItemBlocks,
+  PageBlockOrderedList: MockPageBlockOrderedList,
+  PageListOrderedItemText: MockPageListOrderedItemText,
+  PageListOrderedItemBlocks: MockPageListOrderedItemBlocks,
+  PageBlockDetails: MockPageBlockDetails,
+};
+
+vi.mock('./telegramClient.js', () => ({
+  getApi: () => mockApi,
+}));
+
+import { extractLinks, extractHashtags, parseMessageFields } from './telegramParser.js';
+
+describe('extractLinks', () => {
+  it('extracts URL entities', () => {
+    const text = 'Check https://example.com and more';
+    const entities = [new MockMessageEntityUrl({ offset: 6, length: 19 })];
+    const links = extractLinks(text, entities as any);
+    expect(links).toContain('https://example.com');
+  });
+
+  it('extracts TextUrl entities (hyperlinks)', () => {
+    const text = 'Click here for details';
+    const entities = [new MockMessageEntityTextUrl({ offset: 6, length: 4, url: 'https://hidden.com' })];
+    const links = extractLinks(text, entities as any);
+    expect(links).toContain('https://hidden.com');
+  });
+
+  it('extracts URLs from plain text via regex', () => {
+    const text = 'Visit https://regex.com/path?q=1 today';
+    const links = extractLinks(text);
+    expect(links).toContain('https://regex.com/path?q=1');
+  });
+
+  it('deduplicates entity URLs and regex URLs', () => {
+    const text = 'Go to https://dup.com now';
+    const entities = [new MockMessageEntityUrl({ offset: 6, length: 15 })];
+    const links = extractLinks(text, entities as any);
+    // https://dup.com appears both in entity and regex, should appear once
+    expect(links.filter((l) => l === 'https://dup.com')).toHaveLength(1);
+  });
+
+  it('returns empty array for text without URLs', () => {
+    expect(extractLinks('no links here')).toEqual([]);
+  });
+});
+
+describe('extractHashtags', () => {
+  it('extracts hashtag entities', () => {
+    const text = 'news #Tech update';
+    const entities = [new MockMessageEntityHashtag({ offset: 5, length: 5 })];
+    const tags = extractHashtags(text, entities as any);
+    expect(tags).toContain('#tech'); // lowercased
+  });
+
+  it('extracts hashtags from plain text via regex', () => {
+    const text = 'Hello #World #test';
+    const tags = extractHashtags(text);
+    expect(tags).toContain('#world');
+    expect(tags).toContain('#test');
+  });
+
+  it('deduplicates entity and regex hashtags', () => {
+    const text = 'Tag #Dupe here';
+    const entities = [new MockMessageEntityHashtag({ offset: 4, length: 5 })];
+    const tags = extractHashtags(text, entities as any);
+    expect(tags.filter((t) => t === '#dupe')).toHaveLength(1);
+  });
+
+  it('handles Cyrillic hashtags', () => {
+    const text = '#новости about things';
+    const tags = extractHashtags(text);
+    expect(tags).toContain('#новости');
+  });
+
+  it('returns empty array for text without hashtags', () => {
+    expect(extractHashtags('no tags')).toEqual([]);
+  });
+});
+
+describe('parseMessageFields', () => {
+  function makeMsg(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 1,
+      message: 'hello',
+      date: 1700000000,
+      entities: undefined,
+      media: undefined,
+      groupedId: undefined,
+      ...overrides,
+    } as any;
+  }
+
+  it('returns null when message has no text and no media', () => {
+    const result = parseMessageFields(makeMsg({ message: '', media: undefined }), 'test_channel');
+    expect(result).toBeNull();
+  });
+
+  it('parses basic text message', () => {
+    const result = parseMessageFields(makeMsg({ message: 'hello world' }), 'ch');
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(result!.message).toBe('hello world');
+    expect(result!.date).toBe(1700000000);
+    expect(result!.mediaType).toBeUndefined();
+  });
+
+  it('parses photo media', () => {
+    const photo = new MockPhoto(1, [new MockPhotoSize(5000), new MockPhotoSize(100)]);
+    const media = Object.assign(new MockMessageMediaPhoto(), { photo });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('photo');
+    expect(result!.mediaSizeBytes).toBe(5000); // largest
+  });
+
+  it('parses document media with audio mime', () => {
+    const doc = new MockDocument({ size: BigInt(1024), mimeType: 'audio/mpeg' });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('audio');
+    expect(result!.mediaSizeBytes).toBe(1024);
+  });
+
+  it('parses document media with non-audio mime as document', () => {
+    const doc = new MockDocument({ size: BigInt(2048), mimeType: 'video/mp4' });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('document');
+  });
+
+  it('parses webpage media', () => {
+    const wp = new MockWebPage(undefined);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('webpage');
+    expect(result!.instantViewContent).toBeUndefined();
+  });
+
+  it('extracts Instant View content from webpage', () => {
+    const paragraph = new MockPageBlockParagraph(new MockTextPlain('Article body'));
+    const page = new MockPage([paragraph]);
+    const wp = new MockWebPage(page);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewContent).toBe('Article body');
+  });
+
+  it('returns null for unsupported media types', () => {
+    // Any media that's not Photo/Document/WebPage
+    const media = { someField: true };
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result).toBeNull();
+  });
+
+  it('includes groupedId as string when present', () => {
+    const result = parseMessageFields(makeMsg({ groupedId: BigInt(12345) }), 'ch');
+    expect(result!.groupedId).toBe('12345');
+  });
+
+  it('sets rawMedia from message', () => {
+    const photo = new MockPhoto(1, []);
+    const media = Object.assign(new MockMessageMediaPhoto(), { photo });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.rawMedia).toBe(media);
+  });
+});

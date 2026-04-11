@@ -116,7 +116,7 @@ async function main() {
   });
 
   await client.start({
-    phoneNumber: () => phone,
+    phoneNumber: () => Promise.resolve(phone),
     password: async () => {
       if (password) return password;
       return await question('🔐 Enter your 2FA password: ');

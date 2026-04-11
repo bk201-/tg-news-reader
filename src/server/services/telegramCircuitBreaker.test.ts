@@ -1,0 +1,124 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock dependencies before importing the module
+vi.mock('../logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock('./alertBot.js', () => ({
+  sendAlert: vi.fn(),
+}));
+vi.mock('../utils/retry.js', () => ({
+  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  isTransientTelegramError: (err: unknown) => err instanceof Error && err.message.includes('transient'),
+  TELEGRAM_POLICY: {},
+}));
+
+import { TelegramCircuitBreaker } from './telegramCircuitBreaker.js';
+
+describe('TelegramCircuitBreaker', () => {
+  let cb: TelegramCircuitBreaker;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    cb = new TelegramCircuitBreaker(3, 1_000); // open after 3 failures, half-open after 1s
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('starts in closed state', () => {
+    expect(cb.getState()).toBe('closed');
+  });
+
+  it('stays closed on successful executions', async () => {
+    await cb.execute(() => Promise.resolve('ok'), 'test');
+    expect(cb.getState()).toBe('closed');
+  });
+
+  it('opens after threshold transient failures', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    const mockRetry = vi.mocked(withRetry);
+
+    // Make withRetry throw transient errors
+    const transientErr = new Error('transient failure');
+    mockRetry.mockRejectedValue(transientErr);
+
+    for (let i = 0; i < 3; i++) {
+      await cb.execute(() => Promise.reject(transientErr), 'test').catch(() => {});
+    }
+
+    expect(cb.getState()).toBe('open');
+  });
+
+  it('rejects immediately when open', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    const mockRetry = vi.mocked(withRetry);
+    const transientErr = new Error('transient failure');
+    mockRetry.mockRejectedValue(transientErr);
+
+    // Open the circuit
+    for (let i = 0; i < 3; i++) {
+      await cb.execute(() => Promise.reject(transientErr), 'test').catch(() => {});
+    }
+
+    // Now it should reject immediately without calling fn
+    const fn = vi.fn();
+    await expect(cb.execute(fn, 'test')).rejects.toThrow('circuit breaker OPEN');
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('transitions to half-open after timeout', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    const mockRetry = vi.mocked(withRetry);
+    const transientErr = new Error('transient failure');
+    mockRetry.mockRejectedValue(transientErr);
+
+    // Open the circuit
+    for (let i = 0; i < 3; i++) {
+      await cb.execute(() => Promise.reject(transientErr), 'test').catch(() => {});
+    }
+    expect(cb.getState()).toBe('open');
+
+    // Advance time past half-open threshold
+    vi.advanceTimersByTime(1_100);
+    expect(cb.getState()).toBe('half-open');
+  });
+
+  it('closes again on success after half-open', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    const mockRetry = vi.mocked(withRetry);
+    const transientErr = new Error('transient failure');
+    mockRetry.mockRejectedValue(transientErr);
+
+    // Open
+    for (let i = 0; i < 3; i++) {
+      await cb.execute(() => Promise.reject(transientErr), 'test').catch(() => {});
+    }
+
+    // Advance to half-open
+    vi.advanceTimersByTime(1_100);
+
+    // Success in half-open → closed
+    mockRetry.mockImplementation(async (fn) => fn());
+    await cb.execute(() => Promise.resolve('ok'), 'test');
+    expect(cb.getState()).toBe('closed');
+  });
+
+  it('does not open on permanent (non-transient) errors', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    const mockRetry = vi.mocked(withRetry);
+    const permErr = new Error('permanent failure');
+    mockRetry.mockRejectedValue(permErr);
+
+    for (let i = 0; i < 5; i++) {
+      await cb.execute(() => Promise.reject(permErr), 'test').catch(() => {});
+    }
+
+    expect(cb.getState()).toBe('closed');
+  });
+
+  it('reports sessionExpired=false initially', () => {
+    expect(cb.isSessionExpired()).toBe(false);
+  });
+});
