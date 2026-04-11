@@ -9,6 +9,8 @@ const DOUBLE_TAP_MS = 350;
 const useStyles = createStyles(({ css, token }) => ({
   item: css`
     border-bottom: 1px solid ${token.colorBorderSecondary};
+    /* Disable browser double-tap-to-zoom so our custom double-tap handler works */
+    touch-action: manipulation;
     /* Remove the inner item's own bottom border — accordion wrapper provides it */
     & > div:first-child {
       border-bottom: none;

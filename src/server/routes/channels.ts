@@ -84,8 +84,8 @@ router.post('/', zValidator('json', createChannelSchema), async (c) => {
       .returning();
     return c.json(created, 201);
   } catch (err: unknown) {
-    const error = err as { message?: string };
-    if (error.message?.includes('UNIQUE')) {
+    const error = err as { message?: string; cause?: { message?: string } };
+    if (error.message?.includes('UNIQUE') || error.cause?.message?.includes('UNIQUE')) {
       return c.json({ error: 'Channel with this Telegram ID already exists' }, 409);
     }
     throw err;
