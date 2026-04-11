@@ -10,14 +10,14 @@
 
 | # | Task | Description | Complexity |
 |---|------|-------------|------------|
-| 1 | Unit tests: server services | `channelFetchService`, `filterEngine`, `downloadManager`, `channelStrategies`, `toNewsItem` mapper, `readability` — pure logic, testable with in-memory SQLite (`:memory:` libsql). Stack: **Vitest**. | ⭐⭐ |
-| 2 | Unit tests: client hooks & stores | `uiStore`, `authStore` (Zustand), `useNewsFeedState`, `useNewsHotkeys`, `filterUtils`, `applyFilters` — no DOM needed. Stack: **Vitest** + `@testing-library/react` for hooks. | ⭐⭐ |
-| 3 | Unit tests: shared utilities | `retry.ts` policies, `telegramCircuitBreaker` state machine, `alertBot` dedup logic, `mediaUrl` builder — small pure functions. Stack: **Vitest**. | ⭐ |
+| ~~1~~ | ~~Unit tests: server services~~ | ✅ Done in PR #85 — `filterEngine`, `channelStrategies`, `readability`, `toNewsItem` mapper, `alertBot`, `logBuffer`, `mediaProgress`, `downloadProgress`, `errorHtml`, `openaiClient`, `telegramParser`, `telegramCircuitBreaker`, `customTypes`. Stack: **Vitest**. | ~~⭐⭐~~ |
+| ~~2~~ | ~~Unit tests: client hooks & stores~~ | ✅ Done in PR #85 — `uiStore`, `authStore`, `filterUtils`, `newsUtils`, `digestUtils`, `reconnectingEventSource`, `client`, `digest`, `mediaUrl`, `news` API hooks. Stack: **Vitest** + `@testing-library/react`. | ~~⭐⭐~~ |
+| ~~3~~ | ~~Unit tests: shared utilities~~ | ✅ Done in PR #85 — `retry.ts` policies, `schemas.ts` Zod validation. Stack: **Vitest**. | ~~⭐~~ |
 | 4 | Integration tests: API routes | Happy-path + error cases for `/api/news`, `/api/channels/:id/fetch`, `/api/auth/login`, `/api/downloads`. Spin up Hono app with in-memory SQLite, mock Telegram calls. Stack: **Vitest** + `app.request()`. | ⭐⭐⭐ |
 | 5 | Integration tests: download workers | Worker thread lifecycle: task dispatch → IPC bridge → DB update. Mock `parentPort` + Telegram bridge. Stack: **Vitest** with worker-threads mocks. | ⭐⭐⭐ |
 | 6 | Component tests: key UI flows | `ChannelSidebar` CRUD flow, `NewsDetail` mark-read + hotkeys, `LoginPage` + TOTP, `GroupPinModal` unlock. Stack: **Vitest** + `@testing-library/react` + MSW for API mocking. | ⭐⭐⭐ |
 | 7 | E2E smoke test | Login → select channel → fetch → read news → mark read. Stack: **Playwright**, runs against `npm run dev` with a test SQLite DB seeded with fixture data. | ⭐⭐⭐⭐ |
-| 8 | CI test step | Add `npm test` to PR pipeline (`.github/workflows/pr-check.yml`) after lint, before build. Fail PR on test failure. | ⭐ |
+| ~~8~~ | ~~CI test step~~ | ✅ Done — `npx vitest run` added to both `pr-check.yml` and `build-main.yml` after lint step. | ~~⭐~~ |
 
 ---
 
