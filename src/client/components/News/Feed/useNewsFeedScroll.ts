@@ -82,8 +82,13 @@ export function useNewsFeedScroll(
     if (index === -1) return;
     if (effectiveViewMode === 'accordion') {
       const id = setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'start' });
-      }, 50);
+        const el = document.querySelector(`[data-news-id="${selectedNewsId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'start' });
+        }
+      }, 120);
       return () => clearTimeout(id);
     } else {
       virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth', align: 'center' });

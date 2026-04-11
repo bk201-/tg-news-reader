@@ -1,8 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useRef, useCallback } from 'react';
 import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsListItem } from '../NewsListItem';
 import { NewsDetail } from '../../Detail/NewsDetail';
+
+const DOUBLE_TAP_MS = 350;
 
 const useStyles = createStyles(({ css, token }) => ({
   item: css`
@@ -43,6 +45,25 @@ export const NewsAccordionItem = memo(
     onMarkedRead,
   }: NewsAccordionItemProps) {
     const { styles, cx } = useStyles();
+    const lastTapRef = useRef(0);
+
+    const handleTap = useCallback(() => {
+      const now = Date.now();
+      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+        // Double-tap → toggle read
+        lastTapRef.current = 0;
+        onMarkedRead(item.id);
+      } else {
+        // Single tap → expand (delayed to detect double-tap)
+        lastTapRef.current = now;
+        setTimeout(() => {
+          if (lastTapRef.current !== 0) {
+            lastTapRef.current = 0;
+            onSelect(item.id);
+          }
+        }, DOUBLE_TAP_MS);
+      }
+    }, [item.id, onSelect, onMarkedRead]);
 
     if (!isFiltered && !showAll) return null;
 
@@ -70,7 +91,7 @@ export const NewsAccordionItem = memo(
             isSelected={false}
             isFiltered={isFiltered}
             showAll={showAll}
-            onClick={() => onSelect(item.id)}
+            onClick={handleTap}
             onTagClick={onTagClick}
           />
         )}

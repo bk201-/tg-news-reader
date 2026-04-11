@@ -361,6 +361,49 @@ describe('parseMessageFields', () => {
     expect(result!.instantViewContent).toBe('Article body');
   });
 
+  it('extracts text from unknown container blocks with .blocks (fallback)', () => {
+    // Simulates PageBlockCover, PageBlockCollage, or any container with nested blocks
+    const inner = new MockPageBlockParagraph(new MockTextPlain('Inside container'));
+    const container = { blocks: [inner] }; // unknown block type with .blocks
+    const page = new MockPage([container]);
+    const wp = new MockWebPage(page);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewContent).toContain('Inside container');
+  });
+
+  it('extracts text from unknown blocks with .text property (fallback)', () => {
+    // Simulates an unhandled block type that has a .text field
+    const unknownBlock = { text: new MockTextPlain('Fallback text') };
+    const page = new MockPage([unknownBlock]);
+    const wp = new MockWebPage(page);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewContent).toContain('Fallback text');
+  });
+
+  it('extracts caption from blocks with .caption (PageBlockPhoto, PageBlockEmbed, etc.)', () => {
+    const captionBlock = { caption: { text: new MockTextPlain('Photo caption') } };
+    const page = new MockPage([captionBlock]);
+    const wp = new MockWebPage(page);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewContent).toContain('Photo caption');
+  });
+
+  it('preserves text after an embed block in Instant View', () => {
+    // Simulates: paragraph → embed (unknown type) → paragraph
+    const before = new MockPageBlockParagraph(new MockTextPlain('Before embed'));
+    const embed = { caption: { text: new MockTextPlain('Embed caption') } };
+    const after = new MockPageBlockParagraph(new MockTextPlain('After embed'));
+    const page = new MockPage([before, embed, after]);
+    const wp = new MockWebPage(page);
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewContent).toContain('Before embed');
+    expect(result!.instantViewContent).toContain('After embed');
+  });
+
   it('returns null for unsupported media types', () => {
     // Any media that's not Photo/Document/WebPage
     const media = { someField: true };

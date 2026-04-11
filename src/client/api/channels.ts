@@ -37,12 +37,18 @@ export function useFetchChannel() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, since, limit }: FetchChannelInput & { id: number }) =>
-      api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>('/channels/' + id + '/fetch', {
+      api.post<{
+        inserted: number;
+        total: number;
+        mediaProcessing?: boolean;
+        totalNewsCount: number;
+        unreadCount: number;
+      }>('/channels/' + id + '/fetch', {
         since,
         limit,
       }),
     onSuccess: (data, variables) => {
-      // Update lastFetchedAt + unreadCount directly in the channels cache
+      // Update lastFetchedAt + counts from server (accurate after read-cleanup)
       const now = Math.floor(Date.now() / 1000);
       qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
         old
@@ -51,8 +57,8 @@ export function useFetchChannel() {
                 ? {
                     ...ch,
                     lastFetchedAt: now,
-                    unreadCount: ch.unreadCount + (data.inserted ?? 0),
-                    totalNewsCount: ch.totalNewsCount + (data.inserted ?? 0),
+                    unreadCount: data.unreadCount ?? ch.unreadCount + (data.inserted ?? 0),
+                    totalNewsCount: data.totalNewsCount ?? ch.totalNewsCount + (data.inserted ?? 0),
                   }
                 : ch,
             )
@@ -78,10 +84,13 @@ export function useMarkReadAndFetch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
-      api.post<{ inserted: number; total: number; mediaProcessing?: boolean }>(
-        '/channels/' + id + '/mark-read-and-fetch',
-        {},
-      ),
+      api.post<{
+        inserted: number;
+        total: number;
+        mediaProcessing?: boolean;
+        totalNewsCount: number;
+        unreadCount: number;
+      }>('/channels/' + id + '/mark-read-and-fetch', {}),
     onSuccess: (data, channelId) => {
       const now = Math.floor(Date.now() / 1000);
       qc.setQueryData<Channel[]>(channelKeys.all, (old) =>
@@ -91,8 +100,8 @@ export function useMarkReadAndFetch() {
                 ? {
                     ...ch,
                     lastFetchedAt: now,
-                    unreadCount: data.inserted ?? 0,
-                    totalNewsCount: ch.totalNewsCount + (data.inserted ?? 0),
+                    unreadCount: data.unreadCount ?? data.inserted ?? 0,
+                    totalNewsCount: data.totalNewsCount ?? ch.totalNewsCount + (data.inserted ?? 0),
                   }
                 : ch,
             )

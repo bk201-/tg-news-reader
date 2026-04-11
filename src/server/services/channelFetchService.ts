@@ -28,6 +28,8 @@ export interface FetchChannelResult {
   inserted: number;
   total: number;
   mediaProcessing: boolean;
+  totalNewsCount: number;
+  unreadCount: number;
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -210,18 +212,25 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
   // ── Post-upsert bookkeeping ───────────────────────────────────────────────
 
   const now = Math.floor(Date.now() / 1000);
-  await db.update(channels).set({ lastFetchedAt: now }).where(eq(channels.id, channelId));
 
-  // Increment denormalized unread_count and total_news_count by the number of newly inserted items
-  if (inserted > 0) {
-    await db
-      .update(channels)
-      .set({
-        unreadCount: sql`${channels.unreadCount} + ${inserted}`,
-        totalNewsCount: sql`${channels.totalNewsCount} + ${inserted}`,
-      })
-      .where(eq(channels.id, channelId));
-  }
+  // Recalculate totalNewsCount from actual row count (deleteReadNewsMedia may have removed rows)
+  const [countRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(news)
+    .where(eq(news.channelId, channelId));
+  const actualTotal = countRow?.count ?? 0;
+
+  // Recalculate unreadCount from actual unread rows
+  const [unreadRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(news)
+    .where(and(eq(news.channelId, channelId), eq(news.isRead, 0)));
+  const actualUnread = unreadRow?.count ?? 0;
+
+  await db
+    .update(channels)
+    .set({ lastFetchedAt: now, totalNewsCount: actualTotal, unreadCount: actualUnread })
+    .where(eq(channels.id, channelId));
 
   // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
   const insertedItems = messages
@@ -246,5 +255,5 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
     `fetch done: ${inserted} inserted, ${updated} updated / ${messages.length} total`,
   );
 
-  return { inserted, total: messages.length, mediaProcessing };
+  return { inserted, total: messages.length, mediaProcessing, totalNewsCount: actualTotal, unreadCount: actualUnread };
 }

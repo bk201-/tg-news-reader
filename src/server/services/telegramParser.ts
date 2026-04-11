@@ -125,6 +125,22 @@ function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
       if (title.trim()) parts.push(`### ${title.trim()}`);
       const subText = extractInstantViewText(block.blocks);
       if (subText.trim()) parts.push(subText.trim());
+    } else if ('blocks' in block && Array.isArray((block as { blocks?: unknown[] }).blocks)) {
+      // Fallback: any container block with nested .blocks (e.g. PageBlockCover,
+      // PageBlockCollage, PageBlockSlideshow, PageBlockRelatedArticles, etc.)
+      const subText = extractInstantViewText((block as { blocks: Api.TypePageBlock[] }).blocks);
+      if (subText.trim()) parts.push(subText.trim());
+    } else if ('text' in block && (block as { text?: unknown }).text) {
+      // Fallback: any block with a .text property we haven't handled explicitly
+      const text = richTextToString((block as { text: Api.TypeRichText }).text);
+      if (text.trim()) parts.push(text.trim());
+    } else if ('caption' in block && (block as { caption?: unknown }).caption) {
+      // Blocks with captions (PageBlockPhoto, PageBlockEmbed, PageBlockVideo, etc.)
+      const cap = (block as { caption: { text?: Api.TypeRichText } }).caption;
+      if (cap.text) {
+        const text = richTextToString(cap.text);
+        if (text.trim()) parts.push(text.trim());
+      }
     }
   }
   return parts.join('\n\n');

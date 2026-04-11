@@ -118,6 +118,8 @@ const useStyles = createStyles(({ css, token }) => ({
     align-items: center;
     gap: 6px;
     margin-bottom: 12px;
+    scroll-margin-top: 56px;
+    padding-top: 4px;
   `,
   mediaError: css`
     font-size: 12px;
