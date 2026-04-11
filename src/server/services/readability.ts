@@ -62,7 +62,20 @@ function createTurndown(): TurndownService {
     codeBlockStyle: 'fenced',
   });
   // Strip noisy elements Readability sometimes includes
-  td.remove(['figure', 'aside', 'script', 'style', 'noscript', 'button', 'form']);
+  td.remove(['aside', 'script', 'style', 'noscript', 'button', 'form']);
+  // Keep text content from <figure> elements (e.g. Meduza embeds) — removing them
+  // entirely would cut off all text after an embedded block mid-article.
+  td.addRule('figure', {
+    filter: 'figure',
+    replacement: (_content, node) => {
+      const el = node as unknown as HTMLElement;
+      // If the figure contains an <img>, skip it (Turndown handles images natively).
+      // Otherwise preserve the text content so nothing gets lost.
+      if (el.querySelector?.('img')) return '';
+      const text = el.textContent?.trim() ?? '';
+      return text ? `\n\n${text}\n\n` : '';
+    },
+  });
   return td;
 }
 

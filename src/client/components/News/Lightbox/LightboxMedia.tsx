@@ -70,6 +70,7 @@ const useStyles = createStyles(({ css, token }) => ({
     gap: 12px;
     color: ${token.colorTextSecondary};
     font-size: 13px;
+    z-index: 4;
   `,
 }));
 
@@ -123,7 +124,7 @@ export function LightboxMedia({
     return (
       <div className={styles.wrap}>
         {onDownload ? (
-          <div className={styles.errorOverlay} style={{ position: 'static' }}>
+          <div className={styles.errorOverlay}>
             <LoadingOutlined className={styles.spinner} />
             <Button icon={<DownloadOutlined />} onClick={onDownload} ghost>
               Download

@@ -77,4 +77,29 @@ describe('buildFullContent', () => {
     const result = buildFullContent(makeExtracted({ textContent: '', content: 'fallback content' }));
     expect(result.content).toBe('fallback content');
   });
+
+  // ── Figure handling ─────────────��─────────────────────────────────────
+
+  it('preserves text content from figure elements (no img)', () => {
+    const result = buildFullContent(
+      makeExtracted({
+        rawHtml: '<p>Before</p><figure><p>Caption text</p></figure><p>After</p>',
+      }),
+    );
+    expect(result.format).toBe('markdown');
+    expect(result.content).toContain('Before');
+    expect(result.content).toContain('Caption text');
+    expect(result.content).toContain('After');
+  });
+
+  it('strips figure with img but keeps surrounding text', () => {
+    const result = buildFullContent(
+      makeExtracted({
+        rawHtml: '<p>Before</p><figure><img src="x.jpg"><figcaption>cap</figcaption></figure><p>After</p>',
+      }),
+    );
+    expect(result.format).toBe('markdown');
+    expect(result.content).toContain('Before');
+    expect(result.content).toContain('After');
+  });
 });
