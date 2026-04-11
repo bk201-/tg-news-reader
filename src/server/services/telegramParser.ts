@@ -20,6 +20,10 @@ export interface TelegramMessage {
   albumTelegramIds?: number[];
   // Telegram Instant View: full article text extracted from Page blocks at fetch time
   instantViewContent?: string;
+  // When cachedPage.part is true, only a subset of blocks was delivered —
+  // store the URL so telegramApi can call messages.getWebPage for the full page
+  instantViewUrl?: string;
+  instantViewPartial?: boolean;
 }
 
 export function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
@@ -72,7 +76,7 @@ function richTextToString(rt: Api.TypeRichText): string {
   return wrapped.text ? richTextToString(wrapped.text) : '';
 }
 
-function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
+export function extractInstantViewText(blocks: Api.TypePageBlock[]): string {
   const _Api = getApi();
   const parts: string[] = [];
   for (const block of blocks) {
@@ -158,6 +162,8 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
   let mediaType: string | undefined;
   let mediaSizeBytes: number | undefined;
   let instantViewContent: string | undefined;
+  let instantViewUrl: string | undefined;
+  let instantViewPartial: boolean | undefined;
 
   if (msg.media) {
     if (msg.media instanceof _Api.MessageMediaPhoto) {
@@ -183,6 +189,11 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
       if (wp instanceof _Api.WebPage && wp.cachedPage instanceof _Api.Page) {
         const text = extractInstantViewText(wp.cachedPage.blocks);
         if (text) instantViewContent = text;
+        // Telegram may return only a subset of blocks when part is true
+        if (wp.cachedPage.part) {
+          instantViewPartial = true;
+          instantViewUrl = wp.url;
+        }
       }
     } else {
       // Unsupported media types (poll, geo, contact, game, dice, giveaway, etc.)
@@ -202,5 +213,7 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
     rawMedia: msg.media ?? undefined,
     groupedId: msg.groupedId != null ? String(msg.groupedId) : undefined,
     instantViewContent,
+    instantViewUrl,
+    instantViewPartial,
   };
 }

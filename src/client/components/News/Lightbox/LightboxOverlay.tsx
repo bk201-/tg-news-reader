@@ -24,6 +24,9 @@ const useStyles = createStyles(({ css }) => ({
     display: flex;
     flex-direction: column;
     outline: none;
+    /* Prevent scroll/zoom gestures from passing through to the page */
+    touch-action: none;
+    overscroll-behavior: contain;
   `,
   // Image takes full area; nav buttons are absolutely positioned on top.
   mediaArea: css`
@@ -124,6 +127,26 @@ export function LightboxOverlay() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!lightbox]);
+
+  // ── Lock body scroll while lightbox is open ──────────────────────────
+  useEffect(() => {
+    if (!lightbox) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // iOS Safari ignores overflow:hidden on body — block touchmove at document level
+    const preventScroll = (e: TouchEvent) => {
+      // Allow touch on video controls
+      if ((e.target as HTMLElement)?.closest?.('video')) return;
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, [!!lightbox]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const channel = channels.find((c) => c.id === channelId);
 

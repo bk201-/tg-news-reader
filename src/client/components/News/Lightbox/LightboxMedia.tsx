@@ -27,7 +27,13 @@ const useStyles = createStyles(({ css, token }) => ({
     height: 100%;
     user-select: none;
     position: relative;
-    z-index: 1;
+    /* Must be above nav buttons (z-index 3) so Download/Retry buttons are clickable */
+    z-index: 4;
+    /* Allow touches to pass through to nav buttons underneath, except on interactive children */
+    pointer-events: none;
+    & > * {
+      pointer-events: auto;
+    }
   `,
   img: css`
     max-width: 100%;
@@ -71,6 +77,7 @@ const useStyles = createStyles(({ css, token }) => ({
     color: ${token.colorTextSecondary};
     font-size: 13px;
     z-index: 4;
+    pointer-events: auto;
   `,
 }));
 

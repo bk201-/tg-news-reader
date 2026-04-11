@@ -9,9 +9,34 @@ import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
 import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
 import { getTelegramClient, ensureAndGetApi } from './telegramClient.js';
-import { parseMessageFields, type TelegramMessage } from './telegramParser.js';
+import { parseMessageFields, extractInstantViewText, type TelegramMessage } from './telegramParser.js';
 
 const BATCH_SIZE = 100;
+
+/**
+ * Fetch full Instant View page via messages.getWebPage when the cached page was partial.
+ * Mutates `msg.instantViewContent` in-place if the full page has more content.
+ */
+async function resolvePartialInstantView(msg: TelegramMessage): Promise<void> {
+  if (!msg.instantViewPartial || !msg.instantViewUrl) return;
+  try {
+    const _Api = await ensureAndGetApi();
+    const tg = await getTelegramClient();
+    const result = await tg.invoke(new _Api.messages.GetWebPage({ url: msg.instantViewUrl, hash: 0 }));
+    const wp = result.webpage;
+    if (wp instanceof _Api.WebPage && wp.cachedPage instanceof _Api.Page) {
+      const fullText = extractInstantViewText(wp.cachedPage.blocks);
+      if (fullText && fullText.length > (msg.instantViewContent?.length ?? 0)) {
+        msg.instantViewContent = fullText;
+      }
+      // Even if the page is still partial, we've done our best
+      msg.instantViewPartial = false;
+    }
+  } catch (err) {
+    logger.warn({ module: 'telegram', url: msg.instantViewUrl, err }, 'Failed to fetch full Instant View page');
+    // Keep whatever partial content we already have
+  }
+}
 
 export async function fetchChannelMessages(
   channelUsername: string,
@@ -65,6 +90,18 @@ async function _fetchChannelMessages(
   } catch (err) {
     logger.error({ module: 'telegram', channelUsername, err }, 'Error fetching Telegram messages');
     throw err;
+  }
+
+  // ── Resolve partial Instant View pages ──────────────────────────────────────
+  const partialIVMessages = allMessages.filter((m) => m.instantViewPartial);
+  if (partialIVMessages.length > 0) {
+    logger.info(
+      { module: 'telegram', channelUsername, count: partialIVMessages.length },
+      'Resolving partial Instant View pages',
+    );
+    for (const msg of partialIVMessages) {
+      await resolvePartialInstantView(msg);
+    }
   }
 
   // ── Album grouping ──────────────────────────────────────────────────────────
@@ -242,7 +279,9 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       const result = await tg.getMessages(channelUsername, { ids: [msgId] });
       const msg = result[0];
       if (!(msg instanceof _Api.Message)) return null;
-      return parseMessageFields(msg, channelUsername);
+      const parsed = parseMessageFields(msg, channelUsername);
+      if (parsed) await resolvePartialInstantView(parsed);
+      return parsed;
     }, 'fetchMessageById');
   } catch (err) {
     logger.warn({ module: 'telegram', channelUsername, msgId, err }, 'error fetching message by ID');
