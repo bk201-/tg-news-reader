@@ -3,11 +3,14 @@ import type { NewsItem } from '@shared/types';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
+const mockRefreshMutate = vi.fn();
+let mockMarkReadIsPending = false;
+
 vi.mock('../../../api/news', () => ({
-  useMarkRead: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarkRead: () => ({ mutate: vi.fn(), isPending: mockMarkReadIsPending }),
   useExtractContent: () => ({ mutate: vi.fn(), isPending: false }),
   useDownloadMedia: () => ({ mutate: vi.fn(), isPending: false }),
-  useRefreshNewsItem: () => ({ mutate: vi.fn(), isPending: false }),
+  useRefreshNewsItem: () => ({ mutate: mockRefreshMutate, isPending: false }),
 }));
 
 vi.mock('../../../api/downloads', () => ({
@@ -46,6 +49,7 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
 describe('useNewsDetailState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMarkReadIsPending = false;
   });
 
   it('openUrl falls back to t.me when no links', () => {
@@ -170,5 +174,45 @@ describe('useNewsDetailState', () => {
       }),
     );
     expect(result.current.albumExpectedLength).toBe(4);
+  });
+
+  it('handleRefresh is blocked while markRead is pending', () => {
+    mockMarkReadIsPending = true;
+    const { result } = renderHookWithProviders(() =>
+      useNewsDetailState({
+        item: makeItem(),
+        channelTelegramId: 'ch',
+        variant: 'panel',
+      }),
+    );
+
+    result.current.handleRefresh();
+    expect(mockRefreshMutate).not.toHaveBeenCalled();
+  });
+
+  it('handleRefresh fires when markRead is not pending', () => {
+    mockMarkReadIsPending = false;
+    const { result } = renderHookWithProviders(() =>
+      useNewsDetailState({
+        item: makeItem(),
+        channelTelegramId: 'ch',
+        variant: 'panel',
+      }),
+    );
+
+    result.current.handleRefresh();
+    expect(mockRefreshMutate).toHaveBeenCalledWith(1);
+  });
+
+  it('refreshPending is true when markRead is pending', () => {
+    mockMarkReadIsPending = true;
+    const { result } = renderHookWithProviders(() =>
+      useNewsDetailState({
+        item: makeItem(),
+        channelTelegramId: 'ch',
+        variant: 'panel',
+      }),
+    );
+    expect(result.current.refreshPending).toBe(true);
   });
 });

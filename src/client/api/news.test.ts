@@ -20,6 +20,7 @@ import {
   useMarkAllRead,
   useExtractContent,
   useDownloadMedia,
+  useRefreshNewsItem,
   type NewsResponse,
 } from './news';
 import type { NewsItem, Channel } from '@shared/types';
@@ -243,5 +244,32 @@ describe('useDownloadMedia', () => {
       type: 'media',
       priority: 10,
     });
+  });
+});
+
+describe('useRefreshNewsItem', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('preserves client-side isRead when patching cache', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    // Seed cache with an item the user has marked as read (isRead: 1)
+    const data = makePaginatedData([[makeItem(1, { isRead: 1, text: 'old text' })]]);
+    queryClient.setQueryData(newsKeys.byChannel(1), data);
+
+    // Server returns the refreshed item with isRead: 0 (DB hasn't committed markRead yet)
+    const serverItem = makeItem(1, { isRead: 0, text: 'new text from Telegram' });
+    mockedApi.post.mockResolvedValueOnce(serverItem);
+
+    const { result } = renderHook(() => useRefreshNewsItem(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(1);
+    });
+
+    const cached = queryClient.getQueryData<InfiniteData<NewsResponse>>(newsKeys.byChannel(1));
+    // isRead should be preserved from client cache (1), not overwritten by server (0)
+    expect(cached!.pages[0].items[0].isRead).toBe(1);
+    // But text should be updated from server
+    expect(cached!.pages[0].items[0].text).toBe('new text from Telegram');
   });
 });

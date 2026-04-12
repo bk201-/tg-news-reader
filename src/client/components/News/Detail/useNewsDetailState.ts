@@ -48,7 +48,10 @@ export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, vari
   const mediaQueued = mediaTask?.status === 'pending';
 
   // ── Handlers (stable refs passed to the hotkeys hook) ─────────────────
-  const handleRefresh = useCallback(() => refreshNewsItem.mutate(item.id), [refreshNewsItem, item.id]);
+  const handleRefresh = useCallback(() => {
+    if (markRead.isPending) return;
+    refreshNewsItem.mutate(item.id);
+  }, [refreshNewsItem, item.id, markRead.isPending]);
   const handleExtract = useCallback(
     (url: string) =>
       extractContent.mutate(
@@ -145,6 +148,7 @@ export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, vari
     setSelectedUrl,
     // Handlers
     handleRefresh,
+    refreshPending: refreshNewsItem.isPending || markRead.isPending,
     handleExtract,
     handleShare,
     handleMarkRead,
