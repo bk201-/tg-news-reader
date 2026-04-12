@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
-import { news, channels } from '../db/schema.js';
-import { eq, and, asc, max, sql, gt, type SQL } from 'drizzle-orm';
+import { news, channels, downloads } from '../db/schema.js';
+import { eq, and, asc, max, sql, gt, notInArray, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
@@ -65,9 +65,8 @@ router.post('/read-all', async (c) => {
           await readChannelHistory(channel.telegramId, result.maxMsgId);
         }
 
-        // Update lastReadAt so the next fetch won't re-fetch already-read messages.
-        // Without this, the fetch route deletes all isRead=1 news and then re-inserts
-        // them from Telegram (starting from the old lastReadAt) with isRead=0.
+        // Update lastReadAt so the next fetch uses this as the boundary
+        // for incremental fetching (avoids re-fetching already-read messages).
         if (result?.maxPostedAt) {
           await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, body.channelId));
         }
@@ -81,11 +80,20 @@ router.post('/read-all', async (c) => {
   return c.json({ success: true });
 });
 
-// DELETE /api/news/read - delete all read news
+// DELETE /api/news/read - delete all read news (excluding items with active downloads)
 router.delete('/read', async (c) => {
   const body = await parseOptionalBody(c, readAllNewsSchema, {});
+
+  // Find news IDs with active (pending/processing) download tasks — protect them from deletion
+  const activeDownloadNewsIds = await db
+    .select({ newsId: downloads.newsId })
+    .from(downloads)
+    .where(sql`${downloads.status} IN ('pending', 'processing')`);
+  const protectedIds = activeDownloadNewsIds.map((r) => r.newsId);
+
   const conditions = [eq(news.isRead, 1)];
   if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
+  if (protectedIds.length > 0) conditions.push(notInArray(news.id, protectedIds));
   const deleted = await db
     .delete(news)
     .where(and(...conditions))
