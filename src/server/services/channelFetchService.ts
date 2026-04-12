@@ -6,11 +6,12 @@
  */
 
 import { db } from '../db/index.js';
-import { channels, news } from '../db/schema.js';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { channels, news, downloads } from '../db/schema.js';
+import { eq, and, inArray, sql, notInArray } from 'drizzle-orm';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
 import { getChannelStrategy, type PostProcessArgs } from './channelStrategies.js';
 import { applyFiltersToInserted } from './filterEngine.js';
+import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
 import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
@@ -67,14 +68,41 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
   return new Date(channel.lastFetchedAt * 1000);
 }
 
+// ─── Read-item cleanup ────────────────────────────────────────────────────────
+
+/**
+ * Delete all read news for a channel and remove their media files from disk.
+ * Skips items that have active (pending/processing) download tasks to avoid
+ * losing in-progress work.
+ */
+async function deleteReadNewsMedia(channelId: number): Promise<number> {
+  // Find news IDs with active download tasks — protect them from deletion
+  const activeDownloadNewsIds = await db
+    .select({ newsId: downloads.newsId })
+    .from(downloads)
+    .where(sql`${downloads.status} IN ('pending', 'processing')`);
+  const protectedIds = activeDownloadNewsIds.map((r) => r.newsId);
+
+  const conditions = [eq(news.channelId, channelId), eq(news.isRead, 1)];
+  if (protectedIds.length > 0) conditions.push(notInArray(news.id, protectedIds));
+
+  const deleted = await db
+    .delete(news)
+    .where(and(...conditions))
+    .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
+
+  for (const row of deleted) {
+    deleteAllMediaFiles(row.localMediaPath, row.localMediaPaths);
+  }
+
+  return deleted.length;
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Fetch news for a channel: pull from Telegram, upsert into DB,
- * apply filters, and kick off background post-processing.
- *
- * Read items are preserved — cleanup is handled by the explicit
- * DELETE /api/news/read route.
+ * Fetch news for a channel: clean up read items, pull from Telegram,
+ * upsert into DB, apply filters, and kick off background post-processing.
  *
  * @throws Error with message 'Channel not found' if channelId doesn't exist.
  * @throws Re-throws any Telegram / DB error for the caller to handle.
@@ -82,6 +110,13 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
 export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts = {}): Promise<FetchChannelResult> {
   const [channel] = await db.select().from(channels).where(eq(channels.id, channelId));
   if (!channel) throw new Error('Channel not found');
+
+  // Clean up read news (and their media files) before fetching new ones.
+  // Items with active downloads are protected from deletion.
+  const deletedCount = await deleteReadNewsMedia(channelId);
+  if (deletedCount > 0) {
+    logger.info({ module: 'channels', channelId, deletedCount }, 'deleted read news before fetch');
+  }
 
   const sinceDate = await computeSinceDate(channel, opts.since);
 

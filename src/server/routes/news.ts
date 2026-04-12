@@ -2,8 +2,6 @@ import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { news, channels, downloads } from '../db/schema.js';
 import { eq, and, asc, max, sql, gt, notInArray, type SQL } from 'drizzle-orm';
-import { existsSync, unlinkSync } from 'fs';
-import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
 import { readChannelHistory, fetchMessageById } from '../services/telegram.js';
 import { getChannelStrategy } from '../services/channelStrategies.js';
@@ -11,29 +9,9 @@ import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
 import { toNewsItem } from '../db/mappers.js';
 import { readAllNewsSchema, markReadSchema, parseOptionalBody } from './schemas.js';
+import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 
 const router = new Hono();
-
-function deleteMediaFile(localMediaPath: string | null) {
-  if (!localMediaPath) return;
-  const filepath = join(process.cwd(), 'data', localMediaPath);
-  if (existsSync(filepath)) {
-    try {
-      unlinkSync(filepath);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-/** Delete all media files for a news row (handles both single and album). */
-function deleteAllMediaFiles(localMediaPath: string | null, localMediaPaths: string[] | null) {
-  if (localMediaPaths) {
-    localMediaPaths.forEach(deleteMediaFile);
-  } else if (localMediaPath) {
-    deleteMediaFile(localMediaPath);
-  }
-}
 
 // POST /api/news/read-all
 router.post('/read-all', async (c) => {
