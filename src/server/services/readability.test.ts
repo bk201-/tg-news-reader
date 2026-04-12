@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFullContent, type ExtractedContent } from './readability.js';
+import { buildFullContent, parseHtml, type ExtractedContent } from './readability.js';
 
 function makeExtracted(partial: Partial<ExtractedContent> = {}): ExtractedContent {
   return {
@@ -101,5 +101,49 @@ describe('buildFullContent', () => {
     expect(result.format).toBe('markdown');
     expect(result.content).toContain('Before');
     expect(result.content).toContain('After');
+  });
+});
+
+describe('parseHtml', { timeout: 30_000 }, () => {
+  it('extracts article content from well-structured HTML', async () => {
+    const html = `
+      <html><head><title>Test Article</title></head><body>
+        <article>
+          <h1>Test Article</h1>
+          <p>This is the first paragraph of the article with enough text to be recognized by readability as meaningful content that should be extracted and returned in the result object.</p>
+          <p>Second paragraph with more text to ensure the parser identifies this as the main article body content that needs to be preserved.</p>
+          <p>Third paragraph adding yet more content to make the article long enough for readability to parse it correctly and extract it properly.</p>
+        </article>
+      </body></html>
+    `;
+    const result = await parseHtml(html, 'https://example.com/article');
+    expect(result.title).toBe('Test Article');
+    expect(result.textContent).toContain('first paragraph');
+    expect(result.rawHtml).toBeDefined();
+  });
+
+  it('returns body text fallback when no article is detected', async () => {
+    // Very short HTML that Readability can't parse as an article
+    const html = `<html><body>x</body></html>`;
+    const result = await parseHtml(html, 'https://example.com');
+    // When Readability fails, parseHtml returns body text in textContent
+    expect(result.textContent).toBeDefined();
+  });
+
+  it('cleans HTML tags and entities from content', async () => {
+    const html = `
+      <html><head><title>Title</title></head><body>
+        <article>
+          <h1>Title</h1>
+          <p>Text with <strong>bold</strong> and &amp; entities.</p>
+          <p>More text in the article body to make readability actually parse this as a real article with proper content extraction working.</p>
+          <p>Even more text to pad the article length. Readability needs a minimum amount of text to consider something an article.</p>
+        </article>
+      </body></html>
+    `;
+    const result = await parseHtml(html, 'https://example.com/test');
+    // textContent should be cleaned plain text
+    expect(result.textContent).not.toContain('<strong>');
+    expect(result.textContent).not.toContain('&amp;');
   });
 });

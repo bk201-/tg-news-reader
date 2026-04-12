@@ -31,6 +31,33 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       reportsDirectory: 'coverage',
+      thresholds: {
+        lines: 75,
+        functions: 60,
+        branches: 60,
+        statements: 70,
+      },
+      exclude: [
+        // Server: infrastructure / side-effect-heavy (no unit-testable logic)
+        'src/server/index.ts',
+        'src/server/db/{migrate,schema}.ts',
+        'src/server/services/{telegram,telegramApi,telegramClient,telegramBridge}.ts',
+        'src/server/services/{downloadManager,DownloadCoordinator,channelFetchService}.ts',
+        'src/server/middleware/{cors,rateLimit}.ts',
+
+        // Client: visual-only .tsx components (Ant Design wrappers, no business logic)
+        // Hooks (use*.ts) and utils (*Utils.ts) inside components/ are NOT excluded — they have tests
+        // NOTE: tsx excludes removed — coverage now includes all component files
+
+        // Client: entry / side-effect modules
+        'src/client/{App,main,i18n,logger}.{ts,tsx}',
+        'src/client/{styles.css,vite-env.d.ts}',
+
+        // Test infrastructure
+        '**/*.test.{ts,tsx}',
+        'src/server/__tests__/**',
+        'src/client/test-setup.ts',
+      ],
     },
   },
 });

@@ -5,7 +5,9 @@ import { eq, and, asc, max, sql, gt, notInArray, type SQL } from 'drizzle-orm';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { NewsItem } from '../../shared/types.js';
-import { readChannelHistory } from '../services/telegram.js';
+import { readChannelHistory, fetchMessageById } from '../services/telegram.js';
+import { getChannelStrategy } from '../services/channelStrategies.js';
+import type { ChannelType } from '../../shared/types.js';
 import { logger } from '../logger.js';
 import { toNewsItem } from '../db/mappers.js';
 import { readAllNewsSchema, markReadSchema, parseOptionalBody } from './schemas.js';
@@ -245,6 +247,43 @@ router.patch('/:id/read', async (c) => {
     }
   }
 
+  return c.json(toNewsItem(updated));
+});
+
+// POST /api/news/:id/refresh — re-fetch single news item from Telegram, re-process, update DB
+router.post('/:id/refresh', async (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  const [row] = await db.select().from(news).where(eq(news.id, id));
+  if (!row) return c.json({ error: 'News not found' }, 404);
+
+  const [channel] = await db.select().from(channels).where(eq(channels.id, row.channelId));
+  if (!channel) return c.json({ error: 'Channel not found' }, 404);
+
+  const msg = await fetchMessageById(channel.telegramId, row.telegramMsgId);
+  if (!msg) return c.json({ error: 'Message not found on Telegram' }, 404);
+
+  const strategy = getChannelStrategy(channel.channelType as ChannelType);
+  const flags = strategy.getItemFlags(msg);
+
+  const [updated] = await db
+    .update(news)
+    .set({
+      text: msg.message,
+      links: msg.links,
+      hashtags: msg.hashtags,
+      mediaType: msg.mediaType,
+      mediaSize: msg.mediaSizeBytes,
+      albumMsgIds: msg.albumTelegramIds ?? null,
+      ...(msg.instantViewContent
+        ? { fullContent: msg.instantViewContent, fullContentFormat: 'markdown' as const }
+        : {}),
+      textInPanel: flags.textInPanel ? 1 : 0,
+      canLoadArticle: flags.canLoadArticle ? 1 : 0,
+    })
+    .where(eq(news.id, id))
+    .returning();
+
+  logger.info({ module: 'news', newsId: id, channelId: channel.id }, 'news item refreshed from Telegram');
   return c.json(toNewsItem(updated));
 });
 

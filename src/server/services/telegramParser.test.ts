@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Create mock Api classes
 class MockMessageEntityUrl {
@@ -55,14 +55,18 @@ class MockDocument {
 }
 class MockWebPage {
   cachedPage: unknown;
-  constructor(cachedPage?: unknown) {
+  url: string;
+  constructor(cachedPage?: unknown, url = '') {
     this.cachedPage = cachedPage;
+    this.url = url;
   }
 }
 class MockPage {
   blocks: unknown[];
-  constructor(blocks: unknown[]) {
+  part: boolean;
+  constructor(blocks: unknown[], part = false) {
     this.blocks = blocks;
+    this.part = part;
   }
 }
 class MockTextPlain {
@@ -225,7 +229,7 @@ vi.mock('./telegramClient.js', () => ({
   getApi: () => mockApi,
 }));
 
-import { extractLinks, extractHashtags, parseMessageFields } from './telegramParser.js';
+import { extractLinks, extractHashtags, parseMessageFields, extractInstantViewText } from './telegramParser.js';
 
 describe('extractLinks', () => {
   it('extracts URL entities', () => {
@@ -421,5 +425,40 @@ describe('parseMessageFields', () => {
     const media = Object.assign(new MockMessageMediaPhoto(), { photo });
     const result = parseMessageFields(makeMsg({ media }), 'ch');
     expect(result!.rawMedia).toBe(media);
+  });
+
+  it('sets instantViewPartial and instantViewUrl when cachedPage.part is true', () => {
+    const paragraph = new MockPageBlockParagraph(new MockTextPlain('Partial text'));
+    const page = new MockPage([paragraph], true); // part = true
+    const wp = new MockWebPage(page, 'https://example.com/article');
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewPartial).toBe(true);
+    expect(result!.instantViewUrl).toBe('https://example.com/article');
+    // Still extracts partial content as fallback
+    expect(result!.instantViewContent).toBe('Partial text');
+  });
+
+  it('does not set instantViewPartial when cachedPage.part is false', () => {
+    const paragraph = new MockPageBlockParagraph(new MockTextPlain('Full text'));
+    const page = new MockPage([paragraph], false);
+    const wp = new MockWebPage(page, 'https://example.com/article');
+    const media = Object.assign(new MockMessageMediaWebPage(), { webpage: wp });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.instantViewPartial).toBeUndefined();
+    expect(result!.instantViewUrl).toBeUndefined();
+    expect(result!.instantViewContent).toBe('Full text');
+  });
+});
+
+describe('extractInstantViewText', () => {
+  it('is exported and extracts text from blocks', () => {
+    const blocks = [
+      new MockPageBlockTitle(new MockTextPlain('Title')),
+      new MockPageBlockParagraph(new MockTextPlain('Body paragraph')),
+    ];
+    const text = extractInstantViewText(blocks as any);
+    expect(text).toContain('# Title');
+    expect(text).toContain('Body paragraph');
   });
 });

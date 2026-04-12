@@ -107,7 +107,14 @@ export function useDownloadsSSE() {
             }
 
             if (task.channelId) {
-              void qc.refetchQueries({ queryKey: ['news', task.channelId] }).then(() => {
+              // Article done — fetch the single updated news item and patch it in cache.
+              // Avoids refetching the entire channel's news list (which races with markRead).
+              void api.get<NewsItem>(`/news/${task.newsId}`).then((updated) => {
+                qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
+                  updatePaginatedItems(old, (items) =>
+                    items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+                  ),
+                );
                 qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
                   (old ?? []).filter((t) => t.id !== task.id),
                 );

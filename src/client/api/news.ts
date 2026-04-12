@@ -99,7 +99,11 @@ export function useExtractContent() {
     mutationFn: ({ newsId, url }: { newsId: number; url: string }) =>
       api.post<{ success: boolean }>('/downloads', { newsId, type: 'article', url, priority: 10 }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['news'] });
+      // Only invalidate downloads to show the queued task in DownloadsPanel.
+      // Do NOT invalidate ['news'] here — the article hasn't been downloaded yet,
+      // and a premature refetch races with useMarkRead optimistic updates,
+      // reverting read status. The SSE task_update handler will refetch news
+      // when the worker actually completes the article extraction.
       void qc.invalidateQueries({ queryKey: ['downloads'] });
     },
   });
@@ -109,11 +113,21 @@ export function useDownloadMedia() {
   return useMutation({
     mutationFn: (newsId: number) =>
       api.post<{ success: boolean }>('/downloads', { newsId, type: 'media', priority: 10 }),
-    // No cache invalidation here — the SSE handler in useDownloadsSSE updates
-    // both the news cache (localMediaPath) and the downloads cache in-place
-    // when the task completes. Invalidating ['news'] here would race against
-    // the SSE update: the refetch was issued before the download completes, so
-    // the server returns localMediaPath=null, and the response arrives *after*
-    // the SSE already set the correct path — overwriting it and hiding the image.
+  });
+}
+
+/** Re-fetch a single news item from Telegram, re-process through strategies, update DB. */
+export function useRefreshNewsItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (newsId: number) => api.post<NewsItem>(`/news/${newsId}/refresh`, {}),
+    onSuccess: (updated) => {
+      // Patch the single item in the paginated cache — no full refetch needed
+      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', updated.channelId] }, (old) =>
+        updatePaginatedItems(old, (items) =>
+          items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+        ),
+      );
+    },
   });
 }

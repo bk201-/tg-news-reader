@@ -26,6 +26,25 @@ npm run lint           # ESLint
 npm run format:check   # Prettier (read-only check, use format to fix)
 ```
 
+## Testing Requirements
+
+**Every PR must include tests for the changes it introduces.** This applies to both new features and bug fixes.
+
+### New feature
+- Add unit/integration tests covering the core logic of the feature.
+- If the feature adds a new route — add integration tests (`*.integration.test.ts`) using the in-memory DB pattern (see `src/server/__tests__/`).
+- If the feature adds a new store action or pure utility — add unit tests.
+
+### Bug fix
+- **First**, write a failing test that reproduces the bug (red).
+- **Then**, fix the bug and confirm the test passes (green).
+- Check coverage: run `npx vitest run --coverage` and verify the fixed code path is covered. If the bug was in a previously uncovered area, the new test must cover it.
+
+### Coverage policy
+- Thresholds: **70% stmts / 60% branches / 60% functions / 75% lines** (enforced in `vitest.config.ts`).
+- After adding tests, run `npx vitest run --coverage` to verify — the report shows per-file stats.
+- Prioritize testing **business logic** (services, routes, stores, pure utils) over UI components.
+
 ## Versioning
 
 Version is in `package.json` and displayed in the app's user menu. Bump it **in the same PR** that introduces the change:
