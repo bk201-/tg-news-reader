@@ -54,6 +54,7 @@ export function NewsDetailToolbarPanel({
   onMarkRead,
   markReadPending,
   onRefresh,
+  refreshPending,
   openUrl,
   isExternalLink,
   onTagClick,
@@ -77,7 +78,7 @@ export function NewsDetailToolbarPanel({
 
       <Space wrap size={4}>
         <Tooltip title={t('news.detail.refresh_tooltip')}>
-          <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh}>
+          <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh} loading={refreshPending}>
             <span className={styles.ndBtnText}>{t('news.detail.refresh')}</span>
           </Button>
         </Tooltip>

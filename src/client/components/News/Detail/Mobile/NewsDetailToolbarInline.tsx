@@ -98,6 +98,7 @@ export function NewsDetailToolbarInline({
   onMarkRead,
   markReadPending,
   onRefresh,
+  refreshPending,
   openUrl,
   title,
   onHeaderClick,
@@ -112,8 +113,9 @@ export function NewsDetailToolbarInline({
   const moreItems: MenuProps['items'] = [
     {
       key: 'refresh',
-      icon: <ReloadOutlined />,
+      icon: refreshPending ? <LoadingOutlined /> : <ReloadOutlined />,
       label: t('news.detail.refresh'),
+      disabled: refreshPending,
       onClick: onRefresh,
     },
     ...(links.length > 0

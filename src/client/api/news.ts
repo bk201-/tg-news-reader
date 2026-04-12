@@ -122,10 +122,12 @@ export function useRefreshNewsItem() {
   return useMutation({
     mutationFn: (newsId: number) => api.post<NewsItem>(`/news/${newsId}/refresh`, {}),
     onSuccess: (updated) => {
-      // Patch the single item in the paginated cache — no full refetch needed
+      // Patch the single item in the paginated cache — no full refetch needed.
+      // Preserve client-side `isRead` to avoid overwriting an optimistic mark-read
+      // update that hasn't committed to the DB yet.
       qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', updated.channelId] }, (old) =>
         updatePaginatedItems(old, (items) =>
-          items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+          items.map((item) => (item.id === updated.id ? { ...item, ...updated, isRead: item.isRead } : item)),
         ),
       );
     },

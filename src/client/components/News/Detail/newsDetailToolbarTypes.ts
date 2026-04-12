@@ -12,6 +12,7 @@ export interface NewsDetailToolbarProps {
   onMarkRead: () => void;
   markReadPending: boolean;
   onRefresh: () => void;
+  refreshPending: boolean;
   /** URL to open when the Open button is clicked (firstLink if available, otherwise Telegram deep-link) */
   openUrl: string;
   /** true when openUrl is an external link from the post (false = Telegram fallback) */

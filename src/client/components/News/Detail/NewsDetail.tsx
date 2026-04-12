@@ -74,6 +74,7 @@ export function NewsDetail({
           onMarkRead={s.handleMarkRead}
           markReadPending={s.markReadPending}
           onRefresh={s.handleRefresh}
+          refreshPending={s.refreshPending}
           openUrl={s.openUrl}
           isExternalLink={s.isExternalLink}
           variant={variant}

@@ -10,9 +10,11 @@ const mockFetchChannelMutate = vi.fn();
 const mockCreateFilterMutateAsync = vi.fn().mockResolvedValue({});
 const mockMarkReadAndFetchMutate = vi.fn();
 
+let mockMarkReadIsPending = false;
+
 vi.mock('../../../api/news', () => ({
   useMarkAllRead: () => ({ mutate: mockMarkAllReadMutate }),
-  useMarkRead: () => ({ mutate: mockMarkReadMutate }),
+  useMarkRead: () => ({ mutate: mockMarkReadMutate, isPending: mockMarkReadIsPending }),
 }));
 
 vi.mock('../../../api/filters', () => ({
@@ -66,6 +68,7 @@ describe('useNewsFeedActions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMarkReadIsPending = false;
     mockAllChannels.length = 0;
     mockAllChannels.push(makeChannel(1), makeChannel(2), makeChannel(3));
     useUIStore.setState({
