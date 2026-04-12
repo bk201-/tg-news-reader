@@ -86,4 +86,45 @@ describe('uiStore', () => {
     useUIStore.getState().setLightboxAlbumIndex(5);
     expect(useUIStore.getState().lightbox).toBeNull();
   });
+
+  it('setSelectedNewsId sets the selected news id', () => {
+    useUIStore.getState().setSelectedNewsId(42);
+    expect(useUIStore.getState().selectedNewsId).toBe(42);
+  });
+
+  it('setShowAll sets showAll flag', () => {
+    useUIStore.getState().setShowAll(true);
+    expect(useUIStore.getState().showAll).toBe(true);
+    useUIStore.getState().setShowAll(false);
+    expect(useUIStore.getState().showAll).toBe(false);
+  });
+
+  it('setFilterPanelOpen toggles filterPanelOpen', () => {
+    useUIStore.getState().setFilterPanelOpen(true);
+    expect(useUIStore.getState().filterPanelOpen).toBe(true);
+    useUIStore.getState().setFilterPanelOpen(false);
+    expect(useUIStore.getState().filterPanelOpen).toBe(false);
+  });
+
+  it('setHashTagFilter sets hashTagFilter', () => {
+    useUIStore.getState().setHashTagFilter('#test');
+    expect(useUIStore.getState().hashTagFilter).toBe('#test');
+    useUIStore.getState().setHashTagFilter(null);
+    expect(useUIStore.getState().hashTagFilter).toBeNull();
+  });
+
+  it('setSidebarDrawerOpen sets sidebarDrawerOpen', () => {
+    useUIStore.getState().setSidebarDrawerOpen(true);
+    expect(useUIStore.getState().sidebarDrawerOpen).toBe(true);
+  });
+
+  it('setHeaderHidden sets headerHidden', () => {
+    useUIStore.getState().setHeaderHidden(true);
+    expect(useUIStore.getState().headerHidden).toBe(true);
+  });
+
+  it('setOpenAddChannel sets openAddChannel', () => {
+    useUIStore.getState().setOpenAddChannel(true);
+    expect(useUIStore.getState().openAddChannel).toBe(true);
+  });
 });

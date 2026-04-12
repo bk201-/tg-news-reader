@@ -13,7 +13,8 @@ vi.mock('../utils/retry.js', () => ({
   TELEGRAM_POLICY: {},
 }));
 
-import { TelegramCircuitBreaker } from './telegramCircuitBreaker.js';
+import { TelegramCircuitBreaker, setReconnectCallback } from './telegramCircuitBreaker.js';
+import { sendAlert } from './alertBot.js';
 
 describe('TelegramCircuitBreaker', () => {
   let cb: TelegramCircuitBreaker;
@@ -120,5 +121,56 @@ describe('TelegramCircuitBreaker', () => {
 
   it('reports sessionExpired=false initially', () => {
     expect(cb.isSessionExpired()).toBe(false);
+  });
+
+  it('sets sessionExpired=true on AUTH_KEY_UNREGISTERED and calls sendAlert', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    vi.mocked(withRetry).mockRejectedValueOnce(new Error('AUTH_KEY_UNREGISTERED'));
+
+    await cb.execute(() => Promise.reject(new Error('AUTH_KEY_UNREGISTERED')), 'test').catch(() => {});
+
+    expect(cb.isSessionExpired()).toBe(true);
+    expect(sendAlert).toHaveBeenCalledWith(expect.stringContaining('AUTH_KEY_UNREGISTERED'), 'auth-key-invalid');
+  });
+
+  it('sets sessionExpired=true on AUTH_KEY_DUPLICATED', async () => {
+    const { withRetry } = await import('../utils/retry.js');
+    vi.mocked(withRetry).mockRejectedValueOnce(new Error('AUTH_KEY_DUPLICATED'));
+
+    await cb.execute(() => Promise.reject(new Error('AUTH_KEY_DUPLICATED')), 'test').catch(() => {});
+
+    expect(cb.isSessionExpired()).toBe(true);
+  });
+
+  it('calls reconnect callback on AUTH_KEY_UNREGISTERED and stays not expired on success', async () => {
+    const reconnectFn = vi.fn().mockResolvedValue(undefined);
+    setReconnectCallback(reconnectFn);
+
+    const { withRetry } = await import('../utils/retry.js');
+    vi.mocked(withRetry).mockRejectedValueOnce(new Error('AUTH_KEY_UNREGISTERED'));
+
+    await cb.execute(() => Promise.reject(new Error('AUTH_KEY_UNREGISTERED')), 'test').catch(() => {});
+
+    expect(reconnectFn).toHaveBeenCalled();
+    expect(cb.isSessionExpired()).toBe(false);
+
+    // Cleanup
+    setReconnectCallback(null as never);
+  });
+
+  it('sets sessionExpired=true when reconnect callback fails', async () => {
+    const reconnectFn = vi.fn().mockRejectedValue(new Error('reconnect failed'));
+    setReconnectCallback(reconnectFn);
+
+    const { withRetry } = await import('../utils/retry.js');
+    vi.mocked(withRetry).mockRejectedValueOnce(new Error('AUTH_KEY_UNREGISTERED'));
+
+    await cb.execute(() => Promise.reject(new Error('AUTH_KEY_UNREGISTERED')), 'test').catch(() => {});
+
+    expect(reconnectFn).toHaveBeenCalled();
+    expect(cb.isSessionExpired()).toBe(true);
+
+    // Cleanup
+    setReconnectCallback(null as never);
   });
 });

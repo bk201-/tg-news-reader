@@ -1,0 +1,230 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.4 [39m[90mC:/Users/dshilov/WebstormProjects/tg-news-reader[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/services/reconnectingEventSource.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useNewsFeedHotkeys.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useNewsHotkeys.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 121[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Detail/useNewsDetailHotkeys.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 218[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/filters.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 191[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/Channels/useChannelHotkeys.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/groups.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/client.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 620[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m retries on TypeError (network error) then succeeds [33m 504[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useHashTagSync.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/channels.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 131[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/hooks/breakpoints.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/downloads.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 227[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/digest.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 117[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/openaiClient.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1692[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m isAiConfigured returns false when no keys set [33m 1626[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/news.integration.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 434[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/auth.integration.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 828[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/groups.integration.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 979[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m creates a group with PIN (hashed) [33m 392[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/channels.integration.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 500[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/news.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/store/uiStore.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/store/authStore.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/newsUtils.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/filterUtils.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+[12:38:56] [32mINFO[39m: [36m[readability] jsdom loaded in 9581ms[39m
+    [35mmodule[39m: "readability"
+    [35mms[39m: 9581
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useNewsFeedData.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/readability.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 10259[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m extracts article content from well-structured HTML [33m 10036[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useNewsFeedScroll.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/api/mediaUrl.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/media.integration.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 198[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/middleware/auth.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 144[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/filters.integration.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 264[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/utils/retry.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/alertBot.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 141[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/digest.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 306[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/telegramCircuitBreaker.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/shared/schemas.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/telegramApi.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/telegramParser.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/filterEngine.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/downloads.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 189[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/channelStrategies.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/mediaProgress.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/logBuffer.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/db/mappers.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+stderr | src/server/routes/clientLog.integration.test.ts > Client Log routes (integration) > POST / > ignores entries with disallowed levels
+ZodError: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "warn",
+      "error"
+    ],
+    "path": [
+      "entries",
+      0,
+      "level"
+    ],
+    "message": "Invalid option: expected one of \"warn\"|\"error\""
+  }
+]
+    at parseOptionalBody (C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/schemas.ts:37:17)
+    at C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/clientLog.ts:18:16
+    at dispatch (file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/compose.js:22:17)
+    at authMiddleware (C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/middleware/auth.ts:28:5)
+    at dispatch (file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/compose.js:22:17)
+    at file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/hono-base.js:301:25
+    at C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/clientLog.integration.test.ts:110:7
+    at file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | src/server/routes/clientLog.integration.test.ts > Client Log routes (integration) > POST / > returns 500 for body that fails Zod validation
+ZodError: [
+  {
+    "expected": "array",
+    "code": "invalid_type",
+    "path": [
+      "entries"
+    ],
+    "message": "Invalid input: expected array, received undefined"
+  }
+]
+    at parseOptionalBody (C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/schemas.ts:37:17)
+    at C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/clientLog.ts:18:16
+    at dispatch (file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/compose.js:22:17)
+    at authMiddleware (C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/middleware/auth.ts:28:5)
+    at dispatch (file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/compose.js:22:17)
+    at file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/hono/dist/hono-base.js:301:25
+    at C:/Users/dshilov/WebstormProjects/tg-news-reader/src/server/routes/clientLog.integration.test.ts:124:19
+    at file:///C:/Users/dshilov/WebstormProjects/tg-news-reader/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/clientLog.integration.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 195[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/logs.integration.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 162[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/errorHtml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/downloadProgress.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/routes/content.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 229[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/db/customTypes.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/useNewsFeedActions.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 1036[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m handleSpaceKey marks unread item as read and advances [33m 538[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Digest/digestUtils.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 886[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m replaces [1] with a clickable Tag chip [33m 596[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m server [49m[39m src/server/services/filterEngine.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Detail/useNewsDetailState.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 774[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m openUrl falls back to t.me when no links [33m 406[2mms[22m[39m
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/News/Feed/NewsListItem.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 1634[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders title from first line of text [33m 567[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/Auth/AuthGate.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1724[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m shows spinner when checking auth [33m 986[2mms[22m[39m
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/Channels/GroupPinModal.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 2837[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders modal with group name in title [33m 765[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders OTP input [33m 357[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m calls onConfirm on OK button click [33m 436[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m calls onClose on Cancel button click [33m 325[2mms[22m[39m
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/Filters/FilterPanel.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 5440[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders modal with title when open [33m 2395[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders filter rows in table [33m 1079[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m shows empty state when no filters [33m 991[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders add form with type select and inputs [33m 934[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m client [49m[39m src/client/components/Auth/LoginPage.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 18589[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m renders email and password inputs and submit button [33m 2204[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m calls fetch on form submit with credentials [33m 4111[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m shows error on failed login [33m 4470[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m shows TOTP step when server requires it [33m 4002[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m sets auth store on successful login [33m 3798[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m58 passed[39m[22m[90m (58)[39m
+[2m      Tests [22m [1m[32m609 passed[39m[22m[90m (609)[39m
+[2m   Start at [22m 14:38:27
+[2m   Duration [22m 60.28s[2m (transform 9.14s, setup 74.87s, import 268.04s, tests 52.56s, environment 289.42s)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   83.53 |    73.98 |   83.54 |   85.61 |                   
+ client/__tests__  |     100 |      100 |     100 |     100 |                   
+  ...Providers.tsx |     100 |      100 |     100 |     100 |                   
+ client/api        |   79.03 |     55.1 |   82.63 |   82.52 |                   
+  channels.ts      |     100 |    34.78 |     100 |     100 | 54-104            
+  client.ts        |   81.35 |    71.42 |   92.85 |   86.27 | 52-54,62-64,97    
+  digest.ts        |   95.55 |    78.57 |      50 |     100 | 26,34,52,63-65,90 
+  downloads.ts     |    30.5 |    16.66 |   43.33 |      34 | 66-132            
+  filters.ts       |     100 |      100 |     100 |     100 |                   
+  groups.ts        |     100 |       75 |     100 |     100 | 70                
+  mediaUrl.ts      |     100 |      100 |     100 |     100 |                   
+  news.ts          |   79.24 |    65.62 |   82.35 |   82.05 | 38-47,88          
+ ...nents/Channels |   96.15 |    95.65 |     100 |     100 |                   
+  ...nelHotkeys.ts |   96.15 |    95.65 |     100 |     100 | 25                
+ ...omponents/News |     100 |    90.69 |     100 |     100 |                   
+  filterUtils.ts   |     100 |    92.85 |     100 |     100 | 26                
+  newsUtils.ts     |     100 |    89.65 |     100 |     100 | 34,37-38          
+ ...ts/News/Detail |    82.5 |    79.54 |      55 |   84.11 |                   
+  ...ailHotkeys.ts |   98.52 |    94.64 |     100 |    98.3 | 86                
+  ...etailState.ts |   61.53 |    53.12 |      10 |   66.66 | ...98-102,108-113 
+ ...ents/News/Feed |    78.4 |    69.71 |   76.81 |    79.5 |                   
+  ...ashTagSync.ts |   94.44 |       75 |     100 |     100 | 33-34             
+  ...eedActions.ts |   70.58 |    41.46 |   66.66 |   76.81 | ...24,134,154-155 
+  ...wsFeedData.ts |     100 |    82.35 |     100 |     100 | 25,39,55          
+  ...eedHotkeys.ts |     100 |      100 |     100 |     100 |                   
+  ...FeedScroll.ts |   56.25 |     60.6 |   56.25 |   50.98 | ...3,84-92,99-102 
+  ...ewsHotkeys.ts |     100 |    96.55 |     100 |     100 | 43                
+ client/hooks      |   90.47 |      100 |   84.21 |   93.75 |                   
+  breakpoints.ts   |   90.47 |      100 |   84.21 |   93.75 | 43-44             
+ client/services   |   89.28 |    57.14 |     100 |     100 |                   
+  ...ventSource.ts |   89.28 |    57.14 |     100 |     100 | 39-67             
+ client/store      |   97.61 |    78.57 |   96.66 |   97.36 |                   
+  authStore.ts     |    92.3 |      100 |   88.88 |    90.9 | 44                
+  uiStore.ts       |     100 |       70 |     100 |     100 | 68-87             
+ server            |     100 |     62.5 |     100 |     100 |                   
+  logger.ts        |     100 |     62.5 |     100 |     100 | 5-31              
+ server/db         |      90 |     92.3 |     100 |      90 |                   
+  customTypes.ts   |     100 |      100 |     100 |     100 |                   
+  index.ts         |   81.81 |       50 |     100 |   81.81 | 12-13             
+  mappers.ts       |     100 |      100 |     100 |     100 |                   
+ server/middleware |     100 |      100 |     100 |     100 |                   
+  auth.ts          |     100 |      100 |     100 |     100 |                   
+ server/routes     |   83.17 |    75.46 |   75.94 |    84.4 |                   
+  auth.ts          |   84.07 |       75 |   91.66 |   85.84 | ...15-117,195-203 
+  channels.ts      |   76.28 |    72.72 |   56.25 |   77.77 | ...37,149-172,224 
+  clientLog.ts     |    87.5 |    83.33 |   66.66 |   90.47 | 12,34             
+  content.ts       |     100 |       80 |     100 |     100 | 19,45             
+  digest.ts        |   54.21 |    39.53 |   55.55 |   56.96 | ...1,44-45,89-177 
+  downloads.ts     |   64.51 |      100 |   44.44 |   63.33 | 45-58             
+  filters.ts       |     100 |    91.66 |     100 |     100 | 67                
+  groups.ts        |   93.42 |    78.57 |     100 |   98.46 | 163               
+  logs.ts          |     100 |      100 |     100 |     100 |                   
+  media.ts         |     100 |     87.5 |     100 |     100 | 33,48-49          
+  news.ts          |   91.37 |    82.27 |      90 |    91.5 | ...0,30,32,76,238 
+  schemas.ts       |     100 |      100 |     100 |     100 |                   
+ server/services   |   83.58 |    73.11 |   94.91 |   86.33 |                   
+  alertBot.ts      |   82.35 |    91.66 |     100 |      80 | 48-52             
+  ...Strategies.ts |     100 |      100 |     100 |     100 |                   
+  ...adProgress.ts |     100 |      100 |     100 |     100 |                   
+  errorHtml.ts     |     100 |      100 |     100 |     100 |                   
+  filterEngine.ts  |   97.56 |       90 |     100 |     100 | 20,61             
+  logBuffer.ts     |     100 |       80 |     100 |     100 | 41,59             
+  mediaProgress.ts |     100 |      100 |     100 |     100 |                   
+  openaiClient.ts  |     100 |      100 |     100 |     100 |                   
+  readability.ts   |   86.79 |       78 |   88.88 |   85.71 | 113-128,144-145   
+  ...uitBreaker.ts |      95 |    88.46 |      80 |   96.55 | 133-138           
+  ...gramParser.ts |   66.88 |    58.55 |     100 |   71.54 | ...24,128-131,184 
+ server/utils      |   82.45 |    87.83 |   88.88 |   86.95 |                   
+  retry.ts         |   82.45 |    87.83 |   88.88 |   86.95 | 67-71,78,187      
+ shared            |     100 |      100 |     100 |     100 |                   
+  schemas.ts       |     100 |      100 |     100 |     100 |                   
+-------------------|---------|----------|---------|---------|-------------------

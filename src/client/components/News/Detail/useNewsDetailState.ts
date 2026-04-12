@@ -6,9 +6,8 @@ import { useCallback } from 'react';
 import { App } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead, useExtractContent, useDownloadMedia } from '../../../api/news';
+import { useMarkRead, useExtractContent, useDownloadMedia, useRefreshNewsItem } from '../../../api/news';
 import { useNewsDownloadTask } from '../../../api/downloads';
-import { useQueryClient } from '@tanstack/react-query';
 import { isYouTubeUrl, getNewsTitle } from '../newsUtils';
 import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
 
@@ -22,10 +21,10 @@ interface UseNewsDetailStateArgs {
 export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, variant }: UseNewsDetailStateArgs) {
   const { message } = App.useApp();
   const { t } = useTranslation();
-  const qc = useQueryClient();
   const markRead = useMarkRead();
   const extractContent = useExtractContent();
   const downloadMedia = useDownloadMedia();
+  const refreshNewsItem = useRefreshNewsItem();
 
   const mediaTask = useNewsDownloadTask(item.id, 'media');
   const articleTask = useNewsDownloadTask(item.id, 'article');
@@ -49,10 +48,7 @@ export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, vari
   const mediaQueued = mediaTask?.status === 'pending';
 
   // ── Handlers (stable refs passed to the hotkeys hook) ─────────────────
-  const handleRefresh = useCallback(
-    () => void qc.invalidateQueries({ queryKey: ['news', item.channelId] }),
-    [qc, item.channelId],
-  );
+  const handleRefresh = useCallback(() => refreshNewsItem.mutate(item.id), [refreshNewsItem, item.id]);
   const handleExtract = useCallback(
     (url: string) =>
       extractContent.mutate(
@@ -123,6 +119,7 @@ export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, vari
     isRead,
     openUrl,
     isExternalLink,
+    shareUrl,
     firstMediaPath,
     albumLength,
     albumExpectedLength,
