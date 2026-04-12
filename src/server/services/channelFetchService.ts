@@ -8,8 +8,6 @@
 import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
-import { existsSync, unlinkSync } from 'fs';
-import { join } from 'path';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
 import { getChannelStrategy, type PostProcessArgs } from './channelStrategies.js';
 import { applyFiltersToInserted } from './filterEngine.js';
@@ -69,35 +67,14 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
   return new Date(channel.lastFetchedAt * 1000);
 }
 
-/**
- * Delete all read news for a channel and remove their media files from disk.
- */
-async function deleteReadNewsMedia(channelId: number): Promise<void> {
-  const deletedRead = await db
-    .delete(news)
-    .where(and(eq(news.channelId, channelId), eq(news.isRead, 1)))
-    .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
-
-  for (const row of deletedRead) {
-    const paths: string[] = row.localMediaPaths ? row.localMediaPaths : row.localMediaPath ? [row.localMediaPath] : [];
-    for (const p of paths) {
-      const filepath = join(process.cwd(), 'data', p);
-      if (existsSync(filepath)) {
-        try {
-          unlinkSync(filepath);
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  }
-}
-
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Fetch news for a channel: clean up read items, pull from Telegram,
- * upsert into DB, apply filters, and kick off background post-processing.
+ * Fetch news for a channel: pull from Telegram, upsert into DB,
+ * apply filters, and kick off background post-processing.
+ *
+ * Read items are preserved — cleanup is handled by the explicit
+ * DELETE /api/news/read route.
  *
  * @throws Error with message 'Channel not found' if channelId doesn't exist.
  * @throws Re-throws any Telegram / DB error for the caller to handle.
@@ -107,9 +84,6 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
   if (!channel) throw new Error('Channel not found');
 
   const sinceDate = await computeSinceDate(channel, opts.since);
-
-  // Clean up read news (and their media files) before fetching new ones
-  await deleteReadNewsMedia(channelId);
 
   const messages = await fetchChannelMessages(channel.telegramId, {
     sinceDate,
