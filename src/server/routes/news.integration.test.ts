@@ -297,6 +297,27 @@ describe('News routes (integration)', () => {
       });
       expect(res2.status).toBe(304);
     });
+
+    it('ETag changes when localMediaPath is set (download complete)', async () => {
+      const ch = await seedChannel(testDb.db);
+      const n = await seedNews(testDb.db, ch.id, { postedAt: 6000 });
+
+      // First request — no media path
+      const res1 = await app.request(`/api/news?channelId=${ch.id}`, { headers });
+      expect(res1.status).toBe(200);
+      const etag1 = res1.headers.get('ETag');
+
+      // Simulate download worker updating localMediaPath
+      await testDb.client.execute(`UPDATE news SET local_media_path = 'ch/1.jpg' WHERE id = ${n.id}`);
+
+      // Second request — ETag should differ, must NOT return 304
+      const res2 = await app.request(`/api/news?channelId=${ch.id}`, {
+        headers: { ...headers, 'If-None-Match': etag1! },
+      });
+      expect(res2.status).toBe(200);
+      const body = (await res2.json()) as { items: Array<{ localMediaPath?: string }> };
+      expect(body.items[0].localMediaPath).toBe('ch/1.jpg');
+    });
   });
 
   // ── POST /api/news/read-all (global) ───────────────────────────────────

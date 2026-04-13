@@ -162,9 +162,15 @@ router.get('/', async (c) => {
   const items: NewsItem[] = pageRows.map(toNewsItem);
   const nextCursor = hasMore && pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : null;
 
-  // ETag: based on item count + max postedAt for cache validation
+  // ETag: must capture ALL dimensions of response state — including fields
+  // that change asynchronously after insertion (localMediaPath via download worker,
+  // fullContent via article extractor). Without these, the browser HTTP cache
+  // serves stale 304 responses when TanStack Query refetches, wiping SSE-patched
+  // media paths from the client cache and making images vanish.
   const maxPostedAt = pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : 0;
-  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}"`;
+  const mediaCount = pageRows.filter((r) => r.localMediaPath).length;
+  const contentCount = pageRows.filter((r) => r.fullContent).length;
+  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}"`;
 
   const ifNoneMatch = c.req.header('If-None-Match');
   if (ifNoneMatch === etag) {
