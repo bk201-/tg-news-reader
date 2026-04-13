@@ -41,7 +41,7 @@ const useStyles = createStyles(({ css }) => ({
     position: absolute;
     top: 0;
     bottom: 48px; /* leave room for video controls at the bottom */
-    z-index: 3;
+    z-index: 5; /* above LightboxMedia wrap (z-index: 4) */
     width: 64px;
     display: flex;
     align-items: center;
@@ -102,11 +102,6 @@ export function LightboxOverlay() {
   // Reuse the active infinite query so we can fetch more pages from the lightbox
   const { fetchNextPage, hasNextPage } = useNews(channelId, !showAll);
 
-  // ── Album index memory (Issue 10) ────────────────────────────────────
-  // Remembers the last-viewed album image index per newsId so that navigating
-  // back to a previously viewed item restores position instead of jumping to 0.
-  const albumHistory = useRef<Map<number, number>>(new Map());
-
   // ── History API ───────────────────────────────────────────────────────
   const closedByBackRef = useRef(false);
   useEffect(() => {
@@ -150,16 +145,10 @@ export function LightboxOverlay() {
 
   const channel = channels.find((c) => c.id === channelId);
 
-  // Track albumIndex per newsId
-  useEffect(() => {
-    if (newsId) albumHistory.current.set(newsId, albumIndex);
-  }, [newsId, albumIndex]);
-
   const navigate = useCallback(
     (nextNewsId: number, nextAlbumIndex: number) => {
-      // Restore last-viewed album position if navigating back to a known item
-      const restoredIndex = nextAlbumIndex !== 0 ? nextAlbumIndex : (albumHistory.current.get(nextNewsId) ?? 0);
-      openLightbox(nextNewsId, restoredIndex, channelId);
+      // Simple flat list: forward → first image (0), backward → last image (passed by go())
+      openLightbox(nextNewsId, nextAlbumIndex, channelId);
 
       const ch = channels.find((c) => c.id === channelId);
       if (ch?.channelType === 'media' || ch?.channelType === 'blog') {
