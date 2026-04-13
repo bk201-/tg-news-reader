@@ -67,6 +67,27 @@ export const NewsAccordionItem = memo(
       }
     }, [item.id, onSelect, onMarkedRead]);
 
+    // Double-tap on the expanded body → mark as read (skip interactive elements)
+    const bodyLastTapRef = useRef(0);
+    const handleBodyDoubleTap = useCallback(
+      (e: React.TouchEvent) => {
+        const tag = (e.target as HTMLElement).tagName?.toLowerCase();
+        // Don't interfere with links, buttons, images, videos, inputs
+        if (['a', 'button', 'img', 'video', 'audio', 'input', 'textarea', 'svg', 'path'].includes(tag)) return;
+        // Skip taps on elements inside interactive containers
+        if ((e.target as HTMLElement).closest?.('a, button, .ant-btn, .carousel-btn')) return;
+
+        const now = Date.now();
+        if (now - bodyLastTapRef.current < DOUBLE_TAP_MS) {
+          bodyLastTapRef.current = 0;
+          onMarkedRead(item.id);
+        } else {
+          bodyLastTapRef.current = now;
+        }
+      },
+      [item.id, onMarkedRead],
+    );
+
     if (!isFiltered && !showAll) return null;
 
     const dimmed = !isFiltered && showAll;
@@ -78,15 +99,17 @@ export const NewsAccordionItem = memo(
         className={cx(styles.item, isSelected && styles.itemExpanded, dimmed && styles.itemDimmed)}
       >
         {isSelected ? (
-          <NewsDetail
-            key={item.id}
-            item={item}
-            channelTelegramId={channelTelegramId}
-            onMarkedRead={onMarkedRead}
-            variant="inline"
-            onHeaderClick={() => onSelect(null)}
-            onTagClick={onTagClick}
-          />
+          <div onTouchEnd={handleBodyDoubleTap}>
+            <NewsDetail
+              key={item.id}
+              item={item}
+              channelTelegramId={channelTelegramId}
+              onMarkedRead={onMarkedRead}
+              variant="inline"
+              onHeaderClick={() => onSelect(null)}
+              onTagClick={onTagClick}
+            />
+          </div>
         ) : (
           <NewsListItem
             item={item}
