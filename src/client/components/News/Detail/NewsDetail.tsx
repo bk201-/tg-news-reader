@@ -122,6 +122,7 @@ export function NewsDetail({
           s.handleExtract(s.selectedUrl);
         }}
         onModalCancel={() => s.setLinkModalOpen(false)}
+        onDoubleTap={variant === 'inline' ? s.handleMarkRead : undefined}
       />
     </div>
   );

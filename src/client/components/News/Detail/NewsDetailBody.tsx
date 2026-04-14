@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { Button, Typography, Divider, Modal, Radio } from 'antd';
 import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
@@ -9,6 +9,14 @@ import { NewsDetailMedia } from './NewsDetailMedia';
 import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
 import { NewsTextBlock } from './NewsTextBlock';
 import { NewsArticleBody } from './NewsArticleBody';
+
+const DOUBLE_TAP_MS = 350;
+
+/** Tags that should NOT trigger double-tap (interactive / media elements) */
+const DOUBLE_TAP_EXCLUDED_TAGS = new Set(['a', 'button', 'img', 'video', 'audio', 'input', 'textarea', 'svg', 'path']);
+
+/** Selectors for interactive containers whose children should be excluded */
+const INTERACTIVE_SELECTOR = 'a, button, .ant-btn, .carousel-btn';
 
 const { Text } = Typography;
 
@@ -91,6 +99,8 @@ interface NewsDetailBodyProps {
   onModalConfirm: () => void;
   onModalCancel: () => void;
   variant?: 'panel' | 'inline';
+  /** Double-tap on body text area (mobile) — triggers mark-read */
+  onDoubleTap?: () => void;
 }
 
 export function NewsDetailBody({
@@ -120,9 +130,30 @@ export function NewsDetailBody({
   onModalConfirm,
   onModalCancel,
   variant = 'panel',
+  onDoubleTap,
 }: NewsDetailBodyProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
+
+  // ── Double-tap detection (mobile mark-read on body text) ──────────
+  const lastTapRef = useRef(0);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!onDoubleTap) return;
+      const tag = (e.target as HTMLElement).tagName?.toLowerCase();
+      if (DOUBLE_TAP_EXCLUDED_TAGS.has(tag)) return;
+      if ((e.target as HTMLElement).closest?.(INTERACTIVE_SELECTOR)) return;
+
+      const now = Date.now();
+      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+        lastTapRef.current = 0;
+        onDoubleTap();
+      } else {
+        lastTapRef.current = now;
+      }
+    },
+    [onDoubleTap],
+  );
 
   // Show the text infoblock only when there's actual post text
   const showTextBlock = item.textInPanel !== 1 && !(item.canLoadArticle === 1 && item.fullContent) && !!item.text;
@@ -137,7 +168,11 @@ export function NewsDetailBody({
 
   return (
     <>
-      <div className={cx(styles.content, variant === 'inline' && styles.contentInline)}>
+      <div
+        className={cx(styles.content, variant === 'inline' && styles.contentInline)}
+        onTouchEnd={handleTouchEnd}
+        style={onDoubleTap ? { touchAction: 'manipulation' } : undefined}
+      >
         <NewsDetailMedia
           item={item}
           firstMediaPath={firstMediaPath}
