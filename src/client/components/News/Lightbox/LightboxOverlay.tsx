@@ -344,7 +344,12 @@ export function LightboxOverlay() {
       />
 
       {/* Image fills the full area; nav buttons are positioned on top */}
-      <div className={styles.mediaArea}>
+      <div
+        className={styles.mediaArea}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeLightbox();
+        }}
+      >
         <button
           className={cx(styles.navBtn, styles.navPrev)}
           onClick={(e) => {
