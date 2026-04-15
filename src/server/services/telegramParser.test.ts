@@ -452,13 +452,151 @@ describe('parseMessageFields', () => {
 });
 
 describe('extractInstantViewText', () => {
-  it('is exported and extracts text from blocks', () => {
+  it('extracts title as markdown heading', () => {
+    const blocks = [new MockPageBlockTitle(new MockTextPlain('Title'))];
+    expect(extractInstantViewText(blocks as any)).toBe('# Title');
+  });
+
+  it('extracts subtitle as italic', () => {
+    const blocks = [new MockPageBlockSubtitle(new MockTextPlain('Sub'))];
+    expect(extractInstantViewText(blocks as any)).toBe('*Sub*');
+  });
+
+  it('extracts kicker as italic', () => {
+    const blocks = [new MockPageBlockKicker(new MockTextPlain('Kicker'))];
+    expect(extractInstantViewText(blocks as any)).toBe('*Kicker*');
+  });
+
+  it('extracts header as ## heading', () => {
+    const blocks = [new MockPageBlockHeader(new MockTextPlain('H2'))];
+    expect(extractInstantViewText(blocks as any)).toBe('## H2');
+  });
+
+  it('extracts subheader as ### heading', () => {
+    const blocks = [new MockPageBlockSubheader(new MockTextPlain('H3'))];
+    expect(extractInstantViewText(blocks as any)).toBe('### H3');
+  });
+
+  it('extracts paragraph and footer as plain text', () => {
     const blocks = [
-      new MockPageBlockTitle(new MockTextPlain('Title')),
-      new MockPageBlockParagraph(new MockTextPlain('Body paragraph')),
+      new MockPageBlockParagraph(new MockTextPlain('Body')),
+      new MockPageBlockFooter(new MockTextPlain('Foot')),
     ];
-    const text = extractInstantViewText(blocks as any);
-    expect(text).toContain('# Title');
-    expect(text).toContain('Body paragraph');
+    expect(extractInstantViewText(blocks as any)).toBe('Body\n\nFoot');
+  });
+
+  it('extracts preformatted as code block', () => {
+    const blocks = [new MockPageBlockPreformatted(new MockTextPlain('code()'))];
+    expect(extractInstantViewText(blocks as any)).toBe('```\ncode()\n```');
+  });
+
+  it('extracts divider as ---', () => {
+    const blocks = [new MockPageBlockDivider()];
+    expect(extractInstantViewText(blocks as any)).toBe('---');
+  });
+
+  it('extracts blockquote and pullquote', () => {
+    const blocks = [
+      new MockPageBlockBlockquote(new MockTextPlain('Quote 1')),
+      new MockPageBlockPullquote(new MockTextPlain('Quote 2')),
+    ];
+    expect(extractInstantViewText(blocks as any)).toBe('> Quote 1\n\n> Quote 2');
+  });
+
+  it('extracts unordered list items', () => {
+    const blocks = [
+      new MockPageBlockList([
+        new MockPageListItemText(new MockTextPlain('Item A')),
+        new MockPageListItemText(new MockTextPlain('Item B')),
+      ]),
+    ];
+    expect(extractInstantViewText(blocks as any)).toBe('- Item A\n\n- Item B');
+  });
+
+  it('extracts unordered list with nested blocks', () => {
+    const inner = new MockPageBlockParagraph(new MockTextPlain('Nested'));
+    const blocks = [new MockPageBlockList([new MockPageListItemBlocks([inner])])];
+    expect(extractInstantViewText(blocks as any)).toBe('- Nested');
+  });
+
+  it('extracts ordered list items', () => {
+    const blocks = [
+      new MockPageBlockOrderedList([
+        new MockPageListOrderedItemText(new MockTextPlain('First')),
+        new MockPageListOrderedItemText(new MockTextPlain('Second')),
+      ]),
+    ];
+    expect(extractInstantViewText(blocks as any)).toBe('1. First\n\n2. Second');
+  });
+
+  it('extracts ordered list with nested blocks', () => {
+    const inner = new MockPageBlockParagraph(new MockTextPlain('Sub'));
+    const blocks = [new MockPageBlockOrderedList([new MockPageListOrderedItemBlocks([inner])])];
+    expect(extractInstantViewText(blocks as any)).toBe('1. Sub');
+  });
+
+  it('extracts details block with title and nested blocks', () => {
+    const inner = new MockPageBlockParagraph(new MockTextPlain('Detail body'));
+    const blocks = [new MockPageBlockDetails(new MockTextPlain('Summary'), [inner])];
+    expect(extractInstantViewText(blocks as any)).toBe('### Summary\n\nDetail body');
+  });
+
+  it('skips blocks with empty text', () => {
+    const blocks = [
+      new MockPageBlockTitle(new MockTextPlain('  ')),
+      new MockPageBlockParagraph(new MockTextPlain('Real')),
+    ];
+    expect(extractInstantViewText(blocks as any)).toBe('Real');
+  });
+
+  it('handles TextConcat rich text', () => {
+    const concat = new MockTextConcat([new MockTextPlain('Hello '), new MockTextPlain('World')]);
+    const blocks = [new MockPageBlockParagraph(concat)];
+    expect(extractInstantViewText(blocks as any)).toBe('Hello World');
+  });
+
+  it('handles TextImage as empty string', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextImage())];
+    expect(extractInstantViewText(blocks as any)).toBe('');
+  });
+
+  it('handles TextEmpty as empty string', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextEmpty())];
+    expect(extractInstantViewText(blocks as any)).toBe('');
+  });
+
+  it('handles wrapped rich text with nested .text property', () => {
+    // Simulates TextBold, TextItalic, etc. — have a .text sub-field
+    const wrapped = { text: new MockTextPlain('bold text') };
+    const blocks = [new MockPageBlockParagraph(wrapped)];
+    expect(extractInstantViewText(blocks as any)).toBe('bold text');
+  });
+
+  it('handles wrapped rich text with no .text property', () => {
+    const wrapped = { someOther: 'field' };
+    const blocks = [new MockPageBlockParagraph(wrapped)];
+    expect(extractInstantViewText(blocks as any)).toBe('');
+  });
+});
+
+describe('parseMessageFields — document fallback', () => {
+  function makeMsg(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 1,
+      message: 'hello',
+      date: 1700000000,
+      entities: undefined,
+      media: undefined,
+      groupedId: undefined,
+      ...overrides,
+    } as any;
+  }
+
+  it('sets mediaType to document when document object is not a Document instance', () => {
+    // msg.media.document is not instanceof _Api.Document (e.g. DocumentEmpty)
+    const media = Object.assign(new MockMessageMediaDocument(), { document: {} });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('document');
+    expect(result!.mediaSizeBytes).toBeUndefined();
   });
 });
