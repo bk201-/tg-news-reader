@@ -10,14 +10,7 @@
 
 | # | Task | Description | Complexity |
 |---|------|-------------|------------|
-| ~~1~~ | ~~Unit tests: server services~~ | ✅ Done in PR #85 — `filterEngine`, `channelStrategies`, `readability`, `toNewsItem` mapper, `alertBot`, `logBuffer`, `mediaProgress`, `downloadProgress`, `errorHtml`, `openaiClient`, `telegramParser`, `telegramCircuitBreaker`, `customTypes`. Stack: **Vitest**. | ~~⭐⭐~~ |
-| ~~2~~ | ~~Unit tests: client hooks & stores~~ | ✅ Done in PR #85 — `uiStore`, `authStore`, `filterUtils`, `newsUtils`, `digestUtils`, `reconnectingEventSource`, `client`, `digest`, `mediaUrl`, `news` API hooks. Stack: **Vitest** + `@testing-library/react`. | ~~⭐⭐~~ |
-| ~~3~~ | ~~Unit tests: shared utilities~~ | ✅ Done in PR #85 — `retry.ts` policies, `schemas.ts` Zod validation. Stack: **Vitest**. | ~~⭐~~ |
-| ~~4~~ | ~~Integration tests: API routes~~ | ✅ Done — all 11 route files covered: `auth`, `channels`, `groups`, `news`, `filters`, `content`, `media`, `downloads`, `clientLog`, `logs`, `digest`. In-memory SQLite + `app.request()`. Stack: **Vitest**. | ~~⭐⭐⭐~~ |
-| 5 | Integration tests: download workers | Worker thread lifecycle: task dispatch → IPC bridge → DB update. Mock `parentPort` + Telegram bridge. Stack: **Vitest** with worker-threads mocks. | ⭐⭐⭐ |
-| ~~6~~ | ~~Component tests: key UI flows~~ | ✅ Mostly done — `LoginPage` + TOTP, `AuthGate`, `GroupPinModal` unlock, `NewsDetail` hotkeys + state, `NewsListItem`, `FilterPanel`, `useNewsFeed*` hooks (data/actions/scroll/hotkeys), `useHashTagSync`, `useLightboxNav`, `useChannelHotkeys`, `breakpoints`. Only `ChannelSidebar` full CRUD render-test not yet written (logic covered via hooks + API tests). Stack: **Vitest** + `@testing-library/react`. | ~~⭐⭐⭐~~ |
-| 7 | E2E smoke test | Login → select channel → fetch → read news → mark read. Stack: **Playwright**, runs against `npm run dev` with a test SQLite DB seeded with fixture data. | ⭐⭐⭐⭐ |
-| ~~8~~ | ~~CI test step~~ | ✅ Done — `npx vitest run` added to both `pr-check.yml` and `build-main.yml` after lint step. | ~~⭐~~ |
+| 1 | E2E smoke test | Login → select channel → fetch → read news → mark read. Stack: **Playwright**, runs against `npm run dev` with a test SQLite DB seeded with fixture data. | ⭐⭐⭐⭐ |
 
 ---
 
