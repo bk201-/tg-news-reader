@@ -61,7 +61,7 @@ describe('telegramBridge', () => {
 
   describe('handleBridgeMessage — tg:downloadMedia', () => {
     it('downloads media and posts result back to worker', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce('data/channel/file.jpg');
 
@@ -79,7 +79,7 @@ describe('telegramBridge', () => {
     });
 
     it('replies with no_media when message has no rawMedia', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: null } as any);
 
       const worker = createFakeWorker();
@@ -93,7 +93,7 @@ describe('telegramBridge', () => {
     });
 
     it('replies with no_media when message is null', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce(null as any);
 
       const worker = createFakeWorker();
@@ -105,7 +105,7 @@ describe('telegramBridge', () => {
     });
 
     it('replies with size_limit when downloadMessageMedia returns null', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce(null);
 
@@ -120,7 +120,7 @@ describe('telegramBridge', () => {
     });
 
     it('passes ignoreLimit to downloadMessageMedia', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce('path.jpg');
 
@@ -145,7 +145,7 @@ describe('telegramBridge', () => {
     });
 
     it('replies with tg:error when downloadMessageMedia throws', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockRejectedValueOnce(new Error('disk full'));
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { getLogEntries, getBufferSize, logBufferStream, type LogEntry } from './logBuffer.js';
 
 // Helper to push a JSON log line through the writable stream

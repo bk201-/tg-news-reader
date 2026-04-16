@@ -253,7 +253,7 @@ export async function downloadMessageMedia(
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // oxlint-disable-next-line typescript/no-explicit-any, typescript/no-unsafe-argument
       const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
       if (!result) return null;
       return `${channelTelegramId}/${filename}`;

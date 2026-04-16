@@ -39,7 +39,7 @@ export function AuthGate({ children }: Props) {
         logger.warn({ module: 'auth', err }, 'session restore failed');
         clearAuth();
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   if (isCheckingAuth) {

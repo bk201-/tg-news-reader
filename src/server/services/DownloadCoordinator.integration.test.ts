@@ -25,7 +25,7 @@ vi.mock('../utils/retry.js', async () => {
   };
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 const createdWorkers: any[] = [];
 
 vi.mock('worker_threads', async () => {

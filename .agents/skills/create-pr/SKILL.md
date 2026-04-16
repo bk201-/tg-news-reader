@@ -79,22 +79,30 @@ The PR body should include:
 - What changed (bullet points)
 - Version bump (e.g., "1.3.0 → 1.4.0")
 
-### 7. Switch back to main and update it
+### 7. Wait for CI and switch to main
 
-**This step is mandatory after every push** — prevents stale-branch issues on the next PR:
+After creating the PR, **wait for the CI run to finish** before switching branches:
 
 ```bash
-git checkout main
-git pull origin main
+# Get the CI run triggered by the PR and watch it
+gh run list --branch <branch-name> --limit 1 --json databaseId,status --jq ".[0].databaseId"
+gh run watch <run-id>
 ```
+
+- If CI **passes** — switch to main and update:
+  ```bash
+  git checkout main
+  git pull origin main
+  ```
+- If CI **fails** — **stay on the feature branch**, report the failure to the user, and fix the issue before retrying. Do NOT switch to main.
 
 ### 8. Report to user
 
 Tell the user:
-- �� All checks passed
-- 📦 Version bumped (from → to)
-- 🔗 PR URL
-- The PR will auto-merge after CI passes (if author matches the ruleset)
+- All local checks passed
+- Version bumped (from -> to)
+- PR URL
+- CI result (passed / failed / auto-merged)
 
 ## Important rules
 
@@ -104,4 +112,3 @@ Tell the user:
 - **Always switch back to `main` after pushing.** This is non-negotiable.
 - If `gh` CLI is not authenticated, tell the user to run `gh auth login` first.
 - If there are uncommitted changes when starting, include them in the PR (don't stash).
-
