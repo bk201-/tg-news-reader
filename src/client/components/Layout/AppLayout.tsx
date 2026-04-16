@@ -147,7 +147,7 @@ export function AppLayout() {
 
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [isAccordionMode]);
 
   useEffect(() => {

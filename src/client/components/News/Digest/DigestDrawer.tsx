@@ -131,7 +131,7 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     if (open && !text && !loading && !error) {
       void run();
     }
-  }, [open, paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, paramsKey]); // oxlint-disable-line react/exhaustive-deps
 
   // Abort on unmount
   useEffect(() => {

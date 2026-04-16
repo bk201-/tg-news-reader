@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "promise", "typescript"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "ignorePatterns": [".agents", ".github", ".idea", "coverage", "data", "dist", "node_modules", "public"],
+  "rules": {
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-await-in-loop": "off",
+    "no-shadow": "off",
+    "import/no-unassigned-import": "off",
+    "import/no-named-as-default-member": "off",
+    "promise/no-promise-in-callback": "off",
+    "promise/always-return": "off",
+    "typescript/no-misused-promises": [
+      "error",
+      { "checksVoidReturn": { "attributes": false } }
+    ],
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-misused-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/client/**/*.{ts,tsx}", "src/shared/**/*.ts"],
+      "plugins": ["react"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "warn",
+        "react/react-in-jsx-scope": "off",
+        "react/no-array-index-key": "off",
+        "react/iframe-missing-sandbox": "off",
+        "react/only-export-components": [
+          "warn",
+          { "allowConstantExport": true }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.integration.test.ts", "**/test-setup.ts", "src/server/__tests__/**/*.ts"],
+      "rules": {
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-empty-object-type": "off",
+        "typescript/no-extraneous-class": "off",
+        "typescript/unbound-method": "off",
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+        "no-empty": "off",
+        "no-unsafe-optional-chaining": "off",
+        "promise/no-multiple-resolved": "off"
+      }
+    }
+  ]
+}

@@ -112,7 +112,7 @@ export function ChannelSidebar() {
       openCreate();
       useUIStore.getState().setOpenAddChannel(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [openAddChannel]);
 
   const openEdit = (ch: Channel) => {

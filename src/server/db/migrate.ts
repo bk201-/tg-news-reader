@@ -1,4 +1,4 @@
-﻿import { client } from './index.js';
+import { client } from './index.js';
 import { logger } from '../logger.js';
 
 export async function runMigration(): Promise<void> {

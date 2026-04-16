@@ -120,7 +120,7 @@ export function LightboxOverlay() {
         history.replaceState(null, '', window.location.href);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [!!lightbox]);
 
   // ── Lock body scroll while lightbox is open ──────────────────────────
@@ -141,7 +141,7 @@ export function LightboxOverlay() {
       document.body.style.overflow = prev;
       document.removeEventListener('touchmove', preventScroll);
     };
-  }, [!!lightbox]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [!!lightbox]); // oxlint-disable-line react/exhaustive-deps
 
   const channel = channels.find((c) => c.id === channelId);
 
@@ -178,7 +178,7 @@ export function LightboxOverlay() {
     if (channel.channelType === 'media' || channel.channelType === 'blog') {
       markRead.mutate({ id: lightbox.newsId, isRead: 1, channelId: lightbox.channelId });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [lightbox?.newsId, lightbox?.channelId]);
 
   // Focus overlay so keyboard events are received

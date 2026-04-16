@@ -36,7 +36,7 @@ jobs:
       - name: TypeScript check (server)
         run: npm run build:server
 
-      - name: ESLint
+      - name: Oxlint
         run: npm run lint
 
       - name: Prettier

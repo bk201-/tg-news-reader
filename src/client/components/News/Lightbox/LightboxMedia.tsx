@@ -109,7 +109,7 @@ export function LightboxMedia({
     },
     // Re-create the callback when path changes so React replaces the video element
     // and the callback fires again for the new element.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [path, videoRef],
   );
 

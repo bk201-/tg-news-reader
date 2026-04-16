@@ -18,7 +18,7 @@ vi.mock('../../../api/downloads', () => ({
 }));
 
 vi.mock('./useNewsDetailHotkeys', () => ({
-  useNewsDetailHotkeys: (opts: { item: NewsItem }) => ({
+  useNewsDetailHotkeys: (_opts: { item: NewsItem }) => ({
     albumIndex: 0,
     setAlbumIndex: vi.fn(),
     topPanel: null,
