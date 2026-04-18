@@ -1,8 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { Button } from 'antd';
-import { LoadingOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { LoadingOutlined, DownloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { mediaUrl } from '../../../api/mediaUrl';
+
+/** Max number of silent auto-retries before showing error UI */
+const MAX_AUTO_RETRIES = 2;
+/** Delay between auto-retries (ms) — gives time for file to finish writing */
+const AUTO_RETRY_DELAY = 1500;
 
 interface LightboxMediaProps {
   path: string | undefined;
@@ -13,7 +18,7 @@ interface LightboxMediaProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   /** Called when user wants to queue a download for the missing media */
   onDownload?: () => void;
-  /** Called when the image failed to load (e.g. expired URL) */
+  /** Called when the image failed to load (e.g. expired URL / stale cache) */
   onRetry?: () => void;
 }
 
@@ -79,6 +84,17 @@ const useStyles = createStyles(({ css, token }) => ({
     z-index: 4;
     pointer-events: auto;
   `,
+  lightboxBtn: css`
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.35);
+    background: transparent;
+    &:hover,
+    &:focus {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.65);
+      background: rgba(255, 255, 255, 0.1);
+    }
+  `,
 }));
 
 export function LightboxMedia({
@@ -120,11 +136,53 @@ export function LightboxMedia({
   const [trackedPath, setTrackedPath] = useState(displayPath);
   const [imgLoading, setImgLoading] = useState(!!displayPath);
   const [imgError, setImgError] = useState(false);
+  // Auto-retry: silently reload the image with a cache-buster before showing error UI
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   if (trackedPath !== displayPath) {
     setTrackedPath(displayPath);
     setImgLoading(!!displayPath);
     setImgError(false);
+    setRetryCount(0);
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
   }
+
+  // Cleanup timer on unmount
+  useEffect(
+    () => () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    },
+    [],
+  );
+
+  const handleImgError = useCallback(() => {
+    if (retryCount < MAX_AUTO_RETRIES) {
+      // Silent retry after a delay — file might still be writing to disk
+      retryTimerRef.current = setTimeout(() => {
+        setRetryCount((n) => n + 1);
+        setImgLoading(true);
+        setImgError(false);
+      }, AUTO_RETRY_DELAY);
+      setImgLoading(false);
+      setImgError(false); // don't show error UI during auto-retry wait
+    } else {
+      setImgLoading(false);
+      setImgError(true);
+      // After exhausting auto-retries, trigger onRetry to refresh data from server
+      onRetry?.();
+    }
+  }, [retryCount, onRetry]);
+
+  /** Image URL with cache-buster to bypass browser/SW cache on retries */
+  const imgSrc = displayPath
+    ? retryCount > 0
+      ? `${mediaUrl(displayPath)}&_r=${retryCount}`
+      : mediaUrl(displayPath)
+    : '';
 
   // No path at all — media not downloaded yet
   if (!path) {
@@ -133,7 +191,7 @@ export function LightboxMedia({
         {onDownload ? (
           <div className={styles.errorOverlay}>
             <LoadingOutlined className={styles.spinner} />
-            <Button icon={<DownloadOutlined />} onClick={onDownload} ghost>
+            <Button icon={<DownloadOutlined />} onClick={onDownload} className={styles.lightboxBtn}>
               Download
             </Button>
           </div>
@@ -160,20 +218,20 @@ export function LightboxMedia({
       ) : (
         <>
           {/* img intentionally has NO key — reusing the same DOM node lets the
-              previous image stay visible while the new src is decoding (Issue 12) */}
+              previous image stay visible while the new src is decoding (Issue 12).
+              retryCount in key forces a fresh element after auto-retries. */}
           <img
-            src={mediaUrl(displayPath!)}
+            key={retryCount}
+            src={imgSrc}
             alt=""
             className={styles.img}
             draggable={false}
             onLoad={() => {
               setImgLoading(false);
               setImgError(false);
+              setRetryCount(0);
             }}
-            onError={() => {
-              setImgLoading(false);
-              setImgError(true);
-            }}
+            onError={handleImgError}
           />
           {/* Spinner overlay while loading — previous image stays visible beneath */}
           {imgLoading && !imgError && (
@@ -181,13 +239,13 @@ export function LightboxMedia({
               <LoadingOutlined className={styles.spinner} />
             </div>
           )}
-          {/* Error state — broken / expired URL */}
+          {/* Error state — shown only after all auto-retries exhausted */}
           {imgError && (
             <div className={styles.errorOverlay}>
               <span>Failed to load</span>
-              {onRetry && (
-                <Button icon={<ReloadOutlined />} onClick={onRetry} ghost size="small">
-                  Retry
+              {onDownload && (
+                <Button icon={<DownloadOutlined />} onClick={onDownload} className={styles.lightboxBtn} size="small">
+                  Re-download
                 </Button>
               )}
             </div>

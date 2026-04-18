@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useUIStore } from '../../../store/uiStore';
-import { useChannels, channelKeys } from '../../../api/channels';
-import { useMarkRead, useDownloadMedia, useNews } from '../../../api/news';
+import { useChannels } from '../../../api/channels';
+import { useMarkRead, useDownloadMedia, useNews, type NewsResponse, updatePaginatedItems } from '../../../api/news';
+import { api } from '../../../api/client';
+import type { NewsItem } from '@shared/types.ts';
 import { useLightboxNav } from './useLightboxNav';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
@@ -51,20 +53,34 @@ const useStyles = createStyles(({ css }) => ({
     color: rgba(255, 255, 255, 0.5);
     font-size: 20px;
     cursor: pointer;
-    transition:
-      background 0.15s,
-      color 0.15s;
     outline: none;
     padding: 0;
-    /* Touch-friendly tap target without blocking too much of the image */
-    &:hover,
-    &:active {
-      background: rgba(255, 255, 255, 0.08);
+
+    /* Circle around the chevron icon */
+    .anticon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: transparent;
+      transition:
+        background 0.15s,
+        color 0.15s;
+    }
+
+    &:hover .anticon,
+    &:active .anticon {
+      background: rgba(255, 255, 255, 0.15);
       color: #fff;
     }
     &:disabled {
       opacity: 0.15;
       cursor: default;
+    }
+    &:disabled:hover .anticon {
+      background: transparent;
     }
   `,
   navPrev: css`
@@ -317,9 +333,21 @@ export function LightboxOverlay() {
   };
 
   const handleRetry = () => {
-    // Invalidate news cache to refresh signed URLs, then re-open at same position
-    void qc.invalidateQueries({ queryKey: ['news', channelId] });
-    void qc.invalidateQueries({ queryKey: channelKeys.all });
+    if (!item) return;
+    // Fetch fresh news item from API — cache may be stale (SSE missed update)
+    void api.get<NewsItem>(`/news/${item.id}`).then((updated) => {
+      // Patch the updated item into paginated cache
+      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+        updatePaginatedItems(old, (items) =>
+          items.map((n) => (n.id === updated.id ? { ...n, ...updated, isRead: n.isRead } : n)),
+        ),
+      );
+      // If the server still has no media path → queue a re-download
+      const freshPath = updated.localMediaPaths?.[0] ?? updated.localMediaPath;
+      if (!freshPath) {
+        downloadMedia.mutate(item.id);
+      }
+    });
   };
 
   return createPortal(

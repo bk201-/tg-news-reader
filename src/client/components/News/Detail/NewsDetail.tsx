@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
 import { NewsDetailBody } from './NewsDetailBody';
 import { useNewsDetailState } from './useNewsDetailState';
+import { useScrollProgress } from './useScrollProgress';
+import { ScrollProgressBar } from './ScrollProgressBar';
 import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -58,9 +60,16 @@ export function NewsDetail({
 }: NewsDetailProps) {
   const { styles, cx } = useStyles();
   const s = useNewsDetailState({ item, channelTelegramId, onMarkedRead, variant });
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  // Sticky offset = feed toolbar (on mobile) + approximate header height
+  // On mobile (< BP_XL): MOBILE_TOOLBAR_HEIGHT is the feed toolbar above;
+  // the detail header itself sticks below it. We track progress of the whole detail container.
+  const stickyOffset = MOBILE_TOOLBAR_HEIGHT + 48; // toolbar + approx header height
+  const scrollProgress = useScrollProgress(detailRef, stickyOffset, variant === 'inline');
 
   return (
-    <div className={cx(styles.detail, variant === 'inline' && styles.detailInline)}>
+    <div ref={detailRef} className={cx(styles.detail, variant === 'inline' && styles.detailInline)}>
       <div className={cx(styles.header, variant === 'inline' && styles.headerInline)}>
         <NewsDetailToolbar
           item={item}
@@ -83,6 +92,7 @@ export function NewsDetail({
           onTagClick={onTagClick}
           onShare={() => void s.handleShare()}
         />
+        {variant === 'inline' && <ScrollProgressBar progress={scrollProgress} />}
       </div>
 
       {s.topPanel && (
