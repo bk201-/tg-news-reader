@@ -32,7 +32,9 @@ Implemented via **CSS Container Queries** — native browser standard, no JS:
 ```css
 /* container-type: inline-size on parent */
 @container (max-width: 300px) {
-  .btn-text { display: none; }
+  .btn-text {
+    display: none;
+  }
 }
 ```
 
@@ -125,6 +127,7 @@ DELETE /api/auth/sessions/:id
 ## 10. Service Worker media cache
 
 `public/sw.js` — **Cache-First** for `GET /api/media/*`:
+
 - Strips `?token=` from cache key — JWT rotation doesn't bust the cache
 - Max 2000 entries, 30-day TTL (configurable via `postMessage`)
 - Registers in production only (`import.meta.env.DEV` guard)
@@ -136,12 +139,12 @@ DELETE /api/auth/sessions/:id
 
 Stack: `pino` (JSON in prod, pino-pretty in dev). Level: `LOG_LEVEL` env (default `debug`/`info`).
 
-| Level | Event |
-|-------|-------|
-| `info`  | Server start, channel fetch (inserted/total), download done |
+| Level   | Event                                                          |
+| ------- | -------------------------------------------------------------- |
+| `info`  | Server start, channel fetch (inserted/total), download done    |
 | `warn`  | Task failed, Telegram unavailable, auth fail (no email in log) |
-| `error` | Unhandled exception, worker crash |
-| `debug` | (dev only) Telegram request details |
+| `error` | Unhandled exception, worker crash                              |
+| `debug` | (dev only) Telegram request details                            |
 
 Structure: `{ level, time, module, ...fields, msg }`. In Azure Container Apps, stdout → Log Analytics automatically.
 
@@ -196,6 +199,7 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 **File-reference freshness** (`telegramBridge.ts`): every `tg:downloadMedia` IPC call starts with `fetchMessageById(channelTelegramId, msgId)` to get a fresh `rawMedia` object before calling `downloadMedia()`. Telegram file references have a TTL; re-fetching on every attempt (not just on retry) means stale references are never used and the "file reference expired" error cannot occur.
 
 **Dev vs prod worker entry-point:**
+
 - **Dev**: `downloadWorkerShim.mjs` — plain `.mjs` that calls `register('tsx/esm')` then dynamically imports `downloadWorker.ts`; the only reliable way to activate tsx hooks in `worker_threads` with Node.js 22.12+.
 - **Prod**: `downloadWorker.js` (compiled) — loaded directly, no loader needed.
 
@@ -235,12 +239,12 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 
 ### Stack
 
-| Component | Service | ~Cost/mo |
-|---|---|---|
-| Backend (Hono + Node) | Container Apps | ~$5–15 |
-| DB | Turso | $0–29 |
-| Images | Azure Container Registry (Basic) | $5 |
-| SSL | Container Apps TLS | ~$0.5 |
+| Component             | Service                          | ~Cost/mo |
+| --------------------- | -------------------------------- | -------- |
+| Backend (Hono + Node) | Container Apps                   | ~$5–15   |
+| DB                    | Turso                            | $0–29    |
+| Images                | Azure Container Registry (Basic) | $5       |
+| SSL                   | Container Apps TLS               | ~$0.5    |
 
 ### Container App configuration
 
@@ -259,10 +263,10 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 
 ### Azure Monitor Alerts (deployed in `personal-apps-rg`)
 
-| Rule | Trigger | Window | Delay |
-|---|---|---|---|
-| `tg-reader-error-logs` | KQL: `log.level >= 50` | 5 min | 1–5 min |
-| `tg-reader-restart` | `RestartCount > 1` | **15 min** (updated 2026-03-28) | 1–5 min |
+| Rule                   | Trigger                | Window                          | Delay   |
+| ---------------------- | ---------------------- | ------------------------------- | ------- |
+| `tg-reader-error-logs` | KQL: `log.level >= 50` | 5 min                           | 1–5 min |
+| `tg-reader-restart`    | `RestartCount > 1`     | **15 min** (updated 2026-03-28) | 1–5 min |
 
 Recreate: `scripts/setup-monitoring.sh`. PowerShell: `az rest --body @file.json`.
 
@@ -273,13 +277,13 @@ Recreate: `scripts/setup-monitoring.sh`. PowerShell: `az rest --body @file.json`
 
 ### Alert stack
 
-| Event | Channel | Delay |
-|---|---|---|
-| `uncaughtException` / worker crash / circuit OPEN | alertBot → Telegram | immediate |
-| Deploy failed (CI) | GitHub Actions → Telegram | immediate |
-| `logger.error/fatal` | Azure Monitor KQL → email | 1–5 min |
-| Container restart / OOM | Azure Monitor Metric → email | 1–5 min |
-| Server unreachable | UptimeRobot → Telegram/email (optional) | ≤5 min |
+| Event                                             | Channel                                 | Delay     |
+| ------------------------------------------------- | --------------------------------------- | --------- |
+| `uncaughtException` / worker crash / circuit OPEN | alertBot → Telegram                     | immediate |
+| Deploy failed (CI)                                | GitHub Actions → Telegram               | immediate |
+| `logger.error/fatal`                              | Azure Monitor KQL → email               | 1–5 min   |
+| Container restart / OOM                           | Azure Monitor Metric → email            | 1–5 min   |
+| Server unreachable                                | UptimeRobot → Telegram/email (optional) | ≤5 min    |
 
 ---
 
@@ -361,6 +365,7 @@ The digest prompt instructs the model to annotate each mentioned news item with 
 ## 20. Client-side gramjs download (deferred)
 
 **Implementation options:**
+
 - **A**: server returns `{ fileId, accessHash, dcId, fileReference }`, client downloads via gramjs
 - **B**: server returns a signed proxy URL
 
@@ -416,6 +421,7 @@ app.onError((err, c) => c.html(errorHtml('500', err.message, stack), 500));
 ```
 
 `errorHtml()` is a template literal that:
+
 - Respects `prefers-color-scheme` (dark/light) via a `<style>` media query
 - Shows the stack trace only when `NODE_ENV !== 'production'`
 - Returns a minimal styled HTML page (no external dependencies)
@@ -489,4 +495,3 @@ When auto-reconnect fails, `sendAlert('Telegram session expired …', 'auth-key-
 - Disappears automatically once `sessionExpired` goes back to `false` (e.g. after redeploy)
 
 ---
-

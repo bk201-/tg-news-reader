@@ -10,8 +10,8 @@ on:
     branches: [main]
 
 permissions:
-  contents: write       # needed to merge
-  pull-requests: write  # needed for gh pr merge
+  contents: write # needed to merge
+  pull-requests: write # needed for gh pr merge
 
 jobs:
   # ── 1. Full quality gate ──────────────────────────────────────────────────

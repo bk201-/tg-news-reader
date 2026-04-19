@@ -67,4 +67,3 @@ Integration test for `/api/version` route using the existing `app.request()` pat
 - [ ] `useVersionCheck` hook unit test covers mismatch, match, error, and dev-mode cases
 - [ ] All existing tests still pass
 - [ ] Coverage thresholds not violated
-

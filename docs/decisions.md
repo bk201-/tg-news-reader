@@ -1,6 +1,6 @@
 # TG News Reader — Decisions & History
 
-> Archive of architectural decisions and resolved bugs. Explains the *why*, not just the *what*.
+> Archive of architectural decisions and resolved bugs. Explains the _why_, not just the _what_.
 
 ---
 
@@ -9,6 +9,7 @@
 ### Auth: manual implementation vs better-auth
 
 Chose **manual** (bcryptjs + hono/jwt + otpauth):
+
 - Simple use case: single user, single server
 - No dependency on an external library with its own update cycle
 - Revisit if OAuth (Google/GitHub) or Passkeys are added
@@ -16,6 +17,7 @@ Chose **manual** (bcryptjs + hono/jwt + otpauth):
 ### DB: SQLite/Turso vs PostgreSQL
 
 SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
+
 - `db/index.ts` reads `DATABASE_URL`: if set → Turso, otherwise `file:data/db.sqlite`
 - Minimal infrastructure, no separate DB server
 - Bottleneck: write concurrency — not relevant for a single-user app
@@ -23,6 +25,7 @@ SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
 ### count-unread: lastFetchedAt vs lastReadAt
 
 `count-unread` intentionally uses `lastFetchedAt` (not `lastReadAt`):
+
 - Badge = `unreadCount` from channel list query
 - Using `lastReadAt` would double-count already-fetched unread messages
 - `getSinceDate` is used only in the fetch route
@@ -30,6 +33,7 @@ SQLite locally, Turso (libSQL) in production — via a single `@libsql/client`:
 ### Scale-to-zero cooldown
 
 2026-03-28: increased from 300s to **1800s** (30 minutes):
+
 - Reason: frequent false alerts from `RestartCount` when the container woke from zero
 - Alongside: `tg-reader-restart` alert changed to `RestartCount > 1` over 15 min
 - API note: PATCH via `2024-10-02-preview` (stable API did not accept `cooldownPeriod` as writable)

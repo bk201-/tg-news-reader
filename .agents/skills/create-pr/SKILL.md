@@ -149,6 +149,7 @@ gh pr create --base main --title "<same as commit message>" --body "<brief descr
 ```
 
 PR body should include:
+
 - What changed (bullet points)
 - Version bump (e.g., "1.3.0 → 1.4.0")
 
@@ -201,6 +202,7 @@ gh run view <run-id> --log-failed
 ### 14. Report to user
 
 Tell the user:
+
 - All local checks passed
 - Version bumped (from → to)
 - PR URL

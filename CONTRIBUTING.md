@@ -62,6 +62,7 @@ git push origin your-branch --force-with-lease
 ### PR check (`.github/workflows/pr-check.yml`)
 
 Runs automatically on every PR to `main`:
+
 1. `build` → `build:server` → `lint` → `format:check`
 2. If all pass **and** author is `bk201-` → **auto-squash-merge** + branch deletion
 
@@ -72,6 +73,7 @@ Required status check name in Ruleset: **`Build & Lint`**
 ### Main pipeline (`.github/workflows/build-main.yml`)
 
 Runs on every push to `main` (i.e. after PR merge):
+
 1. Quality gate (same 4 checks)
 2. `docker build` → push to ACR
 3. `az containerapp update` → deploy

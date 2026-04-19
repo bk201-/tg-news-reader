@@ -7,11 +7,11 @@ name: Build Main
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # allows manual run from GitHub Actions UI
+  workflow_dispatch: # allows manual run from GitHub Actions UI
 
 permissions:
   contents: read
-  actions: write   # needed to delete old artifacts
+  actions: write # needed to delete old artifacts
 
 jobs:
   # ── 1. Quality gate (same as PR) ─────────────────────────────────────────
@@ -88,7 +88,6 @@ jobs:
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/tg-news-reader:${{ github.sha }} \
             --revision-suffix "r${SHORT_SHA}"
-
 
       # ── Single-revision mode: deactivate all revisions except the new one ──
       # Container Apps keeps old revisions by default — they consume quota.

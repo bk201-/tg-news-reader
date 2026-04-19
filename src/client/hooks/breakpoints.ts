@@ -75,4 +75,3 @@ export const useIsMd = () => useBreakpoints().isMd;
 export const useIsXl = () => useBreakpoints().isXl;
 /** ≥ 1600px (xxl) — full desktop: inline sidebar, pin downloads panel */
 export const useIsXxl = () => useBreakpoints().isXxl;
-

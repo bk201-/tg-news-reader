@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import versionRouter from './version.js';
-import { version as APP_VERSION } from '../../../package.json';
+import packageJson from '../../../package.json' with { type: 'json' };
+
+const APP_VERSION: string = packageJson.version;
 
 function createApp() {
   const app = new Hono();
@@ -27,4 +29,3 @@ describe('Version route (integration)', () => {
     await expect(res.json()).resolves.toEqual({ version: APP_VERSION });
   });
 });
-

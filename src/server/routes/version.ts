@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
-import { version as APP_VERSION } from '../../../package.json';
+import packageJson from '../../../package.json' with { type: 'json' };
+
+const APP_VERSION: string = packageJson.version;
 
 const router = new Hono();
 
@@ -8,4 +10,3 @@ router.get('/', (c) => {
 });
 
 export default router;
-

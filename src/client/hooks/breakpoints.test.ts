@@ -55,7 +55,6 @@ describe('breakpoints', () => {
     expect(result.current.isXxl).toBe(false);
   });
 
-
   it('useIsMd / useIsXl / useIsXxl return correct booleans', async () => {
     const { useIsMd, useIsXl, useIsXxl } = await import('./breakpoints.js');
 
