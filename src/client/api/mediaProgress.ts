@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
+import { tryRefresh } from './client';
 import type { NewsItem } from '@shared/types.ts';
 import { type NewsResponse, updatePaginatedItems } from './news';
 import { createReconnectingEventSource } from '../services/reconnectingEventSource';
@@ -33,11 +34,14 @@ export function useMediaProgressSSE(
   useEffect(() => {
     if (!channelId) return;
 
-    const token = accessToken ? `?token=${encodeURIComponent(accessToken)}` : '';
-    const url = `/api/channels/${channelId}/media-progress${token}`;
+    const getUrl = () => {
+      const token = useAuthStore.getState().accessToken;
+      return `/api/channels/${channelId}/media-progress${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    };
 
     const rec = createReconnectingEventSource({
-      url,
+      getUrl,
+      onBeforeReconnect: async () => { await tryRefresh(); },
       module: 'mediaProgress',
       onConnect: (es) => {
         es.addEventListener('item', (e: MessageEvent) => {

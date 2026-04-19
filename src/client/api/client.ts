@@ -43,7 +43,7 @@ async function fetchWithNetworkRetry(input: string, init?: RequestInit): Promise
 // Prevent multiple simultaneous refresh calls
 let refreshing: Promise<string | null> | null = null;
 
-async function tryRefresh(): Promise<string | null> {
+export async function tryRefresh(): Promise<string | null> {
   if (refreshing) return refreshing;
 
   refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })

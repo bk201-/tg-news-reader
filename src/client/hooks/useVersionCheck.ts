@@ -43,8 +43,13 @@ export function useVersionCheck({
         if (!active || typeof data.version !== 'string') return;
 
         const mismatch = data.version !== clientVersion;
-        setHasMismatch(mismatch);
-        setDismissed(false);
+        // Only reset `dismissed` when a NEW mismatch is first detected
+        // (i.e., server just deployed a new version). Don't reset if the
+        // user already dismissed this banner — it would re-appear every 5 min.
+        setHasMismatch((prev) => {
+          if (!prev && mismatch) setDismissed(false);
+          return mismatch;
+        });
       } catch {
         // Ignore transient failures — version polling is best-effort only.
       }
