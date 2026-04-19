@@ -63,15 +63,14 @@ router.post('/batch', zValidator('json', batchFiltersSchema), async (c) => {
         .returning()
     : [];
 
-  const deletedCount =
-    toDelete.length
-      ? (
-          await db
-            .delete(filters)
-            .where(and(eq(filters.channelId, channelId), inArray(filters.id, toDelete)))
-            .returning()
-        ).length
-      : 0;
+  const deletedCount = toDelete.length
+    ? (
+        await db
+          .delete(filters)
+          .where(and(eq(filters.channelId, channelId), inArray(filters.id, toDelete)))
+          .returning()
+      ).length
+    : 0;
 
   await reprocessChannelFilters(channelId);
   return c.json({ added, deleted: deletedCount });
