@@ -2,6 +2,7 @@
   "common": {
     "save": "Сохранить",
     "cancel": "Отмена",
+    "close": "Закрыть",
     "delete": "Удалить",
     "download": "Загрузить",
     "loading": "Загрузка...",
@@ -288,8 +289,11 @@
     "add_filter": "Добавить в фильтры",
     "remove_filter": "Убрать из фильтров",
     "filtered": "Скрыт",
-    "filter_added": "Тег {{tag}} добавлен в фильтры",
-    "filter_removed": "Фильтр для {{tag}} удалён",
+    "pending_add": "Будет скрыт",
+    "pending_remove": "Будет удалён",
+    "undo": "Отменить",
+    "ok_with_changes": "Применить ({{count}})",
+    "changes_applied": "Фильтры обновлены: {{count}}",
     "empty": "Нет хэштегов в загруженных новостях"
   }
 }
