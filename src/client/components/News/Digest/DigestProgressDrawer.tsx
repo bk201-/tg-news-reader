@@ -15,8 +15,13 @@ const { Text } = Typography;
 
 /** Batch size (news items per batch). */
 export const DIGEST_BATCH_SIZE = 50;
-/** Max concurrent batches running at once. */
-export const DIGEST_MAX_PARALLEL = 5;
+/**
+ * Max concurrent batches running at once. Each batch is an SSE stream that
+ * polls the server every second during article prefetch — keep this low so
+ * the server-side worker pool (only a few workers can parse jsdom) is not
+ * overwhelmed by simultaneous digest requests.
+ */
+export const DIGEST_MAX_PARALLEL = 3;
 
 const useStyles = createStyles(({ css, token }) => ({
   body: css`
