@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Filter, FilterStat } from '@shared/types.ts';
-import type { CreateFilterInput, UpdateFilterInput } from '@shared/schemas.ts';
+import type { CreateFilterInput, UpdateFilterInput, BatchFiltersInput } from '@shared/schemas.ts';
 
 export const filterKeys = {
   byChannel: (channelId: number) => ['filters', channelId] as const,
@@ -51,6 +51,19 @@ export function useDeleteFilter(channelId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete(`/channels/${channelId}/filters/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) });
+      void qc.invalidateQueries({ queryKey: ['news', channelId] });
+    },
+  });
+}
+
+/** Single request that adds and deletes multiple tag filters at once. */
+export function useBatchFilters(channelId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: BatchFiltersInput) =>
+      api.post<{ added: Filter[]; deleted: number }>(`/channels/${channelId}/filters/batch`, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: filterKeys.byChannel(channelId) });
       void qc.invalidateQueries({ queryKey: ['news', channelId] });

@@ -3,7 +3,7 @@ import { Modal, Table, Tag, Button, Badge, Space, Typography, App } from 'antd';
 import { NumberOutlined, TagsOutlined, UndoOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
-import { useFilters, useCreateFilter, useDeleteFilter } from '../../../api/filters';
+import { useFilters, useBatchFilters } from '../../../api/filters';
 
 const { Text } = Typography;
 
@@ -64,8 +64,7 @@ export function TagBrowserModal({
   const { message } = App.useApp();
 
   const { data: filters = [] } = useFilters(channelId);
-  const createFilter = useCreateFilter(channelId);
-  const deleteFilter = useDeleteFilter(channelId);
+  const batchFilters = useBatchFilters(channelId);
 
   // ── Local pending state — only applied on OK ─────────────────────────
   // pendingAdd: full tag strings (e.g. '#crypto') to create as filters
@@ -114,24 +113,24 @@ export function TagBrowserModal({
     }
   };
 
-  // Commit all pending changes on OK
+  // Commit all pending changes in a single batch request
   const handleOk = async () => {
     if (pendingAdd.size === 0 && pendingRemove.size === 0) {
       onClose();
       return;
     }
 
-    await Promise.all([
-      ...[...pendingAdd].map((tag) => createFilter.mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() })),
-      ...[...pendingRemove].map((id) => deleteFilter.mutateAsync(id)),
-    ]);
+    await batchFilters.mutateAsync({
+      toAdd: [...pendingAdd].map((tag) => ({ name: tag, type: 'tag', value: tag.toLowerCase() })),
+      toDelete: [...pendingRemove],
+    });
 
     void message.success(t('tags.changes_applied', { count: pendingAdd.size + pendingRemove.size }));
     onClose();
   };
 
   const isPendingChanges = pendingAdd.size > 0 || pendingRemove.size > 0;
-  const isCommitting = createFilter.isPending || deleteFilter.isPending;
+  const isCommitting = batchFilters.isPending;
   const totalChanges = pendingAdd.size + pendingRemove.size;
 
   const columns = [
