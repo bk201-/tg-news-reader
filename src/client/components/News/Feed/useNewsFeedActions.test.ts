@@ -182,7 +182,7 @@ describe('useNewsFeedActions', () => {
       result.current.handleMarkAllReadAndAdvance();
     });
 
-    expect(mockMarkAllReadMutate).toHaveBeenCalledWith(1);
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
     expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
   });
 
