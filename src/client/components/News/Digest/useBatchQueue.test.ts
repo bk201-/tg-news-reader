@@ -106,4 +106,38 @@ describe('useBatchQueue', () => {
     const { result } = renderHook(() => useBatchQueue(0, 5));
     expect(result.current.enabled.size).toBe(0);
   });
+
+  it('replaying many releases in one tick advances the queue correctly (cached-batch restore)', () => {
+    // Simulates DigestProgressDrawer restoring 8 cached batches on mount:
+    // 8 batches are "already done" so release() is called 8 times in one tick.
+    // Expected: first 3 + 8 activations = indices 0..10 enabled.
+    const { result } = renderHook(() => useBatchQueue(27, 3));
+    expect([...result.current.enabled].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+
+    act(() => {
+      for (let i = 0; i < 8; i++) result.current.release(i);
+    });
+
+    expect([...result.current.enabled].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('reset followed by multiple releases in the same tick yields a clean sliding window', () => {
+    // Simulates drawer close → open: reset() + release(i) for cached indices.
+    const { result } = renderHook(() => useBatchQueue(20, 3));
+
+    // First open: 2 batches complete
+    act(() => {
+      result.current.release(0);
+      result.current.release(1);
+    });
+    expect([...result.current.enabled].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+
+    // Drawer closed → reopened: reset, then release all cached (indices 0..4 say)
+    act(() => {
+      result.current.reset();
+      for (let i = 0; i < 5; i++) result.current.release(i);
+    });
+    // Initial {0,1,2} + 5 releases → activate 3,4,5,6,7 → enabled = {0..7}
+    expect([...result.current.enabled].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
 });

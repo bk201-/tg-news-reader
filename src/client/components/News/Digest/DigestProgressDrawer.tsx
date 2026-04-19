@@ -103,18 +103,30 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
     if (!open) return;
     setDigestOpenedSet(new Set());
     setDrawerBatchIndex(null);
+    // Reset the queue so releasedCount starts from 0 for this fresh open.
+    // Without this, re-opening the drawer would double-count releases and
+    // skip indices when re-playing cached batches.
+    queue.reset();
     // Pre-fill results from localStorage
     const restored: Record<number, { result: string; refMap: Record<number, number> }> = {};
-    let restoredDone = 0;
+    const restoredIndices: number[] = [];
     batches.forEach((ids, i) => {
       const cached = loadBatchResult(scope, i, ids);
       if (cached) {
         restored[i] = { result: cached.result, refMap: cached.refMap };
-        restoredDone++;
+        restoredIndices.push(i);
       }
     });
     setBatchResults(restored);
-    setDoneCount(restoredDone);
+    setDoneCount(restoredIndices.length);
+
+    // Release queue slots for every cached batch so the queue advances past
+    // them and activates the next non-cached indices. Without this, all
+    // cached batches would sit in "done (cached)" state and the queue's
+    // initial window would stay stuck on slots 0..maxParallel-1 forever.
+    for (const i of restoredIndices) {
+      queue.release(i);
+    }
     // oxlint-disable-next-line react/exhaustive-deps
   }, [open, newsIds]);
 
