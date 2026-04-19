@@ -238,21 +238,44 @@ export class DownloadCoordinator {
       this.pollTimer = null;
     }
 
-    const workerIdEntry = this.available.values().next();
-    if (workerIdEntry.done) return;
-    const workerId = workerIdEntry.value;
+    // Pick the best available worker.
+    //
+    // Worker pinning rule (prevents jsdom proliferation → OOM):
+    //   - Workers with id < maxConcurrentArticles are ARTICLE-capable workers.
+    //     They are the ONLY ones allowed to process 'article' tasks (jsdom parsing).
+    //     Once such a worker has loaded jsdom into its V8 isolate, jsdom stays
+    //     ~100 MB resident. Keeping article tasks pinned to a small set caps
+    //     overall jsdom memory at `maxConcurrentArticles × 100 MB`.
+    //   - Workers with id ≥ maxConcurrentArticles are MEDIA-ONLY workers. They
+    //     never touch jsdom, so their baseline memory stays small.
+    //
+    // Task selection strategy:
+    //   - If an article worker is available, prefer fetching any pending task
+    //     (article OR media) — article workers can process both.
+    //   - If only media-only workers are available, fetch a media task only.
+    const articleCapableIds: number[] = [];
+    const mediaOnlyIds: number[] = [];
+    for (const id of this.available) {
+      if (id < this.maxConcurrentArticles) articleCapableIds.push(id);
+      else mediaOnlyIds.push(id);
+    }
+    const hasArticleCapable = articleCapableIds.length > 0;
+    // Article workers get priority so pending articles don't starve behind media tasks
+    const workerId = hasArticleCapable ? articleCapableIds[0] : mediaOnlyIds[0];
     this.available.delete(workerId);
 
     let task: typeof downloads.$inferSelect | undefined;
     try {
-      const articleSlotsAvailable = this.runningArticles < this.maxConcurrentArticles;
       [task] = await withRetry(
         () => {
+          // Media-only workers: never claim article tasks.
+          // Article-capable workers: claim anything, but still respect the in-flight cap.
+          const canClaimArticle = hasArticleCapable && this.runningArticles < this.maxConcurrentArticles;
           return db
             .select()
             .from(downloads)
             .where(
-              articleSlotsAvailable
+              canClaimArticle
                 ? eq(downloads.status, 'pending')
                 : and(eq(downloads.status, 'pending'), eq(downloads.type, 'media')),
             )
