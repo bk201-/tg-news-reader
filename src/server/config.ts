@@ -60,6 +60,26 @@ export const DIGEST_ARTICLE_CONTENT_LIMIT = parseInt(process.env.DIGEST_ARTICLE_
 /** Max ms to wait for article prefetch before proceeding. Env: DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC */
 export const DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS =
   parseInt(process.env.DIGEST_ARTICLE_PREFETCH_TIMEOUT_SEC ?? '30', 10) * 1_000;
+/**
+ * Max number of articles to prefetch for a single digest request.
+ * Caps the number of download tasks enqueued to avoid saturating the download worker pool.
+ * Env: DIGEST_MAX_PREFETCH (default 20)
+ */
+export const DIGEST_MAX_PREFETCH = parseInt(process.env.DIGEST_MAX_PREFETCH ?? '20', 10);
+
+// ─── Article download limits ──────────────────────────────────────────────────
+/**
+ * Max number of workers that may process article (jsdom) tasks concurrently.
+ * jsdom loaded in a worker costs ~100 MB; limiting concurrency prevents OOM bursts.
+ * Env: ARTICLE_WORKER_CONCURRENCY (default 3)
+ */
+export const ARTICLE_WORKER_CONCURRENCY = parseInt(process.env.ARTICLE_WORKER_CONCURRENCY ?? '3', 10);
+/**
+ * Max HTML response size in bytes for article extraction.
+ * Pages larger than this are skipped as a permanent failure (no retry).
+ * Env: ARTICLE_MAX_HTML_MB (default 3)
+ */
+export const ARTICLE_MAX_HTML_BYTES = parseInt(process.env.ARTICLE_MAX_HTML_MB ?? '3', 10) * 1024 * 1024;
 
 if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-secret-change-in-production') {
   throw new Error('JWT_SECRET env variable must be set in production!');

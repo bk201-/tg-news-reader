@@ -62,13 +62,20 @@ interface DigestDrawerProps {
   open: boolean;
   params: DigestParams;
   onClose: () => void;
+  /**
+   * Pre-loaded digest content (e.g. from a cached batch result).
+   * When provided, the drawer skips auto-streaming and renders this immediately.
+   * The user can still click "Refresh" to re-generate.
+   */
+  initialText?: string;
+  initialRefMap?: Record<number, number>;
 }
 
-export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
+export function DigestDrawer({ open, params, onClose, initialText, initialRefMap }: DigestDrawerProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-  const [text, setText] = useState('');
-  const [refMap, setRefMap] = useState<Record<number, number>>({});
+  const [text, setText] = useState(initialText ?? '');
+  const [refMap, setRefMap] = useState<Record<number, number>>(initialRefMap ?? {});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prefetchProgress, setPrefetchProgress] = useState<{
@@ -77,7 +84,7 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
     errors: number;
   } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const generatedParamsRef = useRef<string>('');
+  const generatedParamsRef = useRef<string>(initialText ? JSON.stringify(params) : '');
   const { setSelectedNewsId } = useUIStore();
 
   const paramsKey = JSON.stringify(params);

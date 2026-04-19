@@ -8,6 +8,7 @@ vi.mock('../config.js', () => ({
   WORKER_POOL_CRASH_WINDOW_MS: 60_000,
   WORKER_RESTART_BASE_MS: 10,
   WORKER_RESTART_JITTER_MS: 0,
+  ARTICLE_WORKER_CONCURRENCY: 3,
 }));
 
 vi.mock('../logger.js', () => ({

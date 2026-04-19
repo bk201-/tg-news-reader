@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Empty, Button } from 'antd';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
@@ -11,6 +11,7 @@ import { NewsFeedToolbar } from './Feed/NewsFeedToolbar';
 import { NewsFeedList } from './Feed/Desktop/NewsFeedList';
 import { NewsAccordionList } from './Feed/Mobile/NewsAccordionList';
 import { DigestDrawer } from './Digest/DigestDrawer';
+import { DigestProgressDrawer, DIGEST_BATCH_SIZE } from './Digest/DigestProgressDrawer';
 import { LightboxOverlay } from './Lightbox/LightboxOverlay';
 import { TagBrowserModal } from './Feed/TagBrowserModal';
 import { useNewsFeedState } from './useNewsFeedState';
@@ -110,6 +111,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     digestOpen,
     setDigestOpen,
     digestParams,
+    visibleNewsIdsChrono,
     tagBrowserOpen,
     setTagBrowserOpen,
     tagCounts,
@@ -122,6 +124,11 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     scrollTopBtnRef,
     topSentinelRef,
   } = useNewsFeedState(channel);
+
+  // Stabilize refs for the batched-digest drawer so BatchRow (React.memo) is
+  // not invalidated on every parent re-render.
+  const digestBaseParams = useMemo(() => ({}), []);
+  const digestScope = useMemo(() => ({ channelId: channel.id }), [channel.id]);
 
   return (
     <div className={styles.feed}>
@@ -206,7 +213,17 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         )}
 
       <FilterPanel channelId={channel.id} />
-      <DigestDrawer open={digestOpen} params={digestParams} onClose={() => setDigestOpen(false)} />
+      {visibleNewsIdsChrono.length > DIGEST_BATCH_SIZE ? (
+        <DigestProgressDrawer
+          open={digestOpen}
+          newsIds={visibleNewsIdsChrono}
+          baseParams={digestBaseParams}
+          scope={digestScope}
+          onClose={() => setDigestOpen(false)}
+        />
+      ) : (
+        <DigestDrawer open={digestOpen} params={digestParams} onClose={() => setDigestOpen(false)} />
+      )}
       <TagBrowserModal
         open={tagBrowserOpen}
         channelId={channel.id}
