@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { Modal } from 'antd';
 import './styles.css';
 import './i18n';
 import 'dayjs/locale/ru';
@@ -9,10 +10,42 @@ import { registerMediaServiceWorker } from './services/serviceWorker';
 import { logger } from './logger';
 import { ApiError } from './api/client';
 import { App } from './App';
+import i18n from './i18n';
 
 registerMediaServiceWorker();
 
+interface VitePreloadErrorEvent extends Event {
+  payload?: unknown;
+}
+
+let staleChunkModalOpen = false;
+
+function showStaleChunkReloadModal(): void {
+  if (staleChunkModalOpen) return;
+  staleChunkModalOpen = true;
+
+  Modal.confirm({
+    title: i18n.t('common.newVersionAvailable'),
+    content: i18n.t('common.newVersionChunkError'),
+    okText: i18n.t('common.newVersionReload'),
+    cancelText: i18n.t('common.close'),
+    onOk: () => window.location.reload(),
+    onCancel: () => {
+      staleChunkModalOpen = false;
+    },
+    afterClose: () => {
+      staleChunkModalOpen = false;
+    },
+  });
+}
+
 // ─── Global JS error handlers ─────────────────────────────────────────────────
+
+window.addEventListener('vite:preloadError', ((event: VitePreloadErrorEvent) => {
+  event.preventDefault();
+  logger.info({ module: 'window', err: event.payload }, 'Vite preload error — prompting user to reload');
+  showStaleChunkReloadModal();
+}) as EventListener);
 
 window.addEventListener('error', (e) => {
   // Filter out resource-load errors (img/script src failures) — they have no `error`
