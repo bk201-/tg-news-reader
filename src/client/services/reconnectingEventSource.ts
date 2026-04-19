@@ -18,16 +18,26 @@ export interface ReconnectingES {
 }
 
 interface ReconnectingESOptions {
-  url: string;
+  /**
+   * URL factory — called on every connect/reconnect attempt so a fresh token
+   * is always used. Pass a function returning the URL with the current token.
+   */
+  getUrl: () => string;
   /** Called on every new EventSource instance so the caller can attach listeners. */
   onConnect: (es: EventSource) => void;
+  /**
+   * Async hook called after an SSE error, before the reconnect delay fires.
+   * Use this to refresh the auth token so the next connect uses a fresh URL.
+   */
+  onBeforeReconnect?: () => Promise<void>;
   /** Module name for logging. */
   module?: string;
 }
 
 export function createReconnectingEventSource({
-  url,
+  getUrl,
   onConnect,
+  onBeforeReconnect,
   module = 'sse',
 }: ReconnectingESOptions): ReconnectingES {
   let attempt = 0;
@@ -38,7 +48,7 @@ export function createReconnectingEventSource({
   function connect() {
     if (closed) return;
 
-    es = new EventSource(url);
+    es = new EventSource(getUrl());
 
     es.addEventListener('open', () => {
       // Connection succeeded — reset backoff
@@ -53,7 +63,14 @@ export function createReconnectingEventSource({
       const delay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
       attempt++;
       logger.warn({ module, attempt, delay }, 'SSE error — reconnecting with backoff');
-      timer = setTimeout(connect, delay);
+
+      void (async () => {
+        // Refresh auth token (e.g. after a JWT expiry 401) before reconnecting.
+        // If rec.close() was called during the async await, skip the reconnect.
+        await onBeforeReconnect?.();
+        if (closed) return;
+        timer = setTimeout(connect, delay);
+      })();
     };
 
     onConnect(es);

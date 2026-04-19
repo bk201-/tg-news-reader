@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { api } from './client';
+import { api, tryRefresh } from './client';
 import { useAuthStore } from '../store/authStore';
 import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
 import type { CreateDownloadInput } from '@shared/schemas.ts';
@@ -72,10 +72,16 @@ export function useDownloadsSSE() {
     if (!accessToken) return;
 
     // EventSource cannot send custom headers — pass JWT as ?token= query param
-    const url = `/api/downloads/stream?token=${encodeURIComponent(accessToken)}`;
+    const getUrl = () => {
+      const token = useAuthStore.getState().accessToken;
+      return `/api/downloads/stream?token=${encodeURIComponent(token ?? '')}`;
+    };
 
     const rec = createReconnectingEventSource({
-      url,
+      getUrl,
+      onBeforeReconnect: async () => {
+        await tryRefresh();
+      },
       module: 'downloads',
       onConnect: (es) => {
         es.addEventListener('init', (e: MessageEvent) => {

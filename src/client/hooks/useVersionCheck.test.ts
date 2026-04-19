@@ -67,7 +67,7 @@ describe('useVersionCheck', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('re-shows the banner on the next poll after dismissal when mismatch persists', async () => {
+  it('keeps banner dismissed across polls when the same mismatch persists', async () => {
     vi.useFakeTimers();
 
     fetcher.mockResolvedValue({
@@ -88,12 +88,38 @@ describe('useVersionCheck', () => {
     act(() => result.current.dismiss());
     expect(result.current.newVersionAvailable).toBe(false);
 
+    // Next poll — same server version still mismatches, but dismissed should stay
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.newVersionAvailable).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets dismissed when a fresh mismatch is detected (was matching, now mismatching)', async () => {
+    // First poll: versions match → no banner
+    fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ version: '1.18.0' }) });
+    // Second poll: new version deployed → mismatch
+    fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ version: '1.19.0' }) });
+
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useVersionCheck({ clientVersion: '1.18.0', intervalMs: 1_000, isDev: false, fetcher }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.newVersionAvailable).toBe(false);
+
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
       await Promise.resolve();
     });
 
     expect(result.current.newVersionAvailable).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
