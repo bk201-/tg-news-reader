@@ -71,11 +71,26 @@ export function useMarkRead() {
   });
 }
 
+export type MarkAllReadArgs = { channelId?: number; newsIds?: number[] };
+
 export function useMarkAllRead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (channelId?: number) => api.post('/news/read-all', { channelId }),
-    onSuccess: (_data, channelId) => {
+    mutationFn: (args: MarkAllReadArgs = {}) => api.post('/news/read-all', args),
+    onSuccess: (_data, args) => {
+      const { channelId, newsIds } = args ?? {};
+
+      if (newsIds && newsIds.length > 0) {
+        // Scoped mark-read: update only the specified items optimistically
+        const newsIdSet = new Set(newsIds);
+        qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news'] }, (old) =>
+          updatePaginatedItems(old, (items) => items.map((n) => (newsIdSet.has(n.id) ? { ...n, isRead: 1 } : n))),
+        );
+        // Invalidate channels to get accurate unread counts from server
+        void qc.invalidateQueries({ queryKey: ['channels'] });
+        return;
+      }
+
       if (channelId !== undefined) {
         qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
           updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: 1 }))),

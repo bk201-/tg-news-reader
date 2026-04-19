@@ -171,7 +171,7 @@ describe('useMarkAllRead', () => {
     const { result } = renderHook(() => useMarkAllRead(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync(1);
+      await result.current.mutateAsync({ channelId: 1 });
     });
 
     expect(mockedApi.post).toHaveBeenCalledWith('/news/read-all', { channelId: 1 });
@@ -194,10 +194,10 @@ describe('useMarkAllRead', () => {
     const { result } = renderHook(() => useMarkAllRead(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync(undefined);
+      await result.current.mutateAsync({});
     });
 
-    expect(mockedApi.post).toHaveBeenCalledWith('/news/read-all', { channelId: undefined });
+    expect(mockedApi.post).toHaveBeenCalledWith('/news/read-all', {});
 
     const channels = queryClient.getQueryData<Channel[]>(['channels']);
     expect(channels!.every((ch) => ch.unreadCount === 0)).toBe(true);

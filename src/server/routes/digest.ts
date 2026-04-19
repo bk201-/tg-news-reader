@@ -22,7 +22,10 @@ router.post('/', zValidator('json', createDigestSchema), async (c) => {
   // ── Fetch news items from DB ─────────────────────────────────────────────
   const conditions = [];
 
-  if (body.channelIds?.length) {
+  if (body.newsIds?.length) {
+    // Tag-filtered view: digest only these specific items
+    conditions.push(inArray(news.id, body.newsIds));
+  } else if (body.channelIds?.length) {
     conditions.push(inArray(news.channelId, body.channelIds));
   } else if (body.groupId !== undefined) {
     const groupChannels = await db

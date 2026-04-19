@@ -278,5 +278,18 @@
     "copied": "Copied to clipboard",
     "powered_by": "Powered by Azure OpenAI · gpt-4o-mini",
     "error_generic": "Failed to generate digest"
+  },
+  "tags": {
+    "title": "Tags",
+    "subtitle": "{{count}} tags",
+    "button_tooltip": "Browse tags in loaded news",
+    "col_tag": "Tag",
+    "col_count": "Count",
+    "add_filter": "Add to filters",
+    "remove_filter": "Remove filter",
+    "filtered": "Filtered",
+    "filter_added": "Tag {{tag}} added to filters",
+    "filter_removed": "Filter for {{tag}} removed",
+    "empty": "No hashtags in loaded news"
   }
 }

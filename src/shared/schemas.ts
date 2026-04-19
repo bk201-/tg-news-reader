@@ -38,6 +38,7 @@ export const fetchChannelSchema = z.object({
 
 export const readAllNewsSchema = z.object({
   channelId: z.number().optional(),
+  newsIds: z.array(z.number()).optional(),
 });
 
 export const markReadSchema = z.object({
@@ -95,6 +96,8 @@ export const createDigestSchema = z.object({
   groupId: z.number().nullable().optional(),
   since: z.string().optional(),
   until: z.string().optional(),
+  /** When provided, generate digest only for these specific news IDs (e.g. tag-filtered view) */
+  newsIds: z.array(z.number()).optional(),
 });
 
 // ─── Client Log ───────────────────────────────────────────────────────────────

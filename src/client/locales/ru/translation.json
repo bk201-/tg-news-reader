@@ -278,5 +278,18 @@
     "copied": "Скопировано в буфер",
     "powered_by": "Azure OpenAI · gpt-4o-mini",
     "error_generic": "Ошибка генерации дайджеста"
+  },
+  "tags": {
+    "title": "Теги",
+    "subtitle": "{{count}} тегов",
+    "button_tooltip": "Теги в загруженных новостях",
+    "col_tag": "Тег",
+    "col_count": "Кол-во",
+    "add_filter": "Добавить в фильтры",
+    "remove_filter": "Убрать из фильтров",
+    "filtered": "Скрыт",
+    "filter_added": "Тег {{tag}} добавлен в фильтры",
+    "filter_removed": "Фильтр для {{tag}} удалён",
+    "empty": "Нет хэштегов в загруженных новостях"
   }
 }
