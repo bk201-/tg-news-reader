@@ -323,7 +323,7 @@ export function LightboxOverlay() {
 
   if (!lightbox || !channel) return null;
 
-  const { currentEntry, isVideo, isAlbum, firstMediaPath } = nav;
+  const { currentEntry, isAlbum, firstMediaPath } = nav;
   const item = currentEntry?.item;
   const albumPaths = item?.localMediaPaths;
   const currentMediaPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? firstMediaPath) : firstMediaPath;
@@ -391,7 +391,6 @@ export function LightboxOverlay() {
 
         <LightboxMedia
           path={firstMediaPath}
-          isVideo={isVideo}
           isAlbum={isAlbum}
           albumIndex={albumIndex}
           albumPaths={albumPaths}

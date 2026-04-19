@@ -11,7 +11,6 @@ const AUTO_RETRY_DELAY = 1500;
 
 interface LightboxMediaProps {
   path: string | undefined;
-  isVideo: boolean;
   isAlbum: boolean;
   albumIndex: number;
   albumPaths: string[] | undefined;
@@ -99,7 +98,6 @@ const useStyles = createStyles(({ css, token }) => ({
 
 export function LightboxMedia({
   path,
-  isVideo,
   isAlbum,
   albumIndex,
   albumPaths,
@@ -130,6 +128,9 @@ export function LightboxMedia({
   );
 
   const displayPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? path) : path;
+  // Per-item video detection: when navigating an album the current item may differ
+  // from the first item that isVideo was computed from (e.g. video at index 0, photos at 1-3).
+  const currentIsVideo = /\.(mp4|webm|mov)$/i.test(displayPath ?? '');
 
   // Track loading/error per src — reset when displayPath changes without useEffect
   // (React "adjust state during render" pattern to avoid cascading-render lint error).
@@ -204,7 +205,7 @@ export function LightboxMedia({
 
   return (
     <div className={styles.wrap}>
-      {isVideo ? (
+      {currentIsVideo ? (
         // Video must remount when source changes so the browser reloads it
         <video
           ref={videoRefCallback}

@@ -230,6 +230,8 @@ export function NewsDetailMedia({
 
   if (isAlbum) {
     const paths = item.localMediaPaths!;
+    const currentPath = paths[albumIndex];
+    const currentIsVideo = /\.(mp4|webm|mov)$/i.test(currentPath ?? '');
     return (
       <div className={cx(styles.media, styles.mediaAlbum)}>
         <div className={styles.carousel}>
@@ -241,13 +243,28 @@ export function NewsDetailMedia({
           >
             <LeftOutlined />
           </button>
-          <img
-            src={murl(paths[albumIndex])}
-            alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
-            className={styles.mediaFile}
-            onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
-            onError={() => setMediaBroken(true)}
-          />
+          {currentIsVideo ? (
+            <video
+              key={currentPath}
+              src={murl(currentPath)}
+              className={styles.mediaFile}
+              controls
+              muted
+              autoPlay
+              loop
+              onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
+              onError={() => setMediaBroken(true)}
+              style={{ cursor: 'pointer' }}
+            />
+          ) : (
+            <img
+              src={murl(currentPath)}
+              alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
+              className={styles.mediaFile}
+              onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
+              onError={() => setMediaBroken(true)}
+            />
+          )}
           <button
             className={cx(styles.carouselBtn, styles.carouselBtnNext, 'carousel-btn')}
             onClick={() => onAlbumNav(1)}
