@@ -224,6 +224,7 @@ export function AppLayout() {
       onClose={() => setSidebarDrawerOpen(false)}
       placement="left"
       size="default"
+      mask={false}
       styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
       title={null}
       closable={false}

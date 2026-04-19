@@ -167,6 +167,7 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
       open={open}
       onClose={onClose}
       closeIcon={<CloseOutlined />}
+      mask={false}
       styles={{ body: { padding: 0 } }}
     >
       <div className={styles.body}>

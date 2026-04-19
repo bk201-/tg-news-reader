@@ -294,7 +294,12 @@
     "batch_mark_read_disabled": "Сначала откройте дайджест",
     "batch_marked_count": "Помечено как прочитано: {{count}}",
     "batch_retry": "Повторить",
-    "batch_count_label": "Готово {{done}} / {{total}} батчей"
+    "batch_count_label": "Готово {{done}} / {{total}} батчей",
+    "clear_all": "Очистить всё",
+    "clear_confirm_title": "Очистить все дайджесты?",
+    "clear_confirm_content": "Все кэшированные результаты дайджеста для этой ленты будут удалены, батчи перезапустятся.",
+    "cleared_count": "Очищено дайджестов: {{count}}",
+    "auto_cleared_all_read": "Все батчи помечены прочитанными — кэш дайджеста очищен"
   },
   "tags": {
     "title": "Теги",

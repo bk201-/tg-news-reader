@@ -1,12 +1,12 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Drawer, Progress, Typography, message } from 'antd';
-import { CloseOutlined } from '@ant-design/icons';
+import { Button, Drawer, Modal, Progress, Typography, message } from 'antd';
+import { CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { DigestBatchPanel } from './DigestBatchPanel';
 import { useBatchDigest, type BatchDigestStatus } from './useBatchDigest';
 import { useBatchQueue } from './useBatchQueue';
-import { saveBatchResult, loadBatchResult, type BatchScope } from './batchPersistence';
+import { saveBatchResult, loadBatchResult, clearScope, type BatchScope } from './batchPersistence';
 import { DigestDrawer } from './DigestDrawer';
 import type { DigestParams } from '../../../api/digest';
 import { useMarkAllRead } from '../../../api/news';
@@ -39,6 +39,13 @@ const useStyles = createStyles(({ css, token }) => ({
     gap: 12px;
     padding-bottom: 8px;
     border-bottom: 1px solid ${token.colorBorderSecondary};
+  `,
+  headerLeft: css`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
   `,
   counter: css`
     font-size: 13px;
@@ -85,6 +92,11 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
   const [doneCount, setDoneCount] = useState(0);
   const [digestOpenedSet, setDigestOpenedSet] = useState<Set<number>>(new Set());
   const [drawerBatchIndex, setDrawerBatchIndex] = useState<number | null>(null);
+  /** Indices for which the user clicked "Mark as read". */
+  const [markedReadSet, setMarkedReadSet] = useState<Set<number>>(new Set());
+  /** Bumped on each clear — included in BatchRow keys so all rows unmount
+   *  (aborting in-flight streams via their cleanup) and remount fresh. */
+  const [clearEpoch, setClearEpoch] = useState(0);
 
   // Per-batch cached/live results, keyed by index
   const [batchResults, setBatchResults] = useState<Record<number, { result: string; refMap: Record<number, number> }>>(
@@ -98,11 +110,23 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
 
-  // Reset when the feed changes or drawer re-opens
+  // Track the last feed signature we've processed so we only reset/restore when
+  // `newsIds` ACTUALLY changes, not just gets a new array reference on every
+  // React-Query cache tick. Without this, any news update (download progress
+  // SSE, mark-read, new post) would re-run the effect, which calls
+  // setDrawerBatchIndex(null) and closes the currently-open digest drawer.
+  const lastSigRef = useRef<string>('');
+
+  // Reset + restore cached batches when the drawer opens on a new feed.
   useEffect(() => {
     if (!open) return;
+    const sig = `${newsIds.length}:${newsIds[0] ?? ''}:${newsIds[newsIds.length - 1] ?? ''}`;
+    if (sig === lastSigRef.current) return; // feed content unchanged — no-op
+    lastSigRef.current = sig;
+
     setDigestOpenedSet(new Set());
     setDrawerBatchIndex(null);
+    setMarkedReadSet(new Set());
     // Reset the queue so releasedCount starts from 0 for this fresh open.
     // Without this, re-opening the drawer would double-count releases and
     // skip indices when re-playing cached batches.
@@ -176,9 +200,68 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
       if (!ids || ids.length === 0) return;
       markAllReadMutate({ newsIds: [...ids] });
       void message.success(t('digest.batch_marked_count', { count: ids.length }));
+      setMarkedReadSet((prev) => {
+        if (prev.has(index)) return prev;
+        const next = new Set(prev);
+        next.add(index);
+        return next;
+      });
     },
     [markAllReadMutate, t],
   );
+
+  // ── Clear (manual + auto) ──
+  // Runs the actual cleanup: nukes localStorage for this scope, resets in-memory
+  // state, and bumps `clearEpoch` so every BatchRow unmounts (aborting any
+  // in-flight streams via their own cleanup effects) and remounts fresh.
+  const doClear = useCallback(() => {
+    const removed = clearScope(scopeRef.current);
+    setBatchResults({});
+    setDoneCount(0);
+    setDigestOpenedSet(new Set());
+    setMarkedReadSet(new Set());
+    setDrawerBatchIndex(null);
+    queue.reset();
+    setClearEpoch((n) => n + 1);
+    // Invalidate the "feed signature" guard so the open-effect can re-run
+    // reset/restore logic on the next relevant change.
+    lastSigRef.current = '';
+    return removed;
+  }, [queue]);
+
+  const handleClearAll = useCallback(() => {
+    Modal.confirm({
+      title: t('digest.clear_confirm_title'),
+      content: t('digest.clear_confirm_content'),
+      okText: t('digest.clear_all'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: () => {
+        const removed = doClear();
+        void message.success(t('digest.cleared_count', { count: removed }));
+      },
+    });
+  }, [doClear, t]);
+
+  // Auto-clear: when every batch has been marked as read, nuke the cache
+  // (user is done with this feed). Runs in an effect so it fires once per
+  // transition, not on every render.
+  const autoClearedRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      autoClearedRef.current = false;
+      return;
+    }
+    if (batches.length === 0) return;
+    if (markedReadSet.size < batches.length) {
+      autoClearedRef.current = false;
+      return;
+    }
+    if (autoClearedRef.current) return;
+    autoClearedRef.current = true;
+    doClear();
+    void message.info(t('digest.auto_cleared_all_read'));
+  }, [open, markedReadSet, batches.length, doClear, t]);
 
   const handleRetry = useCallback(
     (index: number) => {
@@ -207,21 +290,28 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
         open={open}
         onClose={onClose}
         closeIcon={<CloseOutlined />}
+        mask={false}
+        maskClosable={false}
         styles={{ body: { padding: 0 } }}
       >
         <div className={styles.body}>
           <div className={styles.header}>
-            <Text className={styles.counter}>{t('digest.batch_count_label', { done: doneCount, total })}</Text>
-            <Progress
-              percent={total > 0 ? Math.round((doneCount / total) * 100) : 0}
-              size="small"
-              className={styles.overallProgress}
-            />
+            <div className={styles.headerLeft}>
+              <Text className={styles.counter}>{t('digest.batch_count_label', { done: doneCount, total })}</Text>
+              <Progress
+                percent={total > 0 ? Math.round((doneCount / total) * 100) : 0}
+                size="small"
+                className={styles.overallProgress}
+              />
+            </div>
+            <Button size="small" icon={<DeleteOutlined />} onClick={handleClearAll} disabled={total === 0} danger>
+              {t('digest.clear_all')}
+            </Button>
           </div>
           <div className={styles.list}>
             {batches.map((batchIds, i) => (
               <BatchRow
-                key={`${i}-${batchIds[0]}-${batchIds[batchIds.length - 1]}`}
+                key={`${clearEpoch}-${i}-${batchIds[0]}-${batchIds[batchIds.length - 1]}`}
                 index={i}
                 newsIds={batchIds}
                 baseParams={baseParams}

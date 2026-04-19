@@ -94,6 +94,34 @@ export function clearBatchResult(scope: BatchScope, index: number): void {
   }
 }
 
+/**
+ * Remove ALL persisted batches for the given scope (used by the "Clear all"
+ * button in the Progress Drawer and by the auto-clear when every batch has
+ * been marked as read).
+ *
+ * Returns the number of keys that were removed.
+ */
+export function clearScope(scope: BatchScope): number {
+  // Keys look like `digest_v1_{scopeKey}_batch_{index}` — we prefix-match.
+  // scopeKey() is internal; rebuild the prefix here.
+  const prefix = batchKey(scope, 0).replace(/_batch_0$/, '_batch_');
+  let removed = 0;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) toRemove.push(key);
+    }
+    for (const key of toRemove) {
+      localStorage.removeItem(key);
+      removed++;
+    }
+  } catch {
+    /* ignore */
+  }
+  return removed;
+}
+
 function isPersistedBatch(v: unknown): v is PersistedBatch {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;

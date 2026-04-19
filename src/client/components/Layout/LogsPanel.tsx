@@ -76,6 +76,7 @@ export function LogsPanel() {
         size="large"
         open={open}
         onClose={() => setOpen(false)}
+        mask={false}
         styles={{ body: { padding: 0 } }}
       >
         <div className={styles.drawerBody}>

@@ -294,7 +294,12 @@
     "batch_mark_read_disabled": "Open the digest first",
     "batch_marked_count": "{{count}} marked as read",
     "batch_retry": "Retry",
-    "batch_count_label": "{{done}} / {{total}} batches done"
+    "batch_count_label": "{{done}} / {{total}} batches done",
+    "clear_all": "Clear all",
+    "clear_confirm_title": "Clear all digests?",
+    "clear_confirm_content": "All cached digest results for this feed will be removed and batches restarted.",
+    "cleared_count": "Cleared {{count}} cached digest(s)",
+    "auto_cleared_all_read": "All batches marked as read — digest cache cleared"
   },
   "tags": {
     "title": "Tags",
