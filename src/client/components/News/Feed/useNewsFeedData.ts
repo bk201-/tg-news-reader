@@ -44,7 +44,23 @@ export function useNewsFeedData(channel: Channel) {
   const totalCount = channel.totalNewsCount;
 
   const [digestOpen, setDigestOpen] = useState(false);
+  const [tagBrowserOpen, setTagBrowserOpen] = useState(false);
   const [mediaProgressKey, setMediaProgressKey] = useState(0);
+
+  // ── Tag counts — computed from all loaded items (not filtered) ─────────────
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of newsItems) {
+      for (const rawTag of item.hashtags ?? []) {
+        const tag = rawTag.startsWith('#') ? rawTag : `#${rawTag}`;
+        const key = tag.toLowerCase();
+        map.set(key, (map.get(key) ?? 0) + 1);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [newsItems]);
 
   // ── Media progress SSE ─────────────────────────────────────────────────
   useMediaProgressSSE(channel.id, mediaProgressKey);
@@ -69,6 +85,9 @@ export function useNewsFeedData(channel: Channel) {
     forceAccordion,
     digestOpen,
     setDigestOpen,
+    tagBrowserOpen,
+    setTagBrowserOpen,
+    tagCounts,
     mediaProgressKey,
     setMediaProgressKey,
   };

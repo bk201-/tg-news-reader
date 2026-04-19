@@ -25,4 +25,8 @@ export interface NewsFeedToolbarProps {
   showDigest?: boolean;
   /** Telegram ID of the current channel, used to render an "Open in Telegram" link */
   channelTelegramId?: string;
+  /** Whether the channel has any hashtags in loaded news */
+  hasTags?: boolean;
+  /** Open the tag browser modal */
+  onOpenTagBrowser?: () => void;
 }

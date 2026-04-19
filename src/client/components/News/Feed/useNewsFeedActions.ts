@@ -20,7 +20,7 @@ export function useNewsFeedActions(
 ) {
   const { message } = App.useApp();
   const { t } = useTranslation();
-  const { setSelectedNewsId, showAll, setSelectedChannelId, autoAdvance } = useUIStore();
+  const { setSelectedNewsId, showAll, setSelectedChannelId, autoAdvance, hashTagFilter } = useUIStore();
   const { data: allChannels = [] } = useChannels();
 
   const markAllRead = useMarkAllRead();
@@ -70,7 +70,8 @@ export function useNewsFeedActions(
         setSelectedNewsId(nextUnread.id);
       } else {
         const remainingVisible = displayItems.filter((item) => item.id !== currentId && item.isRead === 0);
-        if (!showAll && remainingVisible.length === 0 && serverFilteredOut > 0) markAllRead.mutate(channel.id);
+        if (!showAll && remainingVisible.length === 0 && serverFilteredOut > 0)
+          markAllRead.mutate({ channelId: channel.id });
       }
     },
     [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id],
@@ -145,8 +146,14 @@ export function useNewsFeedActions(
 
   // ── Mark all read (+ auto-advance when enabled) ─────────────────────
   const handleMarkAllReadAndAdvance = useCallback(() => {
+    // When tag filter is active — only mark the currently visible items, no auto-advance
+    if (hashTagFilter) {
+      markAllRead.mutate({ newsIds: displayItems.map((i) => i.id) });
+      return;
+    }
+
     if (!autoAdvance) {
-      markAllRead.mutate(channel.id);
+      markAllRead.mutate({ channelId: channel.id });
       return;
     }
     markReadAndFetch.mutate(channel.id, {
@@ -155,7 +162,16 @@ export function useNewsFeedActions(
         if (data.inserted === 0) goToNextChannel();
       },
     });
-  }, [autoAdvance, markAllRead, channel.id, markReadAndFetch, goToNextChannel, setMediaProgressKey]);
+  }, [
+    hashTagFilter,
+    autoAdvance,
+    markAllRead,
+    channel.id,
+    markReadAndFetch,
+    goToNextChannel,
+    setMediaProgressKey,
+    displayItems,
+  ]);
 
   return {
     fetchChannel,

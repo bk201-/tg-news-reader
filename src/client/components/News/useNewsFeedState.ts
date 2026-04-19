@@ -7,7 +7,7 @@
  *   Feed/useNewsFeedScroll.ts  — FAB, sentinel, scroll-to-index, auto-advance on filter
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Channel } from '../../../shared/types';
 import { useUIStore } from '../../store/uiStore';
 import { useNewsFeedData } from './Feed/useNewsFeedData';
@@ -15,6 +15,7 @@ import { useNewsFeedActions } from './Feed/useNewsFeedActions';
 import { useNewsFeedScroll } from './Feed/useNewsFeedScroll';
 import { useNewsHotkeys } from './Feed/useNewsHotkeys';
 import { useNewsFeedHotkeys } from './Feed/useNewsFeedHotkeys';
+import type { DigestParams } from '../../api/digest';
 
 export function useNewsFeedState(channel: Channel) {
   const {
@@ -68,6 +69,14 @@ export function useNewsFeedState(channel: Channel) {
     onOpenFilters: () => setFilterPanelOpen(true),
   });
 
+  // ── Digest params — scoped to tag when hashTagFilter is active ───────────
+  const digestParams = useMemo<DigestParams>(() => {
+    if (data.hashTagFilter && data.displayItems.length > 0) {
+      return { newsIds: data.displayItems.map((i) => i.id) };
+    }
+    return { channelIds: [channel.id] };
+  }, [data.hashTagFilter, data.displayItems, channel.id]);
+
   // ── Toolbar props ─────────────────────────────────────────────────────
   const toolbarProps = {
     fetchPending: actions.fetchChannel.isPending,
@@ -95,6 +104,8 @@ export function useNewsFeedState(channel: Channel) {
     onOpenDigest: () => data.setDigestOpen(true),
     showDigest: channel.supportsDigest,
     channelTelegramId: channel.telegramId,
+    hasTags: data.tagCounts.length > 0,
+    onOpenTagBrowser: () => data.setTagBrowserOpen(true),
   };
 
   return {
@@ -116,6 +127,11 @@ export function useNewsFeedState(channel: Channel) {
     // Digest
     digestOpen: data.digestOpen,
     setDigestOpen: data.setDigestOpen,
+    digestParams,
+    // Tag browser
+    tagBrowserOpen: data.tagBrowserOpen,
+    setTagBrowserOpen: data.setTagBrowserOpen,
+    tagCounts: data.tagCounts,
     // Toolbar
     toolbarProps,
     // Handlers

@@ -10,6 +10,7 @@ import {
   BulbOutlined,
   LinkOutlined,
   MoreOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +61,8 @@ export function NewsFeedToolbarMobile({
   onOpenDigest,
   showDigest = true,
   channelTelegramId,
+  hasTags,
+  onOpenTagBrowser,
 }: NewsFeedToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
@@ -121,6 +124,16 @@ export function NewsFeedToolbarMobile({
       : []),
     ...(showDigest
       ? [{ key: 'digest', icon: <BulbOutlined />, label: t('digest.button'), onClick: onOpenDigest }]
+      : []),
+    ...(hasTags && onOpenTagBrowser
+      ? [
+          {
+            key: 'tag_browser',
+            icon: <TagsOutlined />,
+            label: t('tags.button_tooltip'),
+            onClick: onOpenTagBrowser,
+          } as NonNullable<MenuProps['items']>[number],
+        ]
       : []),
     ...(hashTagFilter
       ? [

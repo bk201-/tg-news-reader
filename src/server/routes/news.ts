@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { news, channels, downloads } from '../db/schema.js';
-import { eq, and, asc, max, sql, gt, notInArray, type SQL } from 'drizzle-orm';
+import { eq, and, asc, max, sql, gt, notInArray, inArray, type SQL } from 'drizzle-orm';
 import type { NewsItem } from '../../shared/types.js';
 import { readChannelHistory, fetchMessageById } from '../services/telegram.js';
 import { getChannelStrategy } from '../services/channelStrategies.js';
@@ -16,6 +16,42 @@ const router = new Hono();
 // POST /api/news/read-all
 router.post('/read-all', async (c) => {
   const body = await parseOptionalBody(c, readAllNewsSchema, {});
+
+  // ── Scoped mark-read: only specific news IDs (e.g. tag-filtered view) ──────
+  if (body.newsIds && body.newsIds.length > 0) {
+    const toMark = await db
+      .select({ id: news.id, channelId: news.channelId })
+      .from(news)
+      .where(and(inArray(news.id, body.newsIds), eq(news.isRead, 0)));
+
+    if (toMark.length > 0) {
+      await db
+        .update(news)
+        .set({ isRead: 1 })
+        .where(
+          inArray(
+            news.id,
+            toMark.map((r) => r.id),
+          ),
+        );
+
+      // Recount unread per affected channel
+      const affectedChannelIds = [...new Set(toMark.map((r) => r.channelId))];
+      for (const chId of affectedChannelIds) {
+        const [result] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(news)
+          .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+        await db
+          .update(channels)
+          .set({ unreadCount: result?.count ?? 0 })
+          .where(eq(channels.id, chId));
+      }
+    }
+    return c.json({ success: true });
+  }
+
+  // ── Full channel / global mark-read ──────────────────────────────────────
   const conditions = [eq(news.isRead, 0)];
   if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
 

@@ -12,6 +12,7 @@ import { NewsFeedList } from './Feed/Desktop/NewsFeedList';
 import { NewsAccordionList } from './Feed/Mobile/NewsAccordionList';
 import { DigestDrawer } from './Digest/DigestDrawer';
 import { LightboxOverlay } from './Lightbox/LightboxOverlay';
+import { TagBrowserModal } from './Feed/TagBrowserModal';
 import { useNewsFeedState } from './useNewsFeedState';
 import { BP_XL } from '../../hooks/breakpoints';
 
@@ -108,6 +109,10 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     isFetchingNextPage,
     digestOpen,
     setDigestOpen,
+    digestParams,
+    tagBrowserOpen,
+    setTagBrowserOpen,
+    tagCounts,
     toolbarProps,
     setSelectedNewsId,
     handleMarkedRead,
@@ -201,7 +206,15 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         )}
 
       <FilterPanel channelId={channel.id} />
-      <DigestDrawer open={digestOpen} params={{ channelIds: [channel.id] }} onClose={() => setDigestOpen(false)} />
+      <DigestDrawer open={digestOpen} params={digestParams} onClose={() => setDigestOpen(false)} />
+      <TagBrowserModal
+        open={tagBrowserOpen}
+        channelId={channel.id}
+        tagCounts={tagCounts}
+        activeHashTag={hashTagFilter}
+        onSetHashTag={(tag) => handleTagClick(tag, 'show')}
+        onClose={() => setTagBrowserOpen(false)}
+      />
       <LightboxOverlay />
     </div>
   );
