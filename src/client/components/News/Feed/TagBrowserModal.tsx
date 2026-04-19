@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Table, Tag, Button, Badge, Space, Typography, App } from 'antd';
-import { DeleteOutlined, TagsOutlined, NumberOutlined } from '@ant-design/icons';
+import { NumberOutlined, TagsOutlined, UndoOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { useFilters, useCreateFilter, useDeleteFilter } from '../../../api/filters';
@@ -20,9 +20,18 @@ const useStyles = createStyles(({ css, token }) => ({
     color: ${token.colorPrimary};
     background: ${token.colorPrimaryBg};
   `,
+  pendingLabel: css`
+    font-size: 11px;
+    color: ${token.colorWarning};
+  `,
   filteredLabel: css`
     font-size: 11px;
     color: ${token.colorTextSecondary};
+  `,
+  removingLabel: css`
+    font-size: 11px;
+    color: ${token.colorError};
+    text-decoration: line-through;
   `,
   titleSecondary: css`
     font-size: 12px;
@@ -58,32 +67,72 @@ export function TagBrowserModal({
   const createFilter = useCreateFilter(channelId);
   const deleteFilter = useDeleteFilter(channelId);
 
-  // Build a map: normalised tag value → filter id (for already-filtered tags)
+  // ── Local pending state — only applied on OK ─────────────────────────
+  // pendingAdd: full tag strings (e.g. '#crypto') to create as filters
+  const [pendingAdd, setPendingAdd] = useState<Set<string>>(new Set());
+  // pendingRemove: filter IDs to delete
+  const [pendingRemove, setPendingRemove] = useState<Set<number>>(new Set());
+
+  // Reset pending state whenever the modal opens fresh
+  useEffect(() => {
+    if (open) {
+      setPendingAdd(new Set());
+      setPendingRemove(new Set());
+    }
+  }, [open]);
+
+  // norm → filterId map for existing tag filters from API
   const filteredTagMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const f of filters) {
       if (f.type === 'tag') {
-        const norm = f.value.toLowerCase().replace(/^#/, '');
-        map.set(norm, f.id);
+        map.set(f.value.toLowerCase().replace(/^#/, ''), f.id);
       }
     }
     return map;
   }, [filters]);
 
-  const handleAddFilter = async (tag: string) => {
-    await createFilter.mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() });
-    void message.success(t('tags.filter_added', { tag }));
+  // Toggle a tag's pending state (no network calls here)
+  const handleToggle = (tag: string) => {
+    const norm = tag.replace(/^#/, '');
+    const existingId = filteredTagMap.get(norm);
+
+    if (existingId !== undefined) {
+      setPendingRemove((prev) => {
+        const next = new Set(prev);
+        if (next.has(existingId)) next.delete(existingId);
+        else next.add(existingId);
+        return next;
+      });
+    } else {
+      setPendingAdd((prev) => {
+        const next = new Set(prev);
+        if (next.has(tag)) next.delete(tag);
+        else next.add(tag);
+        return next;
+      });
+    }
   };
 
-  const handleRemoveFilter = (filterId: number, tag: string) => {
-    deleteFilter.mutate(filterId);
-    void message.success(t('tags.filter_removed', { tag }));
-  };
+  // Commit all pending changes on OK
+  const handleOk = async () => {
+    if (pendingAdd.size === 0 && pendingRemove.size === 0) {
+      onClose();
+      return;
+    }
 
-  const handleTagClick = (tag: string) => {
-    onSetHashTag(tag);
+    await Promise.all([
+      ...[...pendingAdd].map((tag) => createFilter.mutateAsync({ name: tag, type: 'tag', value: tag.toLowerCase() })),
+      ...[...pendingRemove].map((id) => deleteFilter.mutateAsync(id)),
+    ]);
+
+    void message.success(t('tags.changes_applied', { count: pendingAdd.size + pendingRemove.size }));
     onClose();
   };
+
+  const isPendingChanges = pendingAdd.size > 0 || pendingRemove.size > 0;
+  const isCommitting = createFilter.isPending || deleteFilter.isPending;
+  const totalChanges = pendingAdd.size + pendingRemove.size;
 
   const columns = [
     {
@@ -95,7 +144,10 @@ export function TagBrowserModal({
           <Tag
             icon={<NumberOutlined />}
             className={cx(styles.tagRow, isActive && styles.activeTag)}
-            onClick={() => handleTagClick(record.tag)}
+            onClick={() => {
+              onSetHashTag(record.tag);
+              onClose();
+            }}
           >
             {record.tag.replace(/^#/, '')}
           </Tag>
@@ -114,33 +166,65 @@ export function TagBrowserModal({
     {
       title: '',
       key: 'actions',
-      width: 170,
+      width: 180,
       render: (_: unknown, record: TagRow) => {
-        const norm = record.tag.toLowerCase().replace(/^#/, '');
-        const filterId = filteredTagMap.get(norm);
-        if (filterId !== undefined) {
+        const norm = record.tag.replace(/^#/, '');
+        const existingId = filteredTagMap.get(norm);
+        const isPendingRm = existingId !== undefined && pendingRemove.has(existingId);
+        const isPendingAd = pendingAdd.has(record.tag);
+
+        // State 1: existing filter, not pending remove → "Filtered" + remove button
+        if (existingId !== undefined && !isPendingRm) {
           return (
             <Space size={4}>
               <Text className={styles.filteredLabel}>{t('tags.filtered')}</Text>
               <Button
-                icon={<DeleteOutlined />}
+                icon={<UndoOutlined />}
                 size="small"
                 type="text"
                 danger
                 title={t('tags.remove_filter')}
-                onClick={() => handleRemoveFilter(filterId, record.tag)}
-                loading={deleteFilter.isPending}
+                onClick={() => handleToggle(record.tag)}
               />
             </Space>
           );
         }
+
+        // State 2: existing filter, pending remove → "Removing…" + undo
+        if (existingId !== undefined && isPendingRm) {
+          return (
+            <Space size={4}>
+              <Text className={styles.removingLabel}>{t('tags.pending_remove')}</Text>
+              <Button
+                icon={<UndoOutlined />}
+                size="small"
+                type="text"
+                title={t('tags.undo')}
+                onClick={() => handleToggle(record.tag)}
+              />
+            </Space>
+          );
+        }
+
+        // State 3: pending add → "Adding…" + undo
+        if (isPendingAd) {
+          return (
+            <Space size={4}>
+              <Text className={styles.pendingLabel}>{t('tags.pending_add')}</Text>
+              <Button
+                icon={<UndoOutlined />}
+                size="small"
+                type="text"
+                title={t('tags.undo')}
+                onClick={() => handleToggle(record.tag)}
+              />
+            </Space>
+          );
+        }
+
+        // State 4: no filter, not pending → "Add to filters" button
         return (
-          <Button
-            size="small"
-            type="text"
-            onClick={() => void handleAddFilter(record.tag)}
-            loading={createFilter.isPending}
-          >
+          <Button size="small" type="text" onClick={() => handleToggle(record.tag)}>
             {t('tags.add_filter')}
           </Button>
         );
@@ -159,7 +243,11 @@ export function TagBrowserModal({
         </Space>
       }
       onCancel={onClose}
-      footer={null}
+      onOk={() => void handleOk()}
+      okText={isPendingChanges ? t('tags.ok_with_changes', { count: totalChanges }) : t('common.close')}
+      cancelText={t('common.cancel')}
+      cancelButtonProps={{ style: { display: isPendingChanges ? undefined : 'none' } }}
+      okButtonProps={{ loading: isCommitting }}
       width={520}
     >
       <Table

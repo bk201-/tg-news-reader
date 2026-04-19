@@ -2,6 +2,7 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "close": "Close",
     "delete": "Delete",
     "download": "Download",
     "loading": "Loading...",
@@ -288,8 +289,11 @@
     "add_filter": "Add to filters",
     "remove_filter": "Remove filter",
     "filtered": "Filtered",
-    "filter_added": "Tag {{tag}} added to filters",
-    "filter_removed": "Filter for {{tag}} removed",
+    "pending_add": "Will be hidden",
+    "pending_remove": "Will be removed",
+    "undo": "Undo",
+    "ok_with_changes": "Apply ({{count}})",
+    "changes_applied": "{{count}} filter(s) updated",
     "empty": "No hashtags in loaded news"
   }
 }
