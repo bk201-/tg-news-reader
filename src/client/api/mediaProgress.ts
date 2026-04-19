@@ -41,7 +41,9 @@ export function useMediaProgressSSE(
 
     const rec = createReconnectingEventSource({
       getUrl,
-      onBeforeReconnect: async () => { await tryRefresh(); },
+      onBeforeReconnect: async () => {
+        await tryRefresh();
+      },
       module: 'mediaProgress',
       onConnect: (es) => {
         es.addEventListener('item', (e: MessageEvent) => {

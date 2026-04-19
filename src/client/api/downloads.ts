@@ -79,7 +79,9 @@ export function useDownloadsSSE() {
 
     const rec = createReconnectingEventSource({
       getUrl,
-      onBeforeReconnect: async () => { await tryRefresh(); },
+      onBeforeReconnect: async () => {
+        await tryRefresh();
+      },
       module: 'downloads',
       onConnect: (es) => {
         es.addEventListener('init', (e: MessageEvent) => {
