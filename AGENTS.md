@@ -31,16 +31,19 @@ npm run format:check   # Prettier (read-only check, use format to fix)
 **Every PR must include tests for the changes it introduces.** This applies to both new features and bug fixes.
 
 ### New feature
+
 - Add unit/integration tests covering the core logic of the feature.
 - If the feature adds a new route — add integration tests (`*.integration.test.ts`) using the in-memory DB pattern (see `src/server/__tests__/`).
 - If the feature adds a new store action or pure utility — add unit tests.
 
 ### Bug fix
+
 - **First**, write a failing test that reproduces the bug (red).
 - **Then**, fix the bug and confirm the test passes (green).
 - Check coverage: run `npx vitest run --coverage` and verify the fixed code path is covered. If the bug was in a previously uncovered area, the new test must cover it.
 
 ### Coverage policy
+
 - Thresholds: **70% stmts / 60% branches / 60% functions / 75% lines** (enforced in `vitest.config.ts`).
 - After adding tests, run `npx vitest run --coverage` to verify — the report shows per-file stats.
 - Prioritize testing **business logic** (services, routes, stores, pure utils) over UI components.
@@ -49,13 +52,14 @@ npm run format:check   # Prettier (read-only check, use format to fix)
 
 Version is in `package.json` and displayed in the app's user menu. Bump it **in the same PR** that introduces the change:
 
-| Change | Version part | Example |
-|---|---|---|
-| Bug fix only | **patch** (`1.1.0 → 1.1.1`) | fix scroll, fix video autoplay |
+| Change                                  | Version part                | Example                            |
+| --------------------------------------- | --------------------------- | ---------------------------------- |
+| Bug fix only                            | **patch** (`1.1.0 → 1.1.1`) | fix scroll, fix video autoplay     |
 | New feature (with or without bug fixes) | **minor** (`1.1.0 → 1.2.0`) | new digest button, version display |
-| Breaking / major rework | **major** — discuss first | n/a |
+| Breaking / major rework                 | **major** — discuss first   | n/a                                |
 
 Rules:
+
 - If a PR contains **both** a fix and a feature → bump **minor** only.
 - Never bump major without explicit discussion.
 - Use `npm version patch` / `npm version minor` (updates `package.json` and creates a git tag), or edit `package.json` directly.
@@ -65,6 +69,7 @@ Rules:
 **`main` is protected** — direct pushes are blocked by a GitHub Ruleset. All changes must go through a PR.
 
 ### Creating a PR
+
 ```bash
 git checkout -b feat/my-feature   # branch off main
 # make changes
@@ -87,7 +92,9 @@ git checkout -b feat/next-feature
 ```
 
 ### PR pipeline (`.github/workflows/pr-check.yml`)
+
 Runs automatically on every PR to `main`:
+
 1. `npm run build` → `npm run build:server` → `npm run lint` → `npm run format:check`
 2. If all pass **and** PR author is `bk201-` → PR is **auto-squash-merged** and the branch is deleted
 
@@ -100,7 +107,9 @@ Required status check name in the Ruleset: **`Build & Lint`**
 > Without this, `build-main.yml` will never fire automatically after a PR merge.
 
 ### Main pipeline (`.github/workflows/build-main.yml`)
+
 Runs on every push to `main` (i.e., after PR merge):
+
 1. Same quality gate (fails the build if checks fail)
 2. `docker login ACR` → `docker build` → `docker push` to ACR
 3. `az login` (service principal via `AZURE_CREDENTIALS`) → `az containerapp registry set` → `az containerapp update` (deploy new image) → set single-revision mode
@@ -113,7 +122,9 @@ Runs on every push to `main` (i.e., after PR merge):
 **Optional secrets** (for Telegram deploy alerts): `ALERT_BOT_TOKEN`, `ALERT_CHAT_ID`
 
 ### Rebasing a stale branch
+
 If a branch was created before recent PRs merged to `main`, GitHub will report conflicts. Fix:
+
 ```bash
 git fetch origin
 git checkout main && git reset --hard origin/main
@@ -123,6 +134,7 @@ git push origin your-branch --force-with-lease
 ```
 
 ### Setup checklist
+
 One-time GitHub settings required after cloning/forking — see `.github/SETUP.md`.
 
 ## Architecture
@@ -182,6 +194,7 @@ src/
 ## DB Migration Pattern
 
 **No Drizzle migrations folder** — uses `src/server/db/migrate.ts` directly:
+
 1. `CREATE TABLE IF NOT EXISTS` blocks for initial schema
 2. `alterMigrations` array with `ALTER TABLE` statements wrapped in try/catch (idempotent)
 3. One-time data fixups after the loop
@@ -215,11 +228,11 @@ JWT-based auth with httpOnly refresh-cookie rotation and optional TOTP:
 
 Channel post-processing is implemented as the Strategy pattern in `src/server/services/channelStrategies.ts`:
 
-| Strategy class | `channelType` | `postProcess` behaviour | `requiresMediaProcessing` |
-|---|---|---|---|
-| `NoneStrategy` | `'none'` | no-op | always `false` |
-| `LinkContinuationStrategy` | `'link_continuation'` | no-op (content loaded on demand) | always `false` |
-| `MediaContentStrategy` | `'media_content'` | calls `enqueueTask(newsId, 'media', undefined, 0)` for each media post | `true` when any message has `rawMedia` |
+| Strategy class             | `channelType`         | `postProcess` behaviour                                                | `requiresMediaProcessing`              |
+| -------------------------- | --------------------- | ---------------------------------------------------------------------- | -------------------------------------- |
+| `NoneStrategy`             | `'none'`              | no-op                                                                  | always `false`                         |
+| `LinkContinuationStrategy` | `'link_continuation'` | no-op (content loaded on demand)                                       | always `false`                         |
+| `MediaContentStrategy`     | `'media_content'`     | calls `enqueueTask(newsId, 'media', undefined, 0)` for each media post | `true` when any message has `rawMedia` |
 
 Use `getChannelStrategy(channelType)` factory to get the right instance. Adding a new channel type = new class + one line in `strategyMap`. The fetch route returns `{ inserted, total, mediaProcessing }` — `mediaProcessing: true` signals the client to open the media-progress SSE.
 
@@ -250,12 +263,14 @@ Real-time progress for bulk media fetches (used by `media_content` channels):
 ## State Management
 
 `uiStore` (Zustand, `src/client/store/uiStore.ts`) holds:
+
 - `selectedChannelId` / `selectedGroupId` (null = "Общее") / `selectedNewsId`
 - `showAll`, `filterPanelOpen`, `hashTagFilter`
 - `downloadsPanelPinned` — persisted in `localStorage`; when true, panel renders as inline sidebar
 - `isDarkTheme` — persisted in `localStorage`
 
 `authStore` (Zustand, `src/client/store/authStore.ts`) holds:
+
 - `accessToken: string | null` — JWT access token (in-memory only)
 - `user: { id, email, role, hasTOTP }` — current user
 - `unlockedGroupIds: number[]` — groups whose PIN was verified (decoded from JWT, survives refresh)
@@ -277,6 +292,7 @@ Real-time progress for bulk media fetches (used by `media_content` channels):
 ## Client API Pattern
 
 Each entity has a dedicated file in `src/client/api/` using TanStack Query:
+
 ```ts
 export function useThings() { return useQuery(...) }
 export function useCreateThing() { return useMutation({ onSuccess: () => qc.invalidateQueries(...) }) }
@@ -311,7 +327,9 @@ const useStyles = createStyles(({ css, token }) => ({
   item: css`
     background: ${token.colorBgContainer};
     border-bottom: 1px solid ${token.colorBorderSecondary};
-    &:hover { background: ${token.colorFillTertiary}; }
+    &:hover {
+      background: ${token.colorFillTertiary};
+    }
   `,
   itemActive: css`
     background: ${token.colorPrimaryBg};
@@ -328,7 +346,7 @@ function MyComponent() {
 - Use `cx(styles.a, condition && styles.b)` for conditional class merging
 - Use `theme.useToken()` from `antd` to access tokens in component logic (e.g. inline styles)
 
- ### No inline `style={{}}` — use `createStyles` instead
+### No inline `style={{}}` — use `createStyles` instead
 
 **All styles must live in `createStyles`, including layout and structural styles.** The only permitted exceptions for `style={{}}` are truly runtime-dynamic values that can't be expressed as static CSS:
 
@@ -350,6 +368,7 @@ function MyComponent() {
 ```
 
 Token equivalents for common hardcoded values:
+
 - `#fff` on colored backgrounds → `token.colorTextLightSolid`
 - `'green'` for success icons → `token.colorSuccess`
 - `'#ff4d4f'` for error/warning → `token.colorError`
@@ -368,12 +387,16 @@ const useStyles = createStyles(({ css, token }, sidebarInDrawer: boolean) => ({
     padding: ${sidebarInDrawer ? '0 12px' : '0 24px'};
   `,
 }));
-const { styles } = useStyles(sidebarInDrawer);  // antd-style caches per unique param
+const { styles } = useStyles(sidebarInDrawer); // antd-style caches per unique param
 
 // GroupItem: group color drives radial-gradient background
 const useGroupItemStyles = createStyles(({ css, token }, color?: string) => {
   const c = color ?? token.colorPrimary;
-  return { item: css`background: color-mix(in srgb, ${c} 15%, transparent);` };
+  return {
+    item: css`
+      background: color-mix(in srgb, ${c} 15%, transparent);
+    `,
+  };
 });
 const { styles } = useGroupItemStyles(group.color);
 ```
@@ -395,10 +418,16 @@ Declare `container-type: inline-size` on the parent in its `createStyles`, then 
 
 ```tsx
 // parent
-header: css`container-type: inline-size;`
+header: css`
+  container-type: inline-size;
+`;
 
 // child (separate createStyles)
-btnText: css`@container (max-width: 540px) { display: none; }`
+btnText: css`
+  @container (max-width: 540px) {
+    display: none;
+  }
+`;
 ```
 
 - Ant Design dark/light theme toggled via `ConfigProvider` in `main.tsx`
@@ -479,6 +508,7 @@ logger.error({ module: 'download', workerId, err }, 'worker crashed');
 - Language switcher in `AppHeader` user menu — `TranslationOutlined` + `Select`
 
 **Pattern — every component with UI strings must use `useTranslation`:**
+
 ```tsx
 import { useTranslation } from 'react-i18next';
 function MyComponent() {
@@ -488,6 +518,7 @@ function MyComponent() {
 ```
 
 **Rules:**
+
 - Always add new keys to **both** `en/translation.json` AND `ru/translation.json`
 - Keys are namespaced by section: `sidebar.*`, `channels.*`, `groups.*`, `news.*`, `filters.*`, `downloads.*`, `auth.*`, `header.*`, `common.*`
 - For `Modal.confirm` use `t()` for `title`, `content`, `okText`, `cancelText`
@@ -498,9 +529,9 @@ function MyComponent() {
 
 Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorage`):
 
-| Mode | Layout | Default |
-|---|---|---|
-| `'list'` | 2-pane: `NewsFeedList` (380px) + `NewsDetail` panel | Desktop |
+| Mode          | Layout                                                   | Default          |
+| ------------- | -------------------------------------------------------- | ---------------- |
+| `'list'`      | 2-pane: `NewsFeedList` (380px) + `NewsDetail` panel      | Desktop          |
 | `'accordion'` | Single column: `NewsAccordionList` → `NewsAccordionItem` | Mobile (< 768px) |
 
 **Responsive override**: `useMobileBreakpoint(768)` in `NewsFeed` → `effectiveViewMode = isMobile ? 'accordion' : newsViewMode`. View-toggle buttons are hidden on mobile.
@@ -508,6 +539,7 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 **Shared components** — both modes reuse: `NewsListItem` (collapsed accordion row), `NewsDetail` (expanded accordion body), all `NewsDetail*` sub-components.
 
 **`NewsDetail` variant pattern**:
+
 ```tsx
 // panel (default): sticky header, fixed height, date+tags in toolbar left
 <NewsDetail item={item} channelType={...} variant="panel" />
@@ -522,6 +554,7 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 **Hotkey listener phases**: `NewsDetail` registers its `keydown` listener with `{ capture: true }` so it always fires **before** `useNewsHotkeys` (which uses the default bubble phase). This is essential for `stopImmediatePropagation()` to work in the album Space-advance case — without capture, the parent's listener may be registered first and process the event before the child can stop it.
 
 **Component decomposition** (`src/client/components/News/`):
+
 - `NewsDetail` — state coordinator (queries, album index, top panel, hotkeys, handlers); requires `channelTelegramId: string` prop
 - `NewsDetailBody` — pure display: `NewsDetailMedia` + text body + link-select Modal
 - `NewsDetailToolbar` — header row; `variant='inline'` shows full title + clickable meta area; always renders the Open button using `openUrl` (= `firstLink ?? https://t.me/{channelTelegramId}/{msgId}`) + `isExternalLink` boolean for tooltip switch
@@ -530,18 +563,22 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 - `useNewsHotkeys(items, selectedId, setId, onSpace)` — ↑↓Space keyboard nav
 
 **`uiStore` fields added for news view**:
+
 - `newsViewMode: 'list' | 'accordion'` — user preference, persisted
 - `NewsViewMode` type exported from `uiStore.ts`
 
 ## Resilience Layer
 
 ### Client-side retries
+
 - **`ApiError`** (`src/client/api/client.ts`) — typed HTTP error with `status: number`; thrown by `request()` instead of plain `Error`
 - **Network retry**: `fetchWithNetworkRetry()` wraps bare `fetch()` — retries `TypeError` ("Failed to fetch") up to 3× with **500ms → 1s → 2s** backoff; `AbortError` never retried
 - **TanStack Query retry** (`src/client/main.tsx`): 4xx `ApiError` → `return false` (no retry); 5xx / network → up to 3 attempts with **1s → 2s → 4s → 30s cap** exponential backoff. Mutations stay at default `retry: 0` — don't add global mutation retry (duplicate writes)
 
 ### Server-side: Telegram circuit breaker
+
 `src/server/services/telegramCircuitBreaker.ts` — singleton `telegramCircuit`:
+
 - **Retry**: 3 attempts; `FloodWaitError` → waits exactly `error.seconds * 1000ms`; other transient errors → **2s → 4s → 8s**; permanent errors (wrong username, missing media) pass through immediately
 - **Circuit breaker**: opens after **5 consecutive transient failures**, half-opens after **30s**, closes on first success; logs every state transition at `warn`/`error`/`info`
 - All exported functions in `telegram.ts` are wrapped: `fetchChannelMessages`, `getChannelInfo`, `getReadInboxMaxId`, `readChannelHistory`, `fetchMessageById`, `downloadMessageMedia` (only the `tg.downloadMedia` call, not the local size checks)
@@ -549,6 +586,7 @@ Two view modes toggled by `newsViewMode` in `uiStore` (persisted to `localStorag
 - `GET /api/ready` — readiness probe: returns 200 when Telegram is connected, 503 during startup delay
 
 ### Deploy safety — preventing AUTH_KEY_DUPLICATED
+
 Telegram allows only one connection per auth key. During deploys, old and new containers overlap → both connect → `AUTH_KEY_DUPLICATED`. Three mechanisms prevent this:
 
 1. **Startup delay** (`TG_CONNECT_DELAY_SEC`, default 30 in prod): new container delays its first Telegram connection, giving time for the old one to shut down. Timer starts at module load, not at first request.
@@ -556,6 +594,7 @@ Telegram allows only one connection per auth key. During deploys, old and new co
 3. **Readiness probe** (`/api/ready`): returns 200 immediately so Azure switches traffic and kills the old container **fast**. Configure via `scripts/setup-health-probes.sh` (one-time).
 
 **Correct deploy timeline:**
+
 1. New container starts, `/api/ready` → 200 immediately
 2. Azure switches traffic → sends SIGTERM to old container (~5-10s after start)
 3. Old receives SIGTERM → `disconnectTelegramClient()` → session freed (~10s)
@@ -565,13 +604,16 @@ Telegram allows only one connection per auth key. During deploys, old and new co
 > ⚠️ **Readiness probe must NOT return 503 during Telegram delay.** If it does, Azure won't kill the old container → old stays connected → when delay expires, both containers are connected simultaneously → `AUTH_KEY_DUPLICATED`. The delay must be invisible to Azure — it's an internal application-level gate.
 
 ### Server-side: download worker retry
+
 `src/server/services/downloadManager.ts`:
+
 - Inner retry loop in `runWorker`: up to `DOWNLOAD_MAX_RETRIES` (env, default 3) attempts per task
 - Transient: `FloodWaitError`, `ECONNRESET`, `ETIMEDOUT`, `circuit breaker OPEN` → retry with **30s → 60s → 120s** backoff
 - Permanent: "No media in message", "size limit", "Article task missing URL" → fail immediately
 - **`spawnWorker(id)`** — self-healing: if `runWorker()` throws (shouldn't, but safety), restarts after 5s
 
 ### Azure boundary
+
 Azure App Service / Container Apps handles: process-level crash recovery (containers restart), TCP-level retries, health probing against `/api/health` (liveness) and `/api/ready` (readiness). Custom probes configured via `scripts/setup-health-probes.sh`. It does **not** retry application logic — that's all in code above.
 
 ## Logging Pipeline
@@ -586,6 +628,7 @@ Client logger.warn/error
 ```
 
 **Pino in prod** emits one JSON line per log call (no transport configured — raw stdout). Azure automatically ingests it into `ContainerAppConsoleLogs_CL`. Fields like `module`, `status`, `ms` become queryable. KQL example:
+
 ```kusto
 ContainerAppConsoleLogs_CL
 | extend log = parse_json(Log_s)
@@ -598,14 +641,16 @@ ContainerAppConsoleLogs_CL
 ## Monitoring
 
 ### alertBot — instant Telegram push (`src/server/services/alertBot.ts`)
+
 Calls Telegram Bot API directly from the Node.js process. **No-op when env vars absent** — safe to call unconditionally everywhere.
 
 ```ts
 import { sendAlert } from './alertBot.js';
-void sendAlert('message text', 'optional-dedup-key');  // dedup: 5-min cooldown per key
+void sendAlert('message text', 'optional-dedup-key'); // dedup: 5-min cooldown per key
 ```
 
 **Currently fires on:**
+
 - `uncaughtException` → `logger.fatal` + `sendAlert` → `process.exit(1)` (`index.ts`)
 - `unhandledRejection` → `logger.error` only (process continues)
 - Download worker crash → `logger.error` + `sendAlert` (`downloadManager.ts`)
@@ -626,21 +671,24 @@ az containerapp secret set --name tg-news-reader --resource-group personal-apps-
 
 # Then in Azure Portal, add env vars ALERT_BOT_TOKEN=secretref:alert-bot-token etc.
 ```
+
 How to get values: open [@BotFather](https://t.me/BotFather) → `/newbot` → copy token. Send any message to the bot, then `curl https://api.telegram.org/bot<TOKEN>/getUpdates` → read `result[0].message.chat.id`.
 
 To also enable deploy-failure alerts from GitHub Actions, add `ALERT_BOT_TOKEN` + `ALERT_CHAT_ID` as **GitHub Secrets** (same values).
 
 ### Azure Monitor Alerts (already deployed — `personal-apps-rg`)
+
 Two alert rules send email to `sceletron@gmail.com` via Action Group `tg-reader-alerts`:
 
-| Rule | Trigger | Delay |
-|---|---|---|
-| `tg-reader-error-logs` | KQL: `log.level >= 50` in 5-min window | 1–5 min |
-| `tg-reader-restart` | Metric: `RestartCount > 0` in 5-min window | 1–5 min |
+| Rule                   | Trigger                                    | Delay   |
+| ---------------------- | ------------------------------------------ | ------- |
+| `tg-reader-error-logs` | KQL: `log.level >= 50` in 5-min window     | 1–5 min |
+| `tg-reader-restart`    | Metric: `RestartCount > 0` in 5-min window | 1–5 min |
 
 To recreate from scratch on a different subscription: `scripts/setup-monitoring.sh` (fill in vars at the top). **Note**: the bash script's KQL uses `|` pipes — on Windows/PowerShell use `az rest --body @file.json` instead (see `C:\Users\dshilov\alert-kql-rule.json` as reference body).
 
 ### UptimeRobot (optional — external HTTP monitor, **currently NOT active**)
+
 Checks `/api/health` from outside Azure every 5 min. Catches what Azure Monitor can't: Azure region outage, event-loop freeze, etc.
 
 > ⚠️ **Side effect with scale-to-zero**: a 5-min UptimeRobot interval will wake the container every 5 min via KEDA HTTP scaler, causing a constant sleep/wake cycle. Consider 15–30 min interval or skip entirely — Azure Monitor + alertBot already cover crashes.
@@ -650,4 +698,3 @@ Checks `/api/health` from outside Azure every 5 min. Catches what Azure Monitor 
 1. Register free at [uptimerobot.com](https://uptimerobot.com)
 2. Add monitor: type `HTTP(s)`, URL `https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/api/health`, interval 15 min
 3. Alert Contacts: add Telegram (native support) or email
-

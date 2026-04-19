@@ -15,6 +15,7 @@ import downloadsRouter from './routes/downloads.js';
 import clientLogRouter from './routes/clientLog.js';
 import digestRouter from './routes/digest.js';
 import logsRouter from './routes/logs.js';
+import versionRouter from './routes/version.js';
 import { authMiddleware } from './middleware/auth.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
@@ -133,7 +134,7 @@ if (!isDev) {
 app.route('/api/auth', authRouter);
 
 // Protect all other /api/* routes with JWT auth
-const PUBLIC_PATHS = new Set(['/api/health', '/api/ready']);
+const PUBLIC_PATHS = new Set(['/api/health', '/api/ready', '/api/version']);
 const PUBLIC_PREFIXES = ['/api/auth/'];
 
 app.use('/api/*', async (c, next) => {
@@ -156,6 +157,7 @@ app.route('/api/downloads', downloadsRouter);
 app.route('/api/log/client', clientLogRouter);
 app.route('/api/logs', logsRouter);
 app.route('/api/digest', digestRouter);
+app.route('/api/version', versionRouter);
 
 // Health check — liveness/startup probe: "process is alive, HTTP works"
 // Always 200 as long as the process is running (used by smoke test + startup probe).

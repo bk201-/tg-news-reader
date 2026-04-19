@@ -9,13 +9,13 @@
 
 Media files are stored in `/app/data` inside the container. This path is mounted to an Azure Files share so files survive redeployments and container restarts.
 
-| Resource | Value |
-|---|---|
-| Storage Account | `personalapps` (shared) |
-| File Share | `tgr-media` |
+| Resource          | Value                                          |
+| ----------------- | ---------------------------------------------- |
+| Storage Account   | `personalapps` (shared)                        |
+| File Share        | `tgr-media`                                    |
 | Storage link name | `tgr-media` (registered in Container Apps Env) |
-| Volume name | `data-volume` |
-| Mount path | `/app/data` |
+| Volume name       | `data-volume`                                  |
+| Mount path        | `/app/data`                                    |
 
 The volume and mount were set up once via `az containerapp update --yaml`. Subsequent `az containerapp update --image` calls (used in CI) **preserve** `volumeMounts` — confirmed empirically. No extra CI step needed.
 
@@ -46,12 +46,12 @@ az containerapp update \
 
 ## Current Container App configuration
 
-| Parameter | Value | Updated |
-|---|---|---|
-| `minReplicas` | 0 (scale-to-zero) | — |
-| `maxReplicas` | 10 | — |
-| `cooldownPeriod` | **1800 sec (30 min)** | 2026-03-28 |
-| `pollingInterval` | 30 sec | — |
+| Parameter         | Value                 | Updated    |
+| ----------------- | --------------------- | ---------- |
+| `minReplicas`     | 0 (scale-to-zero)     | —          |
+| `maxReplicas`     | 10                    | —          |
+| `cooldownPeriod`  | **1800 sec (30 min)** | 2026-03-28 |
+| `pollingInterval` | 30 sec                | —          |
 
 ---
 
@@ -145,10 +145,10 @@ az rest --method PATCH \
 
 Deployed in `personal-apps-rg`. Action Group: `tg-reader-alerts` → email `sceletron@gmail.com`.
 
-| Rule | Metric / KQL | Threshold | Window | Updated |
-|---|---|---|---|---|
-| `tg-reader-restart` | `RestartCount` | **> 1** | **15 min** | 2026-03-28 |
-| `tg-reader-error-logs` | KQL: `log.level >= 50` | > 0 | 5 min | — |
+| Rule                   | Metric / KQL           | Threshold | Window     | Updated    |
+| ---------------------- | ---------------------- | --------- | ---------- | ---------- |
+| `tg-reader-restart`    | `RestartCount`         | **> 1**   | **15 min** | 2026-03-28 |
+| `tg-reader-error-logs` | KQL: `log.level >= 50` | > 0       | 5 min      | —          |
 
 ### Update an alert rule
 
@@ -187,12 +187,12 @@ curl https://tg-news-reader.graycoast-407e8a98.westeurope.azurecontainerapps.io/
 
 ## GitHub Actions secrets
 
-| Secret | Purpose |
-|---|---|
-| `ACR_LOGIN_SERVER` | Azure Container Registry URL |
-| `ACR_USERNAME` / `ACR_PASSWORD` | ACR credentials |
-| `AZURE_CREDENTIALS` | Service principal JSON for az login |
-| `AZURE_RESOURCE_GROUP` | `personal-apps-rg` |
-| `AZURE_CONTAINER_APP` | `tg-news-reader` |
-| `PAT_TOKEN` | Fine-grained PAT (Contents+PRs write) — for auto-merge |
-| `ALERT_BOT_TOKEN` / `ALERT_CHAT_ID` | Telegram deploy-failure alerts (optional) |
+| Secret                              | Purpose                                                |
+| ----------------------------------- | ------------------------------------------------------ |
+| `ACR_LOGIN_SERVER`                  | Azure Container Registry URL                           |
+| `ACR_USERNAME` / `ACR_PASSWORD`     | ACR credentials                                        |
+| `AZURE_CREDENTIALS`                 | Service principal JSON for az login                    |
+| `AZURE_RESOURCE_GROUP`              | `personal-apps-rg`                                     |
+| `AZURE_CONTAINER_APP`               | `tg-news-reader`                                       |
+| `PAT_TOKEN`                         | Fine-grained PAT (Contents+PRs write) — for auto-merge |
+| `ALERT_BOT_TOKEN` / `ALERT_CHAT_ID` | Telegram deploy-failure alerts (optional)              |

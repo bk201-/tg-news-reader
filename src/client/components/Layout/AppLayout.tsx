@@ -9,9 +9,10 @@ import { NewsFeed } from '../News/NewsFeed';
 import { DownloadsPinnedContent } from './DownloadsPinnedContent';
 import { AppHeader } from './AppHeader';
 import { TelegramSessionBanner } from './TelegramSessionBanner';
+import { VersionBanner } from './VersionBanner';
 import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
-import { BP_XXL, useIsXl, useMatchMedia } from '../../hooks/breakpoints';
+import { useIsXl, useIsXxl } from '../../hooks/breakpoints';
 import { useBossKey } from '../../hooks/useBossKey';
 
 const { Text } = Typography;
@@ -98,7 +99,7 @@ export function AppLayout() {
   // < 1200px → accordion mode: single-scroll mobile layout
   const isAccordionMode = !useIsXl();
   // < 1600px → sidebar in Drawer (desktop only)
-  const sidebarInDrawer = !useMatchMedia(`(min-width: ${BP_XXL}px)`);
+  const sidebarInDrawer = !useIsXxl();
 
   const [defaultSidebarWidth] = useState(() => parseInt(localStorage.getItem('sidebarWidth') ?? '280', 10));
 
@@ -240,6 +241,7 @@ export function AppLayout() {
       <Layout className={styles.layoutMobile}>
         {sidebarDrawer}
         <div className={styles.mobileContainer}>
+          <VersionBanner />
           <AppHeader />
           <TelegramSessionBanner />
           {selectedChannel ? <NewsFeed channel={selectedChannel} /> : emptyState}
@@ -251,6 +253,7 @@ export function AppLayout() {
   // ── DESKTOP (≥ 1200px): Splitter layout ────────────────────────────────
   return (
     <Layout className={styles.layout}>
+      <VersionBanner />
       <AppHeader />
       <TelegramSessionBanner />
       {sidebarDrawer}

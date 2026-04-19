@@ -24,5 +24,5 @@ export function TelegramSessionBanner() {
 
   if (!data?.telegram.sessionExpired) return null;
 
-  return <Alert type="error" banner showIcon message={t('header.session_expired_banner')} className={styles.banner} />;
+  return <Alert type="error" banner showIcon title={t('header.session_expired_banner')} className={styles.banner} />;
 }

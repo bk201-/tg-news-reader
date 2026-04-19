@@ -8,11 +8,11 @@ import {
   TranslationOutlined,
   TagOutlined,
 } from '@ant-design/icons';
-import { version as APP_VERSION } from '../../../../package.json';
 import { createStyles } from 'antd-style';
 import { useTranslation } from 'react-i18next';
 import { FlagRU, FlagUS } from '../Flags';
 import { clearSwCache } from '../../services/serviceWorker';
+import { APP_VERSION } from '../../appVersion';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
 import type { App } from 'antd';

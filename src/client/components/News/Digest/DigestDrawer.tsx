@@ -163,7 +163,7 @@ export function DigestDrawer({ open, params, onClose }: DigestDrawerProps) {
       styles={{ body: { padding: 0 } }}
     >
       <div className={styles.body}>
-        {error && <Alert type="error" message={error} showIcon />}
+        {error && <Alert type="error" title={error} showIcon />}
 
         {isPrefetching && (
           <div className={styles.prefetchWrap}>

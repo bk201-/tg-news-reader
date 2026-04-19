@@ -5,6 +5,7 @@
 ## Problem Statement
 
 There is no personal landing page or CV site. When sharing a resume with potential employers or contacts, the only option is a static PDF file sent manually. There's no central place that:
+
 - Presents a professional CV in a web-friendly format
 - Allows instant PDF download with consistent formatting
 - Provides a language switcher (EN/RU) for different audiences
@@ -48,32 +49,38 @@ PDF files are auto-generated in CI via Playwright (HTML → PDF) on every push t
 ## Implementation Decisions
 
 ### Stack & Hosting
+
 - **Astro** (SSG mode, zero client JS) — new project, separate git repo
 - **Azure Static Web Apps** (Free tier) — custom domain `dmitriishilov.com`, auto SSL
 - **GitHub Actions** for CI/CD: build → generate PDFs → deploy
 
 ### Template
+
 - Based on **Print-Friendly Portfolio CV** (free Astro theme) — minimal, dense, print-optimized
 - Stripped of unnecessary features, adapted for i18n and custom sections
 
 ### Content Layer
+
 - CV data lives in structured files (JSON or YAML) under `src/data/`
 - Separate files per language: `cv-en.json` and `cv-ru.json` (or YAML equivalent)
 - Components read data via Astro imports — no runtime fetching
 - Single source of truth: edit JSON → web + PDF update automatically
 
 ### i18n Routing
+
 - Astro's built-in i18n: `/` = English (default), `/ru/` = Russian
 - Language switcher in header: simple `<a>` links between `/` and `/ru/`
 - No JS-based language detection — explicit user choice via URL
 
 ### Print & PDF
+
 - `@media print` stylesheet: hides nav, buttons, lang switcher; forces single-column compact layout; targets A4 dimensions
 - Print view is the same HTML, just styled differently — no separate "print page"
 - **PDF generation in CI**: GitHub Action installs Playwright → runs a script that opens `http://localhost:4321/` and `/ru/` → `page.pdf({ format: 'A4' })` → saves to `dist/cv-en.pdf` and `dist/cv-ru.pdf`
 - "Download CV" button = `<a href="/cv-en.pdf" download>` (or `/cv-ru.pdf` on Russian page)
 
 ### Layout
+
 - **Desktop**: 2-column layout — narrow left (photo, contacts, skills, languages), wide right (summary, experience, education, projects)
 - **Mobile**: single column, stacked
 - **Print**: same 2-column but tighter margins, smaller font, no color backgrounds
@@ -81,12 +88,14 @@ PDF files are auto-generated in CI via Playwright (HTML → PDF) on every push t
 - Minimal color: one accent color for headings/name, rest is black/grey on white
 
 ### Hidden Links Page
+
 - URL: unguessable slug (e.g., `/d7k9m/`)
 - Not in `<nav>`, not in `sitemap.xml`, not in `robots.txt`
 - Contains: styled link cards to private apps (tg-news-reader, future apps)
 - Security through obscurity only — no auth needed (apps behind the links have their own auth)
 
 ### CI/CD Pipeline
+
 ```
 push to main
   → npm run build (Astro SSG → dist/)
@@ -97,6 +106,7 @@ push to main
 ```
 
 ### Domain Setup
+
 - `dmitriishilov.com` → Azure Static Web Apps custom domain (CNAME or A record)
 - Auto-managed SSL certificate (Azure provides free cert)
 - `www.dmitriishilov.com` → redirect to apex domain
@@ -104,6 +114,7 @@ push to main
 ## Testing Decisions
 
 No automated tests are planned for this project:
+
 - **Zero business logic** — pure static HTML/CSS, no interactivity, no state
 - **CI build is the test** — if Astro builds successfully and Playwright generates PDFs without errors, the site is working
 - **PDF generation script** can assert file size > 0 and page count ≤ 2 as a basic smoke check
@@ -126,4 +137,3 @@ No automated tests are planned for this project:
 - Secret links page slug should be stored in a constant, easy to change if discovered
 - Consider adding `<meta name="robots" content="noindex">` to the links page as an extra measure
 - Astro v5+ recommended for latest i18n support and performance
-

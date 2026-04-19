@@ -8,22 +8,22 @@ After pushing this code to GitHub, complete the following one-time manual steps.
 
 Go to **Settings → Rules → Rulesets → New ruleset → New branch ruleset**.
 
-| Field | Value |
-|---|---|
-| Ruleset name | `Protect main` |
-| Enforcement status | **Active** |
-| Target branches | **Add target → Include by pattern → `main`** |
+| Field              | Value                                        |
+| ------------------ | -------------------------------------------- |
+| Ruleset name       | `Protect main`                               |
+| Enforcement status | **Active**                                   |
+| Target branches    | **Add target → Include by pattern → `main`** |
 
 Enable the following **Rules**:
 
-| Rule | Value |
-|---|---|
-| Restrict deletions | ✅ |
-| Block force pushes | ✅ |
-| Require a pull request before merging | ✅ — Required approvals: **0** |
-| Require status checks to pass | ✅ |
-| ↳ Add required check | type `Build & Lint`, select the entry from the dropdown |
-| ↳ Require branches to be up to date | ✅ |
+| Rule                                  | Value                                                   |
+| ------------------------------------- | ------------------------------------------------------- |
+| Restrict deletions                    | ✅                                                      |
+| Block force pushes                    | ✅                                                      |
+| Require a pull request before merging | ✅ — Required approvals: **0**                          |
+| Require status checks to pass         | ✅                                                      |
+| ↳ Add required check                  | type `Build & Lint`, select the entry from the dropdown |
+| ↳ Require branches to be up to date   | ✅                                                      |
 
 **Bypass list** — leave empty so even the repo owner cannot push directly to `main`.
 
@@ -85,4 +85,3 @@ feature-branch → PR to main
                               │
                          upload artifact  (keep 3 latest)
 ```
-

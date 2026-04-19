@@ -13,7 +13,6 @@ export const MOBILE_TOOLBAR_HEIGHT = 44;
 
 // ── Singleton breakpoint store ────────────────────────────────────────
 // A single set of 5 matchMedia listeners broadcasts to all React subscribers.
-// Previously each useMatchMedia() call created its own listener per component instance.
 
 export interface BreakpointState {
   isSm: boolean;
@@ -76,18 +75,3 @@ export const useIsMd = () => useBreakpoints().isMd;
 export const useIsXl = () => useBreakpoints().isXl;
 /** ≥ 1600px (xxl) — full desktop: inline sidebar, pin downloads panel */
 export const useIsXxl = () => useBreakpoints().isXxl;
-
-/**
- * @deprecated Use useBreakpoints() or useIsXl() etc. instead.
- * Kept for backwards-compat — subscribes to a single arbitrary CSS media query.
- */
-export function useMatchMedia(query: string): boolean {
-  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [query]);
-  return matches;
-}

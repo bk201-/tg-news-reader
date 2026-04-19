@@ -55,12 +55,6 @@ describe('breakpoints', () => {
     expect(result.current.isXxl).toBe(false);
   });
 
-  it('useMatchMedia subscribes to a custom query', async () => {
-    const { useMatchMedia } = await import('./breakpoints.js');
-    const { result } = renderHook(() => useMatchMedia('(min-width: 500px)'));
-    expect(result.current).toBe(true);
-  });
-
   it('useIsMd / useIsXl / useIsXxl return correct booleans', async () => {
     const { useIsMd, useIsXl, useIsXxl } = await import('./breakpoints.js');
 
