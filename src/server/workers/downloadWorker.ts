@@ -25,6 +25,7 @@ import { withRetry, TASK_POLICY, HTTP_FETCH_POLICY } from '../utils/retry.js';
 import { parseHtml, buildFullContent } from '../services/readability.js';
 import { logger } from '../logger.js';
 import type { TgDownloadMediaMsg, MainToWorkerBridgeMsg } from '../services/telegramBridge.js';
+import { ARTICLE_MAX_HTML_BYTES } from '../config.js';
 
 // ─── Worker identity ──────────────────────────────────────────────────────────
 
@@ -188,7 +189,52 @@ async function processArticleTask(newsId: number, url: string): Promise<void> {
     `article-fetch:${newsId}`,
   );
 
-  const html = await response.text();
+  // Guard against huge pages — jsdom parsing multiplies memory 5-10×.
+  // Treat oversized pages as a permanent failure (no retry) to avoid OOM.
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > ARTICLE_MAX_HTML_BYTES) {
+    logger.warn(
+      { module: 'download', workerId, newsId, bytes: contentLength },
+      `article skipped: Content-Length ${contentLength} exceeds ${ARTICLE_MAX_HTML_BYTES} byte limit`,
+    );
+    // Throwing a message that starts with "size limit" marks the task as permanently failed
+    // (matches the permanent-error guard in the retry policy).
+    throw Object.assign(new Error(`size limit: article HTML too large (${contentLength} bytes)`), {
+      permanent: true,
+    });
+  }
+
+  // Stream and count bytes — catches chunked responses that omit Content-Length
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Response body is not readable');
+  }
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > ARTICLE_MAX_HTML_BYTES) {
+      await reader.cancel();
+      logger.warn(
+        { module: 'download', workerId, newsId, bytes: totalBytes },
+        `article skipped: streamed body exceeds ${ARTICLE_MAX_HTML_BYTES} byte limit`,
+      );
+      throw Object.assign(new Error(`size limit: article HTML too large (>${ARTICLE_MAX_HTML_BYTES} bytes)`), {
+        permanent: true,
+      });
+    }
+    chunks.push(value);
+  }
+  const html = new TextDecoder().decode(
+    chunks.reduce((acc, chunk) => {
+      const merged = new Uint8Array(acc.byteLength + chunk.byteLength);
+      merged.set(acc, 0);
+      merged.set(chunk, acc.byteLength);
+      return merged;
+    }, new Uint8Array(0)),
+  );
 
   // CPU-bound: runs in this worker thread — does NOT block the main event loop
   const extracted = await parseHtml(html, url);

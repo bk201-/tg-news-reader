@@ -9,6 +9,7 @@ vi.mock('../config.js', () => ({
   DIGEST_MAX_ITEMS: 200,
   DIGEST_ARTICLE_CONTENT_LIMIT: 1500,
   DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS: 100, // very short for tests
+  DIGEST_MAX_PREFETCH: 20,
 }));
 
 vi.mock('../logger.js', () => ({

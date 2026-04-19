@@ -281,7 +281,20 @@
     "refresh": "Обновить",
     "copied": "Скопировано в буфер",
     "powered_by": "Azure OpenAI · gpt-4o-mini",
-    "error_generic": "Ошибка генерации дайджеста"
+    "error_generic": "Ошибка генерации дайджеста",
+    "progress_title": "Батчи дайджеста ({{count}})",
+    "batch_label": "Новости {{from}}–{{to}}",
+    "batch_status_pending": "В очереди",
+    "batch_status_prefetching": "Загружаю статьи",
+    "batch_status_generating": "Генерирую",
+    "batch_status_done": "Готово",
+    "batch_status_error": "Ошибка",
+    "batch_show": "Показать дайджест",
+    "batch_mark_read": "Пометить прочитанными",
+    "batch_mark_read_disabled": "Сначала откройте дайджест",
+    "batch_marked_count": "Помечено как прочитано: {{count}}",
+    "batch_retry": "Повторить",
+    "batch_count_label": "Готово {{done}} / {{total}} батчей"
   },
   "tags": {
     "title": "Теги",

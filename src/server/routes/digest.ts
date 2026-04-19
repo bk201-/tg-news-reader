@@ -5,7 +5,12 @@ import { db } from '../db/index.js';
 import { news, channels, downloads } from '../db/schema.js';
 import { eq, and, desc, inArray, isNull, isNotNull, gt, lte, or } from 'drizzle-orm';
 import { createOpenAiClient, DIGEST_DEPLOYMENT, isAiConfigured } from '../services/openaiClient.js';
-import { DIGEST_MAX_ITEMS, DIGEST_ARTICLE_CONTENT_LIMIT, DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS } from '../config.js';
+import {
+  DIGEST_MAX_ITEMS,
+  DIGEST_ARTICLE_CONTENT_LIMIT,
+  DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS,
+  DIGEST_MAX_PREFETCH,
+} from '../config.js';
 import { logger } from '../logger.js';
 import { enqueueTask } from '../services/downloadManager.js';
 import { createDigestSchema } from './schemas.js';
@@ -73,10 +78,11 @@ router.post('/', zValidator('json', createDigestSchema), async (c) => {
   const items = [...rows].reverse();
 
   // ── Identify prefetch set ────────────────────────────────────────────────
-  // news_link items that have no fullContent yet but have a link to fetch
-  const prefetchItems = items.filter(
-    (item) => item.channelType === 'news_link' && item.fullContent === null && item.canLoadArticle === 1,
-  );
+  // news_link items that have no fullContent yet but have a link to fetch.
+  // Capped at DIGEST_MAX_PREFETCH to avoid saturating the download worker pool.
+  const prefetchItems = items
+    .filter((item) => item.channelType === 'news_link' && item.fullContent === null && item.canLoadArticle === 1)
+    .slice(0, DIGEST_MAX_PREFETCH);
 
   // Build citation index → newsId mapping (sent to client before streaming starts)
   const refMap: Record<string, number> = {};
@@ -86,10 +92,13 @@ router.post('/', zValidator('json', createDigestSchema), async (c) => {
 
   // ── Stream SSE response ───────────────────────────────────────────────────
   return streamSSE(c, async (stream) => {
+    /** IDs enqueued during Phase 1 — need cleanup on stream close */
+    let enqueuedPrefetchIds: number[] = [];
     try {
       // ── Phase 1: prefetch articles ──────────────────────────────────────
       if (prefetchItems.length > 0) {
         const prefetchIds = prefetchItems.map((item) => item.id);
+        enqueuedPrefetchIds = prefetchIds;
         const total = prefetchIds.length;
 
         // Enqueue article downloads at priority=10 (user-initiated; no size limits)
@@ -112,7 +121,7 @@ router.post('/', zValidator('json', createDigestSchema), async (c) => {
 
         let timedOut = false;
         while (Date.now() < deadline) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 500));
+          await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
 
           const [doneRows, failedRows, activeRows] = await Promise.all([
             // Items that now have fullContent written
@@ -238,6 +247,31 @@ Summarize the provided news items into a structured digest.
       const msg = err instanceof Error ? err.message : String(err);
       logger.error({ module: 'digest', err }, 'digest error');
       await stream.writeSSE({ event: 'error', data: JSON.stringify({ message: msg }) });
+    } finally {
+      // Cancel any prefetch tasks that are still pending (not yet picked up by a worker).
+      // This prevents the worker pool from being saturated after the digest stream closes.
+      if (enqueuedPrefetchIds.length > 0) {
+        try {
+          const cancelled = await db
+            .delete(downloads)
+            .where(
+              and(
+                inArray(downloads.newsId, enqueuedPrefetchIds),
+                eq(downloads.type, 'article'),
+                eq(downloads.status, 'pending'),
+              ),
+            )
+            .returning({ id: downloads.id });
+          if (cancelled.length > 0) {
+            logger.info(
+              { module: 'digest', cancelled: cancelled.length },
+              'cancelled pending prefetch tasks after digest stream closed',
+            );
+          }
+        } catch (cleanupErr) {
+          logger.warn({ module: 'digest', err: cleanupErr }, 'failed to cancel pending prefetch tasks');
+        }
+      }
     }
   });
 });

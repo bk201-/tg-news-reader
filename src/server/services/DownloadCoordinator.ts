@@ -20,6 +20,7 @@ import {
   WORKER_POOL_CRASH_WINDOW_MS,
   WORKER_RESTART_BASE_MS,
   WORKER_RESTART_JITTER_MS,
+  ARTICLE_WORKER_CONCURRENCY,
 } from '../config.js';
 import type { DownloadTask } from '../../shared/types.js';
 import { logger } from '../logger.js';
@@ -91,9 +92,14 @@ export class DownloadCoordinator {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly concurrency: number;
   private _stopped = false;
+  /** Number of article tasks currently being processed across all workers. */
+  private runningArticles = 0;
+  /** Max concurrent article (jsdom) tasks — capped to avoid OOM. */
+  private readonly maxConcurrentArticles: number;
 
   constructor(concurrency: number) {
     this.concurrency = concurrency;
+    this.maxConcurrentArticles = Math.min(ARTICLE_WORKER_CONCURRENCY, concurrency);
   }
 
   /** Whether the pool has been stopped by the circuit breaker. Exposed for health checks. */
@@ -106,8 +112,8 @@ export class DownloadCoordinator {
     for (let i = 0; i < this.concurrency; i++) this.spawnWorker(i);
     downloadProgressEmitter.on(WAKEUP_EVENT, () => void this.tryDispatch());
     logger.info(
-      { module: 'download', concurrency: this.concurrency },
-      `worker pool started (${this.concurrency} workers)`,
+      { module: 'download', concurrency: this.concurrency, maxConcurrentArticles: this.maxConcurrentArticles },
+      `worker pool started (${this.concurrency} workers, max ${this.maxConcurrentArticles} article tasks)`,
     );
   }
 
@@ -197,6 +203,7 @@ export class DownloadCoordinator {
     await db.update(downloads).set({ status: 'done', processedAt: now }).where(eq(downloads.id, taskId));
     const doneTask = await getTaskWithContext(taskId);
     if (doneTask) {
+      if (doneTask.type === 'article') this.runningArticles = Math.max(0, this.runningArticles - 1);
       emitTaskUpdate({ ...doneTask, status: 'done' });
       setTimeout(() => {
         void db.delete(downloads).where(eq(downloads.id, taskId));
@@ -213,7 +220,10 @@ export class DownloadCoordinator {
       .set({ status: 'failed', error: errorMsg, processedAt: now })
       .where(eq(downloads.id, taskId));
     const failedTask = await getTaskWithContext(taskId);
-    if (failedTask) emitTaskUpdate({ ...failedTask, status: 'failed', error: errorMsg });
+    if (failedTask) {
+      if (failedTask.type === 'article') this.runningArticles = Math.max(0, this.runningArticles - 1);
+      emitTaskUpdate({ ...failedTask, status: 'failed', error: errorMsg });
+    }
     logger.error({ module: 'download', taskId, err: errorMsg }, 'task permanently failed');
     this.available.add(workerId);
     void this.tryDispatch();
@@ -235,14 +245,20 @@ export class DownloadCoordinator {
 
     let task: typeof downloads.$inferSelect | undefined;
     try {
+      const articleSlotsAvailable = this.runningArticles < this.maxConcurrentArticles;
       [task] = await withRetry(
-        () =>
-          db
+        () => {
+          return db
             .select()
             .from(downloads)
-            .where(eq(downloads.status, 'pending'))
+            .where(
+              articleSlotsAvailable
+                ? eq(downloads.status, 'pending')
+                : and(eq(downloads.status, 'pending'), eq(downloads.type, 'media')),
+            )
             .orderBy(desc(downloads.priority), asc(downloads.createdAt))
-            .limit(1),
+            .limit(1);
+        },
         DB_POLL_POLICY,
         'poll',
       );
@@ -280,6 +296,8 @@ export class DownloadCoordinator {
 
     const taskCtx = await getTaskWithContext(task.id);
     if (taskCtx) emitTaskUpdate({ ...taskCtx, status: 'processing' });
+
+    if (task.type === 'article') this.runningArticles++;
 
     worker.postMessage({
       type: 'task',

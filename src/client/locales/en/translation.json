@@ -281,7 +281,20 @@
     "refresh": "Refresh",
     "copied": "Copied to clipboard",
     "powered_by": "Powered by Azure OpenAI · gpt-4o-mini",
-    "error_generic": "Failed to generate digest"
+    "error_generic": "Failed to generate digest",
+    "progress_title": "Digest batches ({{count}})",
+    "batch_label": "Items {{from}}–{{to}}",
+    "batch_status_pending": "Waiting",
+    "batch_status_prefetching": "Fetching articles",
+    "batch_status_generating": "Generating",
+    "batch_status_done": "Done",
+    "batch_status_error": "Error",
+    "batch_show": "Show digest",
+    "batch_mark_read": "Mark as read",
+    "batch_mark_read_disabled": "Open the digest first",
+    "batch_marked_count": "{{count}} marked as read",
+    "batch_retry": "Retry",
+    "batch_count_label": "{{done}} / {{total}} batches done"
   },
   "tags": {
     "title": "Tags",

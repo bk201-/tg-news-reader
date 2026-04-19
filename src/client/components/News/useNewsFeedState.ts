@@ -77,6 +77,12 @@ export function useNewsFeedState(channel: Channel) {
     return { channelIds: [channel.id] };
   }, [data.hashTagFilter, data.displayItems, channel.id]);
 
+  // Visible newsIds in chronological order (oldest first) — used by the batched
+  // digest flow. API returns items DESC (newest first); reverse for chronology.
+  const visibleNewsIdsChrono = useMemo(() => {
+    return [...data.displayItems].reverse().map((item) => item.id);
+  }, [data.displayItems]);
+
   // ── Toolbar props ─────────────────────────────────────────────────────
   const toolbarProps = {
     fetchPending: actions.fetchChannel.isPending,
@@ -128,6 +134,7 @@ export function useNewsFeedState(channel: Channel) {
     digestOpen: data.digestOpen,
     setDigestOpen: data.setDigestOpen,
     digestParams,
+    visibleNewsIdsChrono,
     // Tag browser
     tagBrowserOpen: data.tagBrowserOpen,
     setTagBrowserOpen: data.setTagBrowserOpen,
