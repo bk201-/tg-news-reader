@@ -83,7 +83,14 @@ export function DownloadsPanel() {
       </Tooltip>
 
       {!effectivePinned && (
-        <Drawer title={drawerTitle} placement="right" size="default" open={open} onClose={() => setOpen(false)}>
+        <Drawer
+          title={drawerTitle}
+          placement="right"
+          size="default"
+          open={open}
+          onClose={() => setOpen(false)}
+          mask={false}
+        >
           <TaskList tasks={tasks} cancelDownload={cancelDownload} prioritizeDownload={prioritizeDownload} />
         </Drawer>
       )}
