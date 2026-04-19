@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { db, client } from '../db/index.js';
 import { filters } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { reprocessChannelFilters } from '../services/filterEngine.js';
-import { createFilterSchema, updateFilterSchema } from './schemas.js';
+import { createFilterSchema, updateFilterSchema, batchFiltersSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -36,6 +36,45 @@ router.get('/stats', async (c) => {
     lastHitDate: r[3] as string | null,
   }));
   return c.json(result);
+});
+
+// POST /api/channels/:channelId/filters/batch
+// Apply multiple filter additions and deletions in a single request.
+// Runs one reprocessChannelFilters pass instead of one per change.
+router.post('/batch', zValidator('json', batchFiltersSchema), async (c) => {
+  const channelId = parseInt(c.req.param('channelId')!, 10);
+  const { toAdd, toDelete } = c.req.valid('json');
+
+  if (toAdd.length === 0 && toDelete.length === 0) {
+    return c.json({ added: [], deleted: 0 });
+  }
+
+  const added = toAdd.length
+    ? await db
+        .insert(filters)
+        .values(
+          toAdd.map((f) => ({
+            channelId,
+            name: f.name.trim(),
+            type: f.type,
+            value: f.value.trim().toLowerCase(),
+          })),
+        )
+        .returning()
+    : [];
+
+  const deletedCount =
+    toDelete.length
+      ? (
+          await db
+            .delete(filters)
+            .where(and(eq(filters.channelId, channelId), inArray(filters.id, toDelete)))
+            .returning()
+        ).length
+      : 0;
+
+  await reprocessChannelFilters(channelId);
+  return c.json({ added, deleted: deletedCount });
 });
 
 // POST /api/channels/:channelId/filters

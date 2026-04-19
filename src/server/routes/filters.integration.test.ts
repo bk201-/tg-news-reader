@@ -196,4 +196,100 @@ describe('Filters routes (integration)', () => {
       expect(body[0].hitsTotal).toBe(0);
     });
   });
+
+  // ── POST /api/channels/:channelId/filters/batch ───────────────────────────
+
+  describe('POST /batch', () => {
+    it('adds multiple filters in a single request', async () => {
+      const res = await app.request(`/api/channels/${channelId}/filters/batch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toAdd: [
+            { name: '#crypto', type: 'tag', value: '#crypto' },
+            { name: '#ads', type: 'tag', value: '#ads' },
+          ],
+          toDelete: [],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.added).toHaveLength(2);
+      expect(body.deleted).toBe(0);
+
+      const all = await testDb.db.select().from(filters).where(eq(filters.channelId, channelId));
+      expect(all).toHaveLength(2);
+    });
+
+    it('deletes multiple filters in a single request', async () => {
+      const [f1, f2] = await testDb.db
+        .insert(filters)
+        .values([
+          { channelId, name: '#a', type: 'tag', value: 'a' },
+          { channelId, name: '#b', type: 'tag', value: 'b' },
+        ])
+        .returning();
+
+      const res = await app.request(`/api/channels/${channelId}/filters/batch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toAdd: [], toDelete: [f1.id, f2.id] }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.deleted).toBe(2);
+
+      const remaining = await testDb.db.select().from(filters).where(eq(filters.channelId, channelId));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it('adds and deletes in the same request', async () => {
+      const [existing] = await testDb.db
+        .insert(filters)
+        .values({ channelId, name: '#old', type: 'tag', value: 'old' })
+        .returning();
+
+      const res = await app.request(`/api/channels/${channelId}/filters/batch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toAdd: [{ name: '#new', type: 'tag', value: '#new' }],
+          toDelete: [existing.id],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.added).toHaveLength(1);
+      expect(body.deleted).toBe(1);
+
+      const all = await testDb.db.select().from(filters).where(eq(filters.channelId, channelId));
+      expect(all).toHaveLength(1);
+      expect(all[0].value).toBe('#new');
+    });
+
+    it('returns 200 for empty batch', async () => {
+      const res = await app.request(`/api/channels/${channelId}/filters/batch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toAdd: [], toDelete: [] }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.added).toHaveLength(0);
+      expect(body.deleted).toBe(0);
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(`/api/channels/${channelId}/filters/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toAdd: [], toDelete: [] }),
+      });
+      expect(res.status).toBe(401);
+    });
+  });
 });

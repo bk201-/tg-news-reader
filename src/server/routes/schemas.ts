@@ -19,6 +19,7 @@ export {
   verifyPinSchema,
   createFilterSchema,
   updateFilterSchema,
+  batchFiltersSchema,
   createDownloadSchema,
   createDigestSchema,
   clientLogSchema,

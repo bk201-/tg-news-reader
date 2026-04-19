@@ -80,6 +80,12 @@ export const updateFilterSchema = z.object({
   isActive: z.number().optional(),
 });
 
+/** Batch-apply filter changes in a single request (used by the Tag Browser). */
+export const batchFiltersSchema = z.object({
+  toAdd: z.array(createFilterSchema).default([]),
+  toDelete: z.array(z.number().int().positive()).default([]),
+});
+
 // ─── Downloads ────────────────────────────────────────────────────────────────
 
 export const createDownloadSchema = z.object({
@@ -138,5 +144,6 @@ export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type CreateFilterInput = z.infer<typeof createFilterSchema>;
 export type UpdateFilterInput = z.infer<typeof updateFilterSchema>;
+export type BatchFiltersInput = z.infer<typeof batchFiltersSchema>;
 export type CreateDownloadInput = z.infer<typeof createDownloadSchema>;
 export type CreateDigestInput = z.infer<typeof createDigestSchema>;
