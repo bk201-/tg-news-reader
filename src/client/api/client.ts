@@ -46,9 +46,10 @@ let refreshing: Promise<string | null> | null = null;
 export async function tryRefresh(): Promise<string | null> {
   if (refreshing) return refreshing;
 
-  refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+  refreshing = fetchWithNetworkRetry('/api/auth/refresh', { method: 'POST', credentials: 'include' })
     .then(async (res) => {
       if (!res.ok) {
+        // Server explicitly rejected the session (401/403) — clear auth
         logger.info({ module: 'client' }, 'token refresh failed — clearing auth');
         useAuthStore.getState().clearAuth();
         return null;
@@ -59,8 +60,11 @@ export async function tryRefresh(): Promise<string | null> {
       return data.accessToken;
     })
     .catch((err: unknown) => {
-      logger.warn({ module: 'client', err }, 'token refresh network error');
-      useAuthStore.getState().clearAuth();
+      // Network error (no server response) — session may still be valid once connectivity returns.
+      // Do NOT call clearAuth() here: that would redirect to login on every wake-from-sleep / brief
+      // offline moment. The existing accessToken stays in the store; on next API call the 401 → refresh
+      // cycle will retry and succeed once the network is back.
+      logger.warn({ module: 'client', err }, 'token refresh network error — keeping current auth state');
       return null;
     })
     .finally(() => {

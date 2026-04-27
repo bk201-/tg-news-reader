@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { renderWithProviders } from '../../__tests__/renderWithProviders';
 import { AuthGate } from './AuthGate';
 import { useAuthStore } from '../../store/authStore';
@@ -7,11 +7,15 @@ import { useAuthStore } from '../../store/authStore';
 describe('AuthGate', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // Mock fetch for the refresh call
+    // Mock fetch for the refresh call — default: server rejects (expired / no session)
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       json: () => Promise.resolve({}),
     } as Response);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows spinner when checking auth', () => {
@@ -44,7 +48,7 @@ describe('AuthGate', () => {
     expect(screen.queryByText('App Content')).not.toBeInTheDocument();
   });
 
-  it('renders children when authenticated', async () => {
+  it('renders children when authenticated', () => {
     useAuthStore.setState({
       isCheckingAuth: false,
       accessToken: 'valid-token',
@@ -57,6 +61,7 @@ describe('AuthGate', () => {
       </AuthGate>,
     );
 
+    // isRetry=false on mount — does NOT call setCheckingAuth(true), so existing state preserved
     expect(screen.getByText('App Content')).toBeInTheDocument();
   });
 
@@ -98,5 +103,68 @@ describe('AuthGate', () => {
     await waitFor(() => {
       expect(useAuthStore.getState().accessToken).toBe('restored-token');
     });
+  });
+
+  it('shows "no connection" screen on network error during initial load', async () => {
+    // Use fake timers to skip fetchWithNetworkRetry retry delays (500ms + 1s + 2s)
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+
+    useAuthStore.setState({ isCheckingAuth: true, accessToken: null });
+
+    renderWithProviders(
+      <AuthGate>
+        <div>App Content</div>
+      </AuthGate>,
+    );
+
+    // Flush all timers (retry delays) and resulting promise chains
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(screen.getByText('auth.noConnection')).toBeInTheDocument();
+    expect(screen.queryByText('App Content')).not.toBeInTheDocument();
+    // Must NOT show the login page — session may still be valid once network recovers
+    expect(screen.queryByText('auth.login_button')).not.toBeInTheDocument();
+  });
+
+  it('retries session restore when Retry button is clicked after network error', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+
+    useAuthStore.setState({ isCheckingAuth: true, accessToken: null });
+
+    renderWithProviders(
+      <AuthGate>
+        <div>App Content</div>
+      </AuthGate>,
+    );
+
+    // Skip initial retry delays → "no connection" screen appears
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(screen.getByText('auth.noConnection')).toBeInTheDocument();
+
+    // Now next calls succeed
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          accessToken: 'recovered-token',
+          user: { id: 1, email: 'a@b.com', role: 'admin' },
+        }),
+    } as Response);
+
+    fireEvent.click(screen.getByText('auth.retry'));
+
+    // Flush again (setCheckingAuth(true) → spinner → tryRefresh → resolves)
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(useAuthStore.getState().accessToken).toBe('recovered-token');
   });
 });

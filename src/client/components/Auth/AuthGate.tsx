@@ -1,16 +1,28 @@
-import React, { useEffect } from 'react';
-import { Spin } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Button, Spin, Typography } from 'antd';
+import { WifiOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
-import { useAuthStore, type AuthUser } from '../../store/authStore';
+import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../../store/authStore';
+import { tryRefresh } from '../../api/client';
 import { LoginPage } from './LoginPage';
 import { logger } from '../../logger';
 
-const useStyles = createStyles(({ css }) => ({
+const useStyles = createStyles(({ css, token }) => ({
   loading: css`
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+  `,
+  offline: css`
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: ${token.marginMD}px;
+    color: ${token.colorTextSecondary};
   `,
 }));
 
@@ -20,32 +32,65 @@ interface Props {
 
 export function AuthGate({ children }: Props) {
   const { styles } = useStyles();
-  const { isCheckingAuth, accessToken, setAuth, clearAuth } = useAuthStore();
+  const { t } = useTranslation();
+  const { isCheckingAuth, accessToken, setCheckingAuth } = useAuthStore();
+  const [networkError, setNetworkError] = useState(false);
+
+  // isRetry=true: called from the "Retry" button — need to show spinner first.
+  // isRetry=false: called on mount — isCheckingAuth is already true from store initial state.
+  const restoreSession = React.useCallback((isRetry = false) => {
+    setNetworkError(false);
+    if (isRetry) setCheckingAuth(true);
+    // tryRefresh calls setAuth/clearAuth internally; on network error it returns null without clearing auth
+    void tryRefresh().then((token) => {
+      if (token === null) {
+        // Check if server explicitly cleared auth (clearAuth sets isCheckingAuth=false)
+        // or if it was a network error (isCheckingAuth stays true because nothing changed it)
+        const state = useAuthStore.getState();
+        if (state.isCheckingAuth) {
+          // Network error path — server never responded; don't boot user to login
+          logger.warn({ module: 'auth' }, 'session restore failed — network error');
+          setCheckingAuth(false);
+          setNetworkError(true);
+        }
+        // else: server returned !ok → clearAuth() already called → isCheckingAuth=false, accessToken=null → LoginPage
+      } else {
+        logger.info({ module: 'auth' }, 'session restored');
+      }
+    });
+    // oxlint-disable-next-line react/exhaustive-deps
+  }, []);
 
   // On mount: try to restore session via httpOnly cookie
   useEffect(() => {
-    fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
-      .then(async (res) => {
-        if (!res.ok) {
-          logger.info({ module: 'auth' }, 'no active session — showing login');
-          clearAuth();
-          return;
-        }
-        const data = (await res.json()) as { accessToken: string; user: AuthUser };
-        logger.info({ module: 'auth' }, 'session restored');
-        setAuth(data.accessToken, data.user);
-      })
-      .catch((err: unknown) => {
-        logger.warn({ module: 'auth', err }, 'session restore failed');
-        clearAuth();
-      });
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, []);
+    restoreSession(false);
+  }, [restoreSession]);
+
+  // Auto-retry when browser comes back online
+  useEffect(() => {
+    if (!networkError) return;
+    const handler = () => {
+      logger.info({ module: 'auth' }, 'network back online — retrying session restore');
+      restoreSession(true);
+    };
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, [networkError, restoreSession]);
 
   if (isCheckingAuth) {
     return (
       <div className={styles.loading}>
         <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (networkError) {
+    return (
+      <div className={styles.offline}>
+        <WifiOutlined style={{ fontSize: 48 }} />
+        <Typography.Text>{t('auth.noConnection')}</Typography.Text>
+        <Button onClick={() => restoreSession(true)}>{t('auth.retry')}</Button>
       </div>
     );
   }
