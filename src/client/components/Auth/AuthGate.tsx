@@ -36,9 +36,11 @@ export function AuthGate({ children }: Props) {
   const { isCheckingAuth, accessToken, setCheckingAuth } = useAuthStore();
   const [networkError, setNetworkError] = useState(false);
 
-  const restoreSession = React.useCallback(() => {
+  // isRetry=true: called from the "Retry" button — need to show spinner first.
+  // isRetry=false: called on mount — isCheckingAuth is already true from store initial state.
+  const restoreSession = React.useCallback((isRetry = false) => {
     setNetworkError(false);
-    setCheckingAuth(true);
+    if (isRetry) setCheckingAuth(true);
     // tryRefresh calls setAuth/clearAuth internally; on network error it returns null without clearing auth
     void tryRefresh().then((token) => {
       if (token === null) {
@@ -61,7 +63,7 @@ export function AuthGate({ children }: Props) {
 
   // On mount: try to restore session via httpOnly cookie
   useEffect(() => {
-    restoreSession();
+    restoreSession(false);
   }, [restoreSession]);
 
   // Auto-retry when browser comes back online
@@ -69,7 +71,7 @@ export function AuthGate({ children }: Props) {
     if (!networkError) return;
     const handler = () => {
       logger.info({ module: 'auth' }, 'network back online — retrying session restore');
-      restoreSession();
+      restoreSession(true);
     };
     window.addEventListener('online', handler);
     return () => window.removeEventListener('online', handler);
@@ -88,7 +90,7 @@ export function AuthGate({ children }: Props) {
       <div className={styles.offline}>
         <WifiOutlined style={{ fontSize: 48 }} />
         <Typography.Text>{t('auth.noConnection')}</Typography.Text>
-        <Button onClick={restoreSession}>{t('auth.retry')}</Button>
+        <Button onClick={() => restoreSession(true)}>{t('auth.retry')}</Button>
       </div>
     );
   }
