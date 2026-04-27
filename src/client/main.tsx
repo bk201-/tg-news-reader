@@ -89,16 +89,21 @@ const queryClient = new QueryClient({
     },
   }),
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      // Don't retry client errors (4xx) — only network and server errors
-      retry: (failureCount, err) => {
-        if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-        return failureCount < 3;
+      queries: {
+        refetchOnWindowFocus: false,
+        // Don't retry client errors (4xx) — except 429 (rate limit) which is transient
+        retry: (failureCount, err) => {
+          if (err instanceof ApiError && err.status === 429) return failureCount < 3;
+          if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+          return failureCount < 3;
+        },
+        // 429: back off slowly (15s → 30s → 60s); others: 1s → 2s → 4s → 30s cap
+        retryDelay: (attempt, err) => {
+          if (err instanceof ApiError && err.status === 429)
+            return Math.min(15_000 * Math.pow(2, attempt), 60_000);
+          return Math.min(1_000 * Math.pow(2, attempt), 30_000);
+        },
       },
-      // Exponential backoff: 1s → 2s → 4s → … capped at 30s
-      retryDelay: (attempt) => Math.min(1_000 * Math.pow(2, attempt), 30_000),
-    },
   },
 });
 

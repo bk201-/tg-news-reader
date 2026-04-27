@@ -250,6 +250,10 @@
       "logout": "Sign out"
     }
   },
+  "rateLimit": {
+    "message": "Slow down — too many requests. Cooling down for {{secs}}s…",
+    "description": "The app sends too many requests at once. All queries will retry automatically."
+  },
   "error": {
     "crash_title": "Something went sideways",
     "crash_description": "An unexpected error crashed the app. Try reloading — it's probably fine."

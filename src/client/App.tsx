@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import { AppLayout } from './components/Layout/AppLayout';
 import { AuthGate } from './components/Auth/AuthGate';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary';
+import { RateLimitBanner } from './components/common/RateLimitBanner';
 import { useUIStore } from './store/uiStore';
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
       <StyleProvider>
         <AntApp>
           <AppErrorBoundary>
+            <RateLimitBanner />
             <AuthGate>
               <AppLayout />
             </AuthGate>
