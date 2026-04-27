@@ -12,4 +12,3 @@ export const useRateLimitStore = create<RateLimitStore>((set) => ({
   setRateLimited: (until) => set({ until }),
   clear: () => set({ until: null }),
 }));
-

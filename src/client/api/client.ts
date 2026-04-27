@@ -68,7 +68,10 @@ export async function tryRefresh(): Promise<string | null> {
           return null;
         }
         // 5xx or other errors — don't clear auth, just fail silently
-        logger.warn({ module: 'client', status: res.status }, 'token refresh server error — keeping current auth state');
+        logger.warn(
+          { module: 'client', status: res.status },
+          'token refresh server error — keeping current auth state',
+        );
         return null;
       }
       const data = (await res.json()) as { accessToken: string; user: AuthUser };
