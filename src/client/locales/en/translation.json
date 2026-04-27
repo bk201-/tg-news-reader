@@ -217,6 +217,8 @@
     "totp_prompt": "Enter the 6-digit code from your authenticator app:",
     "back": "Back",
     "confirm_totp": "Confirm",
+    "noConnection": "No connection. Check your internet and try again.",
+    "retry": "Retry",
     "totp_setup": {
       "title": "Set up two-factor authentication",
       "scan_prompt": "Scan the QR code with Google Authenticator, Microsoft Authenticator or similar:",
