@@ -63,7 +63,7 @@ export function RateLimitBanner() {
       icon={<ThunderboltOutlined />}
       showIcon
       banner
-      message={t('rateLimit.message', { secs })}
+      title={t('rateLimit.message', { secs })}
       description={t('rateLimit.description')}
     />
   );
