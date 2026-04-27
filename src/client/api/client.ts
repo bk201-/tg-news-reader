@@ -1,5 +1,9 @@
 import { useAuthStore, type AuthUser } from '../store/authStore';
+import { useRateLimitStore } from '../store/rateLimitStore';
 import { logger } from '../logger';
+
+/** How long (ms) to show the rate-limit banner when a 429 is received. */
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const BASE = '/api';
 
@@ -49,9 +53,25 @@ export async function tryRefresh(): Promise<string | null> {
   refreshing = fetchWithNetworkRetry('/api/auth/refresh', { method: 'POST', credentials: 'include' })
     .then(async (res) => {
       if (!res.ok) {
-        // Server explicitly rejected the session (401/403) — clear auth
-        logger.info({ module: 'client' }, 'token refresh failed — clearing auth');
-        useAuthStore.getState().clearAuth();
+        if (res.status === 429) {
+          // Rate limited — session may still be valid; don't boot user to login
+          const retryAfterSec = Number(res.headers.get('Retry-After') ?? 0);
+          const cooldownMs = retryAfterSec > 0 ? retryAfterSec * 1000 : RATE_LIMIT_WINDOW_MS;
+          useRateLimitStore.getState().setRateLimited(Date.now() + cooldownMs);
+          logger.warn({ module: 'client' }, 'token refresh rate-limited — keeping current auth state');
+          return null;
+        }
+        if (res.status === 401 || res.status === 403) {
+          // Server explicitly rejected the session — clear auth
+          logger.info({ module: 'client' }, 'token refresh failed — clearing auth');
+          useAuthStore.getState().clearAuth();
+          return null;
+        }
+        // 5xx or other errors — don't clear auth, just fail silently
+        logger.warn(
+          { module: 'client', status: res.status },
+          'token refresh server error — keeping current auth state',
+        );
         return null;
       }
       const data = (await res.json()) as { accessToken: string; user: AuthUser };
@@ -105,6 +125,11 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as { error?: string };
     const msg = err.error || `HTTP ${res.status}`;
     logger.warn({ module: 'client', path, status: res.status }, msg);
+    if (res.status === 429) {
+      const retryAfterSec = Number(res.headers.get('Retry-After') ?? 0);
+      const cooldownMs = retryAfterSec > 0 ? retryAfterSec * 1000 : RATE_LIMIT_WINDOW_MS;
+      useRateLimitStore.getState().setRateLimited(Date.now() + cooldownMs);
+    }
     throw new ApiError(res.status, msg);
   }
 
