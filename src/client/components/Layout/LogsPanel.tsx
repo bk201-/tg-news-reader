@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Button, Drawer, Select, Tooltip, Typography, Badge } from 'antd';
 import { FileTextOutlined, ReloadOutlined, VerticalAlignBottomOutlined } from '@ant-design/icons';
+import { Badge, Button, Drawer, Select, Tooltip, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useServerLogs, LOG_LEVEL_OPTIONS, HOURS_OPTIONS } from '../../api/logs';
+import { HOURS_OPTIONS, LOG_LEVEL_OPTIONS, useServerLogs } from '../../api/logs';
+import type { ServerLogEntry } from '../../api/logs';
 import { LogEntryList } from './LogEntryList';
 
 const { Text } = Typography;
+
+const ICON_FILE_TEXT = <FileTextOutlined />;
+const ICON_SCROLL_BOTTOM = <VerticalAlignBottomOutlined />;
+const BADGE_OFFSET: [number, number] = [-4, 4];
+const DRAWER_BODY_STYLES = { body: { padding: 0 } };
+const LEVEL_OPTIONS = LOG_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+const HOURS_SELECT_OPTIONS = HOURS_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+const EMPTY_ENTRIES: ServerLogEntry[] = [];
 
 const useStyles = createStyles(({ css, token }) => ({
   iconBtn: css`
@@ -31,6 +40,17 @@ const useStyles = createStyles(({ css, token }) => ({
     overflow: hidden;
     padding: 12px 16px;
   `,
+  logList: css`
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  `,
+  levelSelect: css`
+    width: 90px;
+  `,
+  hoursSelect: css`
+    width: 80px;
+  `,
 }));
 
 export function LogsPanel() {
@@ -42,7 +62,7 @@ export function LogsPanel() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const { data, isFetching, refetch } = useServerLogs(hours, level, open);
-  const entries = data?.entries ?? [];
+  const entries = data?.entries ?? EMPTY_ENTRIES;
   const errorCount = entries.filter((e) => e.level >= 50).length;
 
   // Auto-scroll to bottom when new entries arrive
@@ -52,18 +72,23 @@ export function LogsPanel() {
     }
   }, [entries.length]);
 
-  const handleScrollBottom = () => {
+  const handleOpen = useCallback(() => setOpen(true), []);
+  const handleClose = useCallback(() => setOpen(false), []);
+  const handleScrollBottom = useCallback(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  };
+  }, []);
+  const handleRefetch = useCallback(() => void refetch(), [refetch]);
+
+  const reloadIcon = useMemo(() => <ReloadOutlined spin={isFetching} />, [isFetching]);
 
   return (
     <>
       <Tooltip title={t('logs.button_tooltip')}>
-        <Badge count={errorCount} size="small" offset={[-4, 4]}>
+        <Badge count={errorCount} size="small" offset={BADGE_OFFSET}>
           <Button
             type="text"
-            icon={<FileTextOutlined />}
-            onClick={() => setOpen(true)}
+            icon={ICON_FILE_TEXT}
+            onClick={handleOpen}
             aria-label={t('logs.button_tooltip')}
             className={styles.iconBtn}
           />
@@ -75,9 +100,9 @@ export function LogsPanel() {
         placement="right"
         size="large"
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={handleClose}
         mask={false}
-        styles={{ body: { padding: 0 } }}
+        styles={DRAWER_BODY_STYLES}
       >
         <div className={styles.drawerBody}>
           <div className={styles.toolbar}>
@@ -85,22 +110,22 @@ export function LogsPanel() {
               size="small"
               value={level}
               onChange={setLevel}
-              options={LOG_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              style={{ width: 90 }}
+              options={LEVEL_OPTIONS}
+              className={styles.levelSelect}
             />
             <Select
               size="small"
               value={hours}
               onChange={setHours}
-              options={HOURS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              style={{ width: 80 }}
+              options={HOURS_SELECT_OPTIONS}
+              className={styles.hoursSelect}
             />
-            <Button size="small" icon={<ReloadOutlined spin={isFetching} />} onClick={() => void refetch()}>
+            <Button size="small" icon={reloadIcon} onClick={handleRefetch}>
               {t('logs.refresh')}
             </Button>
             <Button
               size="small"
-              icon={<VerticalAlignBottomOutlined />}
+              icon={ICON_SCROLL_BOTTOM}
               onClick={handleScrollBottom}
               title={t('logs.scroll_bottom')}
             />
@@ -110,7 +135,7 @@ export function LogsPanel() {
             </Text>
           </div>
 
-          <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div ref={listRef} className={styles.logList}>
             <LogEntryList entries={entries} emptyText={t('logs.empty')} />
           </div>
         </div>
