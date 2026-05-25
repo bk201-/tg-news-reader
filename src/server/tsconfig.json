@@ -1,0 +1,4 @@
+{
+  "$comment": "This file exists so that oxlint (typeAware mode) finds the correct tsconfig when linting server files. The actual build still uses tsconfig.server.json via `npm run build:server`.",
+  "extends": "../../tsconfig.server.json"
+}

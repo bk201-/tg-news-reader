@@ -1,7 +1,7 @@
 import { OrderedListOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { Channel, ChannelType } from '@shared/types.ts';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Form, Modal, Space, Switch, Typography } from 'antd';
+import { App, Button, Form, Modal, Space, Switch, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -73,9 +73,17 @@ export function ChannelSidebar() {
   const reorderChannels = useReorderChannels();
   const { t } = useTranslation();
 
-  const { selectedChannelId, setSelectedChannelId, selectedGroupId, autoAdvance, toggleAutoAdvance } = useUIStore();
+  const {
+    selectedChannelId,
+    setSelectedChannelId,
+    selectedGroupId,
+    setSelectedGroupId,
+    autoAdvance,
+    toggleAutoAdvance,
+  } = useUIStore();
   const { styles } = useStyles();
   const qc = useQueryClient();
+  const { message } = App.useApp();
 
   useChannelHotkeys();
 
@@ -121,6 +129,9 @@ export function ChannelSidebar() {
   const openEdit = useCallback(
     (ch: Channel) => {
       setEditingChannel(ch);
+      // Clear any stale validation state / values from a previous create or edit
+      // so changing only the group field is still treated as a valid form.
+      form.resetFields();
       form.setFieldsValue({
         telegramId: ch.telegramId,
         name: ch.name,
@@ -134,17 +145,30 @@ export function ChannelSidebar() {
   );
 
   const handleSave = useCallback(async () => {
-    const values = (await form.validateFields()) as {
+    let values: {
       telegramId: string;
       name: string;
       description?: string;
       channelType: ChannelType;
       groupId?: number;
     };
+    try {
+      values = (await form.validateFields()) as typeof values;
+    } catch {
+      // antd surfaces field-level errors in the form itself — nothing more to do here.
+      return;
+    }
 
     try {
       if (editingChannel) {
-        await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: values.groupId ?? null });
+        const newGroupId = values.groupId ?? null;
+        await updateChannel.mutateAsync({ id: editingChannel.id, ...values, groupId: newGroupId });
+        void message.success(t('channels.update_success'));
+        // If the channel moved to a different group, follow it so the user can see it.
+        if (newGroupId !== (editingChannel.groupId ?? null)) {
+          setSelectedGroupId(newGroupId);
+          setSelectedChannelId(editingChannel.id);
+        }
       } else {
         await createChannel.mutateAsync({ ...values, groupId: values.groupId ?? null });
       }
@@ -156,7 +180,9 @@ export function ChannelSidebar() {
         throw err;
       }
     }
-  }, [form, editingChannel, updateChannel, createChannel, t]);
+  }, [form, editingChannel, updateChannel, createChannel, message, t, setSelectedGroupId, setSelectedChannelId]);
+
+  const handleSaveVoid = useCallback(() => void handleSave(), [handleSave]);
 
   const handleTelegramIdBlur = useCallback(
     async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -273,7 +299,7 @@ export function ChannelSidebar() {
         lookupLoading={lookupLoading}
         confirmLoading={createChannel.isPending || updateChannel.isPending}
         onClose={handleCloseModal}
-        onSave={handleSave}
+        onSave={handleSaveVoid}
         onTelegramIdBlur={handleTelegramIdBlur}
       />
 

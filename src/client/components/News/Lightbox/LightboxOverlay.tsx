@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useChannels } from '../../../api/channels';
 import { api } from '../../../api/client';
 import { mediaUrl } from '../../../api/mediaUrl';
-import { updatePaginatedItems, useDownloadMedia, useMarkRead, useNews } from '../../../api/news';
+import { updatePaginatedItems, useDownloadMedia, useMarkRead } from '../../../api/news';
 import type { NewsResponse } from '../../../api/news';
 import { useUIStore } from '../../../store/uiStore';
 import { LightboxMedia } from './LightboxMedia';
@@ -101,12 +101,20 @@ const useStyles = createStyles(({ css }) => ({
   `,
 }));
 
-export function LightboxOverlay() {
+interface LightboxOverlayProps {
+  /** fetchNextPage / hasNextPage forwarded from the parent news feed query.
+   *  Avoids mounting a second observer on the same query key, which would
+   *  trigger a background refetch and overwrite optimistic isRead updates. */
+  fetchNextPage: () => void;
+  hasNextPage: boolean;
+}
+
+export function LightboxOverlay({ fetchNextPage, hasNextPage }: LightboxOverlayProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
   const qc = useQueryClient();
 
-  const { lightbox, closeLightbox, openLightbox, showAll } = useUIStore();
+  const { lightbox, closeLightbox, openLightbox } = useUIStore();
   const { data: channels = [] } = useChannels();
   const markRead = useMarkRead();
   const downloadMedia = useDownloadMedia();
@@ -119,8 +127,6 @@ export function LightboxOverlay() {
   const isLightboxOpen = lightbox !== null;
   const markReadMutate = markRead.mutate;
 
-  // Reuse the active infinite query so we can fetch more pages from the lightbox
-  const { fetchNextPage, hasNextPage } = useNews(channelId, !showAll);
 
   // ── History API ───────────────────────────────────────────────────────
   const closedByBackRef = useRef(false);
@@ -174,33 +180,44 @@ export function LightboxOverlay() {
 
       const ch = channels.find((c) => c.id === channelId);
       if (ch?.channelType === 'media' || ch?.channelType === 'blog') {
-        markRead.mutate({ id: nextNewsId, isRead: 1, channelId });
+        // Find the item in cache to verify media is downloaded before marking as read
+        const allData =
+          qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'all']) ??
+          qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'filtered']);
+        const items = allData?.pages.flatMap((p) => p.items) ?? [];
+        const nextItem = items.find((it) => it.id === nextNewsId);
+        const hasMedia = !!(nextItem?.localMediaPaths?.[0] ?? nextItem?.localMediaPath);
+        if (hasMedia) {
+          markRead.mutate({ id: nextNewsId, isRead: 1, channelId });
+        }
       }
     },
-    [openLightbox, channelId, channels, markRead],
+    [openLightbox, channelId, channels, markRead, qc],
   );
 
-  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, () => void fetchNextPage(), hasNextPage);
+  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, () => { fetchNextPage(); }, hasNextPage);
 
-  // ── Prefetch adjacent images (Issue 8) ───────────────────────────────
+  // ── Prefetch adjacent images: 1 behind + 2 ahead ────────────────────
   useEffect(() => {
     const { entries, cursor } = nav;
-    [entries[cursor - 1], entries[cursor + 1]].forEach((e) => {
+    [entries[cursor - 1], entries[cursor + 1], entries[cursor + 2]].forEach((e) => {
       const p = e?.item.localMediaPaths?.[0] ?? e?.item.localMediaPath;
-      if (p) {
+      // Skip videos — no point preloading them
+      if (p && !/\.(mp4|webm|mov)$/i.test(p)) {
         const img = new Image();
         img.src = mediaUrl(p);
       }
     });
   }, [nav]);
 
-  // Auto-mark as read on open (media channels)
+  // Auto-mark as read on open (media channels) — only when media is already downloaded
   useEffect(() => {
     if (!isLightboxOpen || lightboxNewsId === null || lightboxChannelId === null) return;
-    if (channelType === 'media' || channelType === 'blog') {
-      markReadMutate({ id: lightboxNewsId, isRead: 1, channelId: lightboxChannelId });
-    }
-  }, [isLightboxOpen, lightboxNewsId, lightboxChannelId, channelType, markReadMutate]);
+    if (channelType !== 'media' && channelType !== 'blog') return;
+    // Don't mark read if media hasn't been downloaded yet
+    if (!nav.firstMediaPath) return;
+    markReadMutate({ id: lightboxNewsId, isRead: 1, channelId: lightboxChannelId });
+  }, [isLightboxOpen, lightboxNewsId, lightboxChannelId, channelType, markReadMutate, nav.firstMediaPath]);
 
   // Focus overlay so keyboard events are received
   useEffect(() => {

@@ -148,6 +148,7 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
           : {}),
         textInPanel: flags.textInPanel ? 1 : 0,
         canLoadArticle: flags.canLoadArticle ? 1 : 0,
+        forwardFromName: msg.forwardFromName ?? null,
       };
     });
 

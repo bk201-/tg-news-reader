@@ -241,7 +241,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
         onSetHashTag={handleSetHashTag}
         onClose={handleCloseTagBrowser}
       />
-      <LightboxOverlay />
+      <LightboxOverlay fetchNextPage={fetchNextPage} hasNextPage={hasNextPage ?? false} />
     </div>
   );
 }

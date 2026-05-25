@@ -1,0 +1,4 @@
+{
+  "$comment": "Anchor for oxlint typeAware mode — makes oxlint find the correct tsconfig when linting shared files directly.",
+  "extends": "../../tsconfig.json"
+}

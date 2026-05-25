@@ -27,6 +27,7 @@
   },
   "channels": {
     "updated": "Обновлено: {{date}}",
+    "update_success": "Канал обновлён",
     "unavailable_tooltip": "Канал недоступен в Telegram (удалён или закрыт)",
     "fetch_tooltip": "Загрузить новости",
     "edit_tooltip": "Редактировать",
@@ -140,6 +141,9 @@
       "next": "Следующее",
       "retry_download": "Повторить загрузку",
       "redownload_media": "Скачать медиа заново",
+      "font_size_increase": "Увеличить размер текста",
+      "font_size_decrease": "Уменьшить размер текста",
+      "forwarded_from": "Переслано из {{name}}",
       "media_missing": "Файл не найден на сервере",
       "download_media": "Скачать медиа",
       "download_media_size": "Скачать медиа ({{size}})",
@@ -246,6 +250,7 @@
       "clear_cache_confirm_content": "Все закэшированные фото и видео будут удалены из браузера. При следующем просмотре они загрузятся снова.",
       "clear_cache_success": "Кэш медиа очищен",
       "language": "Язык",
+      "font_size": "Размер текста",
       "version": "v{{version}}",
       "logout": "Выйти"
     }

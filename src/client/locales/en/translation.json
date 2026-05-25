@@ -27,6 +27,7 @@
   },
   "channels": {
     "updated": "Updated: {{date}}",
+    "update_success": "Channel updated",
     "unavailable_tooltip": "Channel unavailable in Telegram (deleted or closed)",
     "fetch_tooltip": "Fetch news",
     "edit_tooltip": "Edit",
@@ -140,6 +141,9 @@
       "next": "Next",
       "retry_download": "Retry download",
       "redownload_media": "Re-download media",
+      "font_size_increase": "Increase text size",
+      "font_size_decrease": "Decrease text size",
+      "forwarded_from": "Forwarded from {{name}}",
       "media_missing": "Media file not found on server",
       "download_media": "Download media",
       "download_media_size": "Download media ({{size}})",
@@ -246,6 +250,7 @@
       "clear_cache_confirm_content": "All cached photos and videos will be removed from the browser. They will reload on next view.",
       "clear_cache_success": "Media cache cleared",
       "language": "Language",
+      "font_size": "Text size",
       "version": "v{{version}}",
       "logout": "Sign out"
     }

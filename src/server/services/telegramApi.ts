@@ -105,6 +105,35 @@ async function _fetchChannelMessages(
     }
   }
 
+  // ── Resolve forward source channel names (entity cache lookup) ───────────
+  // After getHistory, gramjs caches all entities from the response,
+  // so PeerChannel lookups here are cache hits — no extra network calls.
+  // Build a deduped map from stringified channelId → PeerChannel peer
+  const channelForwardPeers = [
+    ...new Map(
+      allMessages
+        .filter((m) => !m.forwardFromName && m.forwardFromPeer instanceof _Api.PeerChannel)
+        .map((m) => [String((m.forwardFromPeer as Api.PeerChannel).channelId), m.forwardFromPeer as Api.TypePeer]),
+    ).values(),
+  ];
+
+  if (channelForwardPeers.length > 0) {
+    const entityResults = await Promise.all(channelForwardPeers.map((peer) => tg.getEntity(peer).catch(() => null)));
+    const nameMap = new Map<string, string>();
+    channelForwardPeers.forEach((peer, i) => {
+      const entity = entityResults[i];
+      if (entity && 'title' in entity && typeof (entity as { title?: unknown }).title === 'string') {
+        nameMap.set(String((peer as Api.PeerChannel).channelId), (entity as { title: string }).title);
+      }
+    });
+    for (const msg of allMessages) {
+      if (!msg.forwardFromName && msg.forwardFromPeer instanceof _Api.PeerChannel) {
+        const name = nameMap.get(String(msg.forwardFromPeer.channelId));
+        if (name) msg.forwardFromName = name;
+      }
+    }
+  }
+
   // ── Album grouping ──────────────────────────────────────────────────────────
   const groupMap = new Map<string, TelegramMessage[]>();
   const singles: TelegramMessage[] = [];

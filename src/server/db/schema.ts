@@ -62,6 +62,7 @@ export const news = sqliteTable(
     fullContentFormat: text('full_content_format', { enum: ['text', 'markdown'] })
       .notNull()
       .default('text'),
+    forwardFromName: text('forward_from_name'),
   },
   (table) => [unique().on(table.channelId, table.telegramMsgId)],
 );

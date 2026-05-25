@@ -31,5 +31,6 @@ export function toNewsItem(row: NewsRow): NewsItem {
     textInPanel: row.textInPanel ?? 0,
     canLoadArticle: row.canLoadArticle ?? 0,
     fullContentFormat: row.fullContentFormat ?? 'text',
+    forwardFromName: row.forwardFromName || undefined,
   };
 }

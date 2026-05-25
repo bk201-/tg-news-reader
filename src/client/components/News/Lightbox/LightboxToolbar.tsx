@@ -1,4 +1,4 @@
-import { CloseOutlined, LinkOutlined, LoadingOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { CloseOutlined, LinkOutlined, LoadingOutlined, RetweetOutlined, ShareAltOutlined } from '@ant-design/icons';
 import type { NewsItem } from '@shared/types.ts';
 import { Button, Typography } from 'antd';
 import { createStyles } from 'antd-style';
@@ -11,6 +11,7 @@ const ICON_LINK = <LinkOutlined />;
 const ICON_CLOSE = <CloseOutlined />;
 const ICON_LOADING = <LoadingOutlined />;
 const ICON_SHARE = <ShareAltOutlined />;
+const ICON_RETWEET = <RetweetOutlined />;
 
 interface LightboxToolbarProps {
   item: NewsItem | null | undefined;
@@ -53,6 +54,18 @@ const useStyles = createStyles(({ css }) => ({
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
+  `,
+  forwardTag: css`
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   `,
   closeBtn: css`
     flex-shrink: 0;
@@ -139,6 +152,12 @@ export function LightboxToolbar({
         <div className={styles.meta}>
           <Text>{date}</Text>
           {positionLabel && <Text>· {positionLabel}</Text>}
+          {item?.forwardFromName && (
+            <span className={styles.forwardTag} title={t('news.detail.forwarded_from', { name: item.forwardFromName })}>
+              {ICON_RETWEET}
+              {item.forwardFromName}
+            </span>
+          )}
         </div>
       </div>
 

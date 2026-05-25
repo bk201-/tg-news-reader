@@ -61,6 +61,7 @@ export function NewsDetail({
   const { styles, cx } = useStyles();
   const s = useNewsDetailState({ item, channelTelegramId, onMarkedRead, variant });
   const detailRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const handleTogglePanel = useCallback(
     (p: typeof s.topPanel) => s.setTopPanel((prev) => (prev === p ? null : p)),
@@ -149,6 +150,7 @@ export function NewsDetail({
         onModalConfirm={handleModalConfirm}
         onModalCancel={handleModalCancel}
         onDoubleTap={variant === 'inline' ? s.handleMarkRead : undefined}
+        videoRef={videoRef}
       />
     </div>
   );

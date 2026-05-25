@@ -1,6 +1,8 @@
 import {
   ClearOutlined,
   LogoutOutlined,
+  MinusOutlined,
+  PlusOutlined,
   QrcodeOutlined,
   SafetyCertificateOutlined,
   TagOutlined,
@@ -15,6 +17,7 @@ import { api } from '../../api/client';
 import { APP_VERSION } from '../../appVersion';
 import { clearSwCache } from '../../services/serviceWorker';
 import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
 import { FlagRU, FlagUS } from '../Flags';
 
 const { Text } = Typography;
@@ -24,6 +27,8 @@ const ICON_TRANSLATION = <TranslationOutlined />;
 const ICON_TAG = <TagOutlined />;
 const ICON_LOGOUT = <LogoutOutlined />;
 const ICON_QRCODE = <QrcodeOutlined />;
+const ICON_MINUS = <MinusOutlined />;
+const ICON_PLUS = <PlusOutlined />;
 
 const stopPropagation = (e: React.MouseEvent | React.KeyboardEvent) => e.stopPropagation();
 
@@ -73,6 +78,60 @@ function LangSwitcher({
   );
 }
 
+const FONT_SIZE_STEP = 10;
+const FONT_SIZE_MIN = 100;
+const FONT_SIZE_MAX = 200;
+
+/** Font size control row for the user menu */
+function FontSizeRow({
+  className,
+  labelClassName,
+  fontSizeLabelClassName,
+}: {
+  className: string;
+  labelClassName: string;
+  fontSizeLabelClassName: string;
+}) {
+  const { t } = useTranslation();
+  const { newsFontSize, setNewsFontSize } = useUIStore();
+
+  const handleDecrease = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setNewsFontSize(newsFontSize - FONT_SIZE_STEP);
+    },
+    [newsFontSize, setNewsFontSize],
+  );
+  const handleIncrease = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setNewsFontSize(newsFontSize + FONT_SIZE_STEP);
+    },
+    [newsFontSize, setNewsFontSize],
+  );
+
+  return (
+    <div className={className} onClick={stopPropagation}>
+      <span className={labelClassName}>{t('header.user_menu.font_size')}:</span>
+      <Button
+        size="small"
+        icon={ICON_MINUS}
+        onClick={handleDecrease}
+        disabled={newsFontSize <= FONT_SIZE_MIN}
+        aria-label={t('news.detail.font_size_decrease')}
+      />
+      <span className={fontSizeLabelClassName}>{newsFontSize}%</span>
+      <Button
+        size="small"
+        icon={ICON_PLUS}
+        onClick={handleIncrease}
+        disabled={newsFontSize >= FONT_SIZE_MAX}
+        aria-label={t('news.detail.font_size_increase')}
+      />
+    </div>
+  );
+}
+
 const useStyles = createStyles(({ css, token }) => ({
   emailText: css`
     font-size: 12px;
@@ -92,6 +151,26 @@ const useStyles = createStyles(({ css, token }) => ({
     display: flex;
     align-items: center;
     gap: 4px;
+  `,
+  fontSizeRow: css`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  `,
+  fontSizeLabel: css`
+    margin-right: 4px;
+  `,
+  fontSizeValue: css`
+    min-width: 36px;
+    text-align: center;
+    font-size: 12px;
+    color: ${token.colorTextSecondary};
+    user-select: none;
+  `,
+  fontSizeMenuIcon: css`
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
   `,
 }));
 
@@ -166,6 +245,18 @@ export function useUserMenuItems({ message, onOpenTotp }: UserMenuProps) {
       icon: ICON_CLEAR,
       label: t('header.user_menu.clear_cache'),
       onClick: handleClearMediaCache,
+    },
+    { type: 'divider' as const },
+    {
+      key: 'font-size',
+      icon: <span className={styles.fontSizeMenuIcon}>Aa</span>,
+      label: (
+        <FontSizeRow
+          className={styles.fontSizeRow}
+          labelClassName={styles.fontSizeLabel}
+          fontSizeLabelClassName={styles.fontSizeValue}
+        />
+      ),
     },
     { type: 'divider' as const },
     {

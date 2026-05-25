@@ -22,6 +22,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     textInPanel: 0,
     canLoadArticle: 0,
     fullContentFormat: 'text' as const,
+    forwardFromName: null,
     ...overrides,
   };
 }

@@ -286,7 +286,14 @@
       }
     },
     {
-      "files": ["**/*.tsx"],
+      "files": ["src/server/**/*.ts", "scripts/**/*.ts"],
+      "env": {
+        "node": true,
+        "builtin": true
+      }
+    },
+    {
+      "files": ["src/client/**/*.{ts,tsx}"],
       "env": {
         "browser": true
       }

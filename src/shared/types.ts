@@ -70,6 +70,8 @@ export interface NewsItem {
   canLoadArticle?: number;
   /** Format of fullContent: 'markdown' for newly extracted articles, 'text' for legacy plain-text */
   fullContentFormat?: 'text' | 'markdown';
+  /** Name of the channel/user this post was forwarded from (if it's a repost) */
+  forwardFromName?: string;
 }
 
 export interface Filter {

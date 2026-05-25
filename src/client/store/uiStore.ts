@@ -48,6 +48,9 @@ interface UIStore {
   // Signal to ChannelSidebar to auto-open the create modal
   openAddChannel: boolean;
   setOpenAddChannel: (v: boolean) => void;
+  // News body font size (100–200, step 10)
+  newsFontSize: number;
+  setNewsFontSize: (n: number) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -106,4 +109,10 @@ export const useUIStore = create<UIStore>()((set) => ({
     set((state) => (state.lightbox ? { lightbox: { ...state.lightbox, albumIndex: index } } : {})),
   openAddChannel: false,
   setOpenAddChannel: (v) => set({ openAddChannel: v }),
+  newsFontSize: Number(localStorage.getItem('newsFontSize')) || 100,
+  setNewsFontSize: (n) => {
+    const clamped = Math.max(100, Math.min(200, n));
+    localStorage.setItem('newsFontSize', String(clamped));
+    set({ newsFontSize: clamped });
+  },
 }));

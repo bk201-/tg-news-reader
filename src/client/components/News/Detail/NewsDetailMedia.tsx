@@ -158,6 +158,8 @@ interface NewsDetailMediaProps {
   mediaTaskStatus?: string;
   mediaTaskError?: string;
   onDownload: () => void;
+  /** Ref forwarded to the active <video> element so callers can pause it (e.g. before opening lightbox) */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
 export function NewsDetailMedia({
@@ -175,6 +177,7 @@ export function NewsDetailMedia({
   mediaTaskStatus,
   mediaTaskError,
   onDownload,
+  videoRef,
 }: NewsDetailMediaProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
@@ -213,14 +216,14 @@ export function NewsDetailMedia({
   const handleMediaBroken = useCallback(() => setMediaBroken(true), []);
   const handleNavPrev = useCallback(() => onAlbumNav(-1), [onAlbumNav]);
   const handleNavNext = useCallback(() => onAlbumNav(1), [onAlbumNav]);
-  const handleOpenLightboxAlbum = useCallback(
-    () => openLightbox(item.id, albumIndex, item.channelId),
-    [openLightbox, item.id, albumIndex, item.channelId],
-  );
-  const handleOpenLightboxSingle = useCallback(
-    () => openLightbox(item.id, 0, item.channelId),
-    [openLightbox, item.id, item.channelId],
-  );
+  const handleOpenLightboxAlbum = useCallback(() => {
+    videoRef?.current?.pause();
+    openLightbox(item.id, albumIndex, item.channelId);
+  }, [openLightbox, item.id, albumIndex, item.channelId, videoRef]);
+  const handleOpenLightboxSingle = useCallback(() => {
+    videoRef?.current?.pause();
+    openLightbox(item.id, 0, item.channelId);
+  }, [openLightbox, item.id, item.channelId, videoRef]);
   const downloadIcon = mediaLoading ? ICON_LOADING : ICON_DOWNLOAD;
 
   // When media file is missing on server (404), show re-download button
@@ -257,6 +260,7 @@ export function NewsDetailMedia({
           </button>
           {currentIsVideo ? (
             <video
+              ref={videoRef}
               key={currentPath}
               src={murl(currentPath)}
               className={styles.mediaFile}
@@ -264,6 +268,7 @@ export function NewsDetailMedia({
               muted
               autoPlay
               loop
+              disablePictureInPicture
               onClick={handleOpenLightboxAlbum}
               onError={handleMediaBroken}
               style={CURSOR_POINTER}
@@ -311,11 +316,13 @@ export function NewsDetailMedia({
           </>
         ) : isVideo ? (
           <video
+            ref={videoRef}
             src={murl(firstMediaPath)}
             controls
             muted
             autoPlay
             loop
+            disablePictureInPicture
             className={styles.mediaFile}
             onClick={handleOpenLightboxSingle}
             onError={handleMediaBroken}
