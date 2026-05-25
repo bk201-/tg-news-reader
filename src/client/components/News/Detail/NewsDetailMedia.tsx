@@ -2,7 +2,7 @@ import { DownloadOutlined, LeftOutlined, LoadingOutlined, RightOutlined, SoundOu
 import type { NewsItem } from '@shared/types.ts';
 import { Button, Typography } from 'antd';
 import { createStyles } from 'antd-style';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
 import { useUIStore } from '../../../store/uiStore';
@@ -182,7 +182,15 @@ export function NewsDetailMedia({
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
   const openLightbox = useUIStore((s) => s.openLightbox);
+  const isLightboxOpen = useUIStore((s) => s.lightbox !== null);
   const [mediaBroken, setMediaBroken] = useState(false);
+
+  // Pause the video whenever ANY lightbox is open (more reliable than onClick-only approach)
+  useEffect(() => {
+    if (isLightboxOpen) {
+      videoRef?.current?.pause();
+    }
+  }, [isLightboxOpen, videoRef]);
   // Cache-buster: incremented after a successful re-download so the browser
   // doesn't serve the previously-cached 404 response for the same URL.
   const [cacheBuster, setCacheBuster] = useState(0);
