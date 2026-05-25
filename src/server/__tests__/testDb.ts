@@ -67,6 +67,7 @@ export async function createTestDb(): Promise<TestDb> {
       text_in_panel INTEGER NOT NULL DEFAULT 0,
       can_load_article INTEGER NOT NULL DEFAULT 0,
       full_content_format TEXT NOT NULL DEFAULT 'text',
+      forward_from_name TEXT,
       UNIQUE(channel_id, telegram_msg_id)
     );
     CREATE INDEX IF NOT EXISTS idx_news_channel_id ON news(channel_id);
