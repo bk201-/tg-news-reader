@@ -81,9 +81,10 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
   fontSizeBar: css`
     position: sticky;
-    bottom: 16px;
+    top: 8px;
     align-self: flex-end;
     margin-right: 4px;
+    margin-bottom: -36px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -212,7 +213,7 @@ export function NewsDetailBody({
     [newsFontSize, setNewsFontSize],
   );
 
-  const textBodyStyle = useMemo(() => ({ fontSize: `${newsFontSize}%` }), [newsFontSize]);
+  const textBodyStyle = useMemo(() => ({ zoom: newsFontSize / 100 }), [newsFontSize]);
 
   // ── Double-tap detection (mobile mark-read on body text) ──────────
   const lastTapRef = useRef(0);
@@ -257,6 +258,27 @@ export function NewsDetailBody({
         onTouchEnd={handleTouchEnd}
         style={onDoubleTap ? TOUCH_ACTION_MANIPULATION : undefined}
       >
+        {/* Font size controls — appear on hover at top-right of the content area */}
+        <div className={cx(styles.fontSizeBar, 'font-size-bar')} onClick={stopPropagation}>
+          <Button
+            type="text"
+            size="small"
+            icon={ICON_MINUS}
+            onClick={handleDecrease}
+            disabled={newsFontSize <= FONT_SIZE_MIN}
+            aria-label={t('news.detail.font_size_decrease')}
+          />
+          <span className={styles.fontSizeLabel}>{newsFontSize}%</span>
+          <Button
+            type="text"
+            size="small"
+            icon={ICON_PLUS}
+            onClick={handleIncrease}
+            disabled={newsFontSize >= FONT_SIZE_MAX}
+            aria-label={t('news.detail.font_size_increase')}
+          />
+        </div>
+
         <NewsDetailMedia
           item={item}
           firstMediaPath={firstMediaPath}
@@ -326,27 +348,6 @@ export function NewsDetailBody({
           )}
 
           <NewsYouTubeEmbeds links={links} />
-        </div>
-
-        {/* Font size controls — appear on hover at bottom-right of the content area */}
-        <div className={cx(styles.fontSizeBar, 'font-size-bar')} onClick={stopPropagation}>
-          <Button
-            type="text"
-            size="small"
-            icon={ICON_MINUS}
-            onClick={handleDecrease}
-            disabled={newsFontSize <= FONT_SIZE_MIN}
-            aria-label={t('news.detail.font_size_decrease')}
-          />
-          <span className={styles.fontSizeLabel}>{newsFontSize}%</span>
-          <Button
-            type="text"
-            size="small"
-            icon={ICON_PLUS}
-            onClick={handleIncrease}
-            disabled={newsFontSize >= FONT_SIZE_MAX}
-            aria-label={t('news.detail.font_size_increase')}
-          />
         </div>
       </div>
 
