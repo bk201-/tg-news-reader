@@ -2,7 +2,7 @@ import { DownloadOutlined, LeftOutlined, LoadingOutlined, RightOutlined, SoundOu
 import type { NewsItem } from '@shared/types.ts';
 import { Button, Typography } from 'antd';
 import { createStyles } from 'antd-style';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
 import { useUIStore } from '../../../store/uiStore';
@@ -185,12 +185,9 @@ export function NewsDetailMedia({
   const isLightboxOpen = useUIStore((s) => s.lightbox !== null);
   const [mediaBroken, setMediaBroken] = useState(false);
 
-  // Pause the video whenever ANY lightbox is open (more reliable than onClick-only approach)
-  useEffect(() => {
-    if (isLightboxOpen) {
-      videoRef?.current?.pause();
-    }
-  }, [isLightboxOpen, videoRef]);
+  // Video is unmounted while the lightbox is open — this reliably stops playback
+  // (pause() via ref can be ignored by the browser when autoPlay is active).
+  // The video remounts when the lightbox closes.
   // Cache-buster: incremented after a successful re-download so the browser
   // doesn't serve the previously-cached 404 response for the same URL.
   const [cacheBuster, setCacheBuster] = useState(0);
@@ -267,20 +264,22 @@ export function NewsDetailMedia({
             <LeftOutlined />
           </button>
           {currentIsVideo ? (
-            <video
-              ref={videoRef}
-              key={currentPath}
-              src={murl(currentPath)}
-              className={styles.mediaFile}
-              controls
-              muted
-              autoPlay
-              loop
-              disablePictureInPicture
-              onClick={handleOpenLightboxAlbum}
-              onError={handleMediaBroken}
-              style={CURSOR_POINTER}
-            />
+            !isLightboxOpen ? (
+              <video
+                ref={videoRef}
+                key={currentPath}
+                src={murl(currentPath)}
+                className={styles.mediaFile}
+                controls
+                muted
+                autoPlay
+                loop
+                disablePictureInPicture
+                onClick={handleOpenLightboxAlbum}
+                onError={handleMediaBroken}
+                style={CURSOR_POINTER}
+              />
+            ) : null
           ) : (
             <img
               src={murl(currentPath)}
@@ -323,19 +322,21 @@ export function NewsDetailMedia({
             <audio src={murl(firstMediaPath)} controls className={styles.audioPlayer} onError={handleMediaBroken} />
           </>
         ) : isVideo ? (
-          <video
-            ref={videoRef}
-            src={murl(firstMediaPath)}
-            controls
-            muted
-            autoPlay
-            loop
-            disablePictureInPicture
-            className={styles.mediaFile}
-            onClick={handleOpenLightboxSingle}
-            onError={handleMediaBroken}
-            style={CURSOR_POINTER}
-          />
+          !isLightboxOpen ? (
+            <video
+              ref={videoRef}
+              src={murl(firstMediaPath)}
+              controls
+              muted
+              autoPlay
+              loop
+              disablePictureInPicture
+              className={styles.mediaFile}
+              onClick={handleOpenLightboxSingle}
+              onError={handleMediaBroken}
+              style={CURSOR_POINTER}
+            />
+          ) : null
         ) : (
           <img
             src={murl(firstMediaPath)}
