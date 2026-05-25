@@ -1,14 +1,15 @@
-import React, { useRef, useCallback } from 'react';
-import { Button, Typography, Divider, Modal, Radio } from 'antd';
 import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
+import { Button, Divider, Modal, Radio, Typography } from 'antd';
+import type { RadioChangeEvent } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isYouTubeUrl } from '../newsUtils';
-import { NewsDetailMedia } from './NewsDetailMedia';
-import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
-import { NewsTextBlock } from './NewsTextBlock';
 import { NewsArticleBody } from './NewsArticleBody';
+import { NewsDetailMedia } from './NewsDetailMedia';
+import { NewsTextBlock } from './NewsTextBlock';
+import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
 
 const DOUBLE_TAP_MS = 350;
 
@@ -70,6 +71,10 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 12px;
   `,
 }));
+
+const ICON_DOWNLOAD = <DownloadOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
+const TOUCH_ACTION_MANIPULATION = { touchAction: 'manipulation' as const };
 
 interface NewsDetailBodyProps {
   item: NewsItem;
@@ -155,6 +160,11 @@ export function NewsDetailBody({
     [onDoubleTap],
   );
 
+  const handleUrlChange = useCallback(
+    (e: RadioChangeEvent) => onSelectedUrlChange(e.target.value as string),
+    [onSelectedUrlChange],
+  );
+
   // Show the text infoblock only when there's actual post text
   const showTextBlock = item.textInPanel !== 1 && !(item.canLoadArticle === 1 && item.fullContent) && !!item.text;
 
@@ -171,7 +181,7 @@ export function NewsDetailBody({
       <div
         className={cx(styles.content, variant === 'inline' && styles.contentInline)}
         onTouchEnd={handleTouchEnd}
-        style={onDoubleTap ? { touchAction: 'manipulation' } : undefined}
+        style={onDoubleTap ? TOUCH_ACTION_MANIPULATION : undefined}
       >
         <NewsDetailMedia
           item={item}
@@ -198,7 +208,7 @@ export function NewsDetailBody({
           {showLoadBtn && (
             <div className={styles.loadBtnWrap}>
               <Button
-                icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+                icon={articleLoading ? ICON_LOADING : ICON_DOWNLOAD}
                 onClick={onExtractClick}
                 loading={articleLoading}
                 disabled={articleQueued}
@@ -241,11 +251,7 @@ export function NewsDetailBody({
         onOk={onModalConfirm}
         onCancel={onModalCancel}
       >
-        <Radio.Group
-          value={selectedUrl}
-          onChange={(e) => onSelectedUrlChange(e.target.value as string)}
-          className={styles.radioGroup}
-        >
+        <Radio.Group value={selectedUrl} onChange={handleUrlChange} className={styles.radioGroup}>
           {links
             .filter((l) => !isYouTubeUrl(l))
             .map((link) => (
