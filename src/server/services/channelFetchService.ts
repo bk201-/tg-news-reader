@@ -5,16 +5,17 @@
  * make the business logic framework-agnostic (no Hono dependency).
  */
 
-import { db } from '../db/index.js';
-import { channels, news, downloads } from '../db/schema.js';
-import { eq, and, inArray, sql, notInArray } from 'drizzle-orm';
-import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
-import { getChannelStrategy, type PostProcessArgs } from './channelStrategies.js';
-import { applyFiltersToInserted } from './filterEngine.js';
-import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
-import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { ChannelType } from '../../shared/types.js';
+import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
+import { db } from '../db/index.js';
+import { channels, downloads, news } from '../db/schema.js';
 import { logger } from '../logger.js';
+import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
+import { getChannelStrategy } from './channelStrategies.js';
+import type { PostProcessArgs } from './channelStrategies.js';
+import { applyFiltersToInserted } from './filterEngine.js';
+import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -147,6 +148,7 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
           : {}),
         textInPanel: flags.textInPanel ? 1 : 0,
         canLoadArticle: flags.canLoadArticle ? 1 : 0,
+        forwardFromName: msg.forwardFromName ?? null,
       };
     });
 
@@ -177,6 +179,7 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
     // INSERT new rows in chunks
     for (let i = 0; i < toInsertValues.length; i += BATCH_SIZE) {
       const chunk = toInsertValues.slice(i, i + BATCH_SIZE);
+
       const rows = await tx.insert(news).values(chunk).returning({ id: news.id, telegramMsgId: news.telegramMsgId });
       for (const row of rows) {
         insertedMap.set(row.telegramMsgId, row.id);

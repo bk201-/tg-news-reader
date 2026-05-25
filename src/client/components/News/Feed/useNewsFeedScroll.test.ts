@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
 import type { NewsItem } from '@shared/types';
+import { renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUIStore } from '../../../store/uiStore';
 import { useNewsFeedScroll } from './useNewsFeedScroll';
 

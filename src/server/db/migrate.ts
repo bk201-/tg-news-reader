@@ -1,5 +1,5 @@
-import { client } from './index.js';
 import { logger } from '../logger.js';
+import { client } from './index.js';
 
 export async function runMigration(): Promise<void> {
   await client.execute('PRAGMA foreign_keys = ON');
@@ -98,6 +98,7 @@ export async function runMigration(): Promise<void> {
     "ALTER TABLE news ADD COLUMN full_content_format TEXT NOT NULL DEFAULT 'text'",
     'ALTER TABLE channels ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE channels ADD COLUMN total_news_count INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE news ADD COLUMN forward_from_name TEXT',
   ];
   for (const sql of alterMigrations) {
     try {

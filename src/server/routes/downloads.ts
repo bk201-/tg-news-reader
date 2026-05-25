@@ -1,12 +1,12 @@
-import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import type { DownloadTask } from '../../shared/types.js';
 import { db } from '../db/index.js';
 import { downloads } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { enqueueTask, prioritizeTask, getActiveTasks } from '../services/downloadManager.js';
+import { enqueueTask, getActiveTasks, prioritizeTask } from '../services/downloadManager.js';
 import { downloadProgressEmitter } from '../services/downloadProgress.js';
-import type { DownloadTask } from '../../shared/types.js';
 import { createDownloadSchema } from './schemas.js';
 
 const router = new Hono();

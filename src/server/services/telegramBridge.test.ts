@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Worker } from 'worker_threads';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn(), debug: vi.fn() },
@@ -9,9 +10,9 @@ vi.mock('./telegram.js', () => ({
   downloadMessageMedia: vi.fn(),
 }));
 
+import { fetchMessageById, downloadMessageMedia } from './telegram.js';
 import { handleBridgeMessage, isBridgeMessage } from './telegramBridge.js';
 import type { TgDownloadMediaMsg, TgResultMsg, TgErrorMsg } from './telegramBridge.js';
-import { fetchMessageById, downloadMessageMedia } from './telegram.js';
 
 const mockFetchMessageById = vi.mocked(fetchMessageById);
 const mockDownloadMessageMedia = vi.mocked(downloadMessageMedia);
@@ -22,7 +23,7 @@ function createFakeWorker() {
     on: vi.fn(),
     emit: vi.fn(),
     terminate: vi.fn(),
-  } as unknown as import('worker_threads').Worker & { postMessage: ReturnType<typeof vi.fn> };
+  } as unknown as Worker & { postMessage: ReturnType<typeof vi.fn> };
 }
 
 function createDownloadMsg(overrides: Partial<TgDownloadMediaMsg> = {}): TgDownloadMediaMsg {
@@ -61,7 +62,6 @@ describe('telegramBridge', () => {
 
   describe('handleBridgeMessage — tg:downloadMedia', () => {
     it('downloads media and posts result back to worker', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce('data/channel/file.jpg');
 
@@ -79,7 +79,6 @@ describe('telegramBridge', () => {
     });
 
     it('replies with no_media when message has no rawMedia', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: null } as any);
 
       const worker = createFakeWorker();
@@ -93,7 +92,6 @@ describe('telegramBridge', () => {
     });
 
     it('replies with no_media when message is null', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce(null as any);
 
       const worker = createFakeWorker();
@@ -105,7 +103,6 @@ describe('telegramBridge', () => {
     });
 
     it('replies with size_limit when downloadMessageMedia returns null', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce(null);
 
@@ -120,7 +117,6 @@ describe('telegramBridge', () => {
     });
 
     it('passes ignoreLimit to downloadMessageMedia', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce('path.jpg');
 
@@ -145,7 +141,6 @@ describe('telegramBridge', () => {
     });
 
     it('replies with tg:error when downloadMessageMedia throws', async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockRejectedValueOnce(new Error('disk full'));
 

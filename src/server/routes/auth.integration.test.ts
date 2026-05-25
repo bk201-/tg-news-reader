@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (must be before any imports that touch them) ─────────────────────
 
@@ -13,8 +13,9 @@ vi.mock('../logger.js', () => ({
 }));
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, createTestSession, authHeaders } from '../__tests__/auth.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 // We need to mock db/index so the auth routes use our in-memory DB
 let testDb: TestDb;

@@ -1,6 +1,6 @@
 import { logger } from '../logger.js';
+import { isTransientTelegramError, TELEGRAM_POLICY, withRetry } from '../utils/retry.js';
 import { sendAlert } from './alertBot.js';
-import { withRetry, isTransientTelegramError, TELEGRAM_POLICY } from '../utils/retry.js';
 
 export { isTransientTelegramError };
 

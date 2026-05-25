@@ -1,7 +1,8 @@
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, renderHook, type RenderOptions, type RenderHookOptions } from '@testing-library/react';
+import { render, renderHook } from '@testing-library/react';
+import type { RenderHookOptions, RenderOptions } from '@testing-library/react';
 import { App, ConfigProvider } from 'antd';
+import React from 'react';
 
 function createTestQueryClient() {
   return new QueryClient({

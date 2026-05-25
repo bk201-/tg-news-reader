@@ -1,21 +1,23 @@
-import React, { useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { Empty, Button } from 'antd';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
+import { Button, Empty } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { Channel } from '../../../shared/types';
-import { NewsDetail } from './Detail/NewsDetail';
+import { BP_XL } from '../../hooks/breakpoints';
 import { FilterPanel } from '../Filters/FilterPanel';
-import { NewsFeedToolbar } from './Feed/NewsFeedToolbar';
+import { NewsDetail } from './Detail/NewsDetail';
+import { DigestDrawer } from './Digest/DigestDrawer';
+import { DIGEST_BATCH_SIZE, DigestProgressDrawer } from './Digest/DigestProgressDrawer';
 import { NewsFeedList } from './Feed/Desktop/NewsFeedList';
 import { NewsAccordionList } from './Feed/Mobile/NewsAccordionList';
-import { DigestDrawer } from './Digest/DigestDrawer';
-import { DigestProgressDrawer, DIGEST_BATCH_SIZE } from './Digest/DigestProgressDrawer';
-import { LightboxOverlay } from './Lightbox/LightboxOverlay';
+import { NewsFeedToolbar } from './Feed/NewsFeedToolbar';
 import { TagBrowserModal } from './Feed/TagBrowserModal';
+import { LightboxOverlay } from './Lightbox/LightboxOverlay';
 import { useNewsFeedState } from './useNewsFeedState';
-import { BP_XL } from '../../hooks/breakpoints';
+
+const ICON_SCROLL_TOP = <VerticalAlignTopOutlined />;
 
 const useStyles = createStyles(({ css, token }) => ({
   feed: css`
@@ -130,6 +132,13 @@ export function NewsFeed({ channel }: NewsFeedProps) {
   const digestBaseParams = useMemo(() => ({}), []);
   const digestScope = useMemo(() => ({ channelId: channel.id }), [channel.id]);
 
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage) void fetchNextPage();
+  }, [hasNextPage, fetchNextPage]);
+  const handleCloseDigest = useCallback(() => setDigestOpen(false), [setDigestOpen]);
+  const handleCloseTagBrowser = useCallback(() => setTagBrowserOpen(false), [setTagBrowserOpen]);
+  const handleSetHashTag = useCallback((tag: string | null) => handleTagClick(tag, 'show'), [handleTagClick]);
+
   return (
     <div className={styles.feed}>
       {/* Toolbar wrapper: sticky top:0 on mobile via CSS @media */}
@@ -158,7 +167,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             windowScroll
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
-            onEndReached={() => hasNextPage && fetchNextPage()}
+            onEndReached={handleEndReached}
           />
         ) : (
           <>
@@ -175,7 +184,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
               virtuosoRef={virtuosoRef}
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
-              onEndReached={() => hasNextPage && fetchNextPage()}
+              onEndReached={handleEndReached}
             />
             <div className={styles.detail}>
               {selectedItem ? (
@@ -204,7 +213,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             type="primary"
             shape="circle"
             size="large"
-            icon={<VerticalAlignTopOutlined />}
+            icon={ICON_SCROLL_TOP}
             className={styles.scrollTopBtn}
             onClick={scrollToTop}
             aria-label={t('news.scroll_to_top')}
@@ -219,20 +228,20 @@ export function NewsFeed({ channel }: NewsFeedProps) {
           newsIds={visibleNewsIdsChrono}
           baseParams={digestBaseParams}
           scope={digestScope}
-          onClose={() => setDigestOpen(false)}
+          onClose={handleCloseDigest}
         />
       ) : (
-        <DigestDrawer open={digestOpen} params={digestParams} onClose={() => setDigestOpen(false)} />
+        <DigestDrawer open={digestOpen} params={digestParams} onClose={handleCloseDigest} />
       )}
       <TagBrowserModal
         open={tagBrowserOpen}
         channelId={channel.id}
         tagCounts={tagCounts}
         activeHashTag={hashTagFilter}
-        onSetHashTag={(tag) => handleTagClick(tag, 'show')}
-        onClose={() => setTagBrowserOpen(false)}
+        onSetHashTag={handleSetHashTag}
+        onClose={handleCloseTagBrowser}
       />
-      <LightboxOverlay />
+      <LightboxOverlay fetchNextPage={fetchNextPage} hasNextPage={hasNextPage ?? false} />
     </div>
   );
 }

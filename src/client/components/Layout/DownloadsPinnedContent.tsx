@@ -1,12 +1,12 @@
-import React from 'react';
-import { Typography, Space, Button, Spin } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PushpinFilled } from '@ant-design/icons';
+import { Button, Space, Spin, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TaskList } from './DownloadTaskList';
-import { useDownloads, useCancelDownload, usePrioritizeDownload } from '../../api/downloads';
+import { useCancelDownload, useDownloads, usePrioritizeDownload } from '../../api/downloads';
 import { useUIStore } from '../../store/uiStore';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { TaskList } from './DownloadTaskList';
 
 const { Text } = Typography;
 
@@ -52,6 +52,7 @@ export function DownloadsPinnedContent() {
   const { t } = useTranslation();
 
   const activeCount = tasks.filter((t) => t.status === 'pending' || t.status === 'processing').length;
+  const pinIcon = useMemo(() => <PushpinFilled className={styles.pinIcon} />, [styles.pinIcon]);
 
   return (
     <div className={styles.container}>
@@ -63,7 +64,7 @@ export function DownloadsPinnedContent() {
           </Text>
         </Space>
         <Tooltip title={t('downloads.unpin_tooltip')} placement="left">
-          <Button type="text" icon={<PushpinFilled className={styles.pinIcon} />} onClick={toggleDownloadsPanelPin} />
+          <Button type="text" icon={pinIcon} onClick={toggleDownloadsPanelPin} />
         </Tooltip>
       </div>
       <div className={styles.body}>

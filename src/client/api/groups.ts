@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from './client';
-import type { Group } from '@shared/types.ts';
 import type { CreateGroupInput, UpdateGroupInput } from '@shared/schemas.ts';
+import type { Group } from '@shared/types.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
+import { api } from './client';
 
 export const groupKeys = { all: ['groups'] as const };
 

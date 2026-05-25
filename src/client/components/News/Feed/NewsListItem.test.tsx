@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import type { NewsItem } from '@shared/types';
+import { fireEvent, screen } from '@testing-library/react';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../__tests__/renderWithProviders';
 import { NewsListItem } from './NewsListItem';
-import type { NewsItem } from '@shared/types';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 vi.mock('../../../api/news', () => ({
@@ -32,7 +33,7 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
 }
 
 describe('NewsListItem', () => {
-  let onClick: ReturnType<typeof vi.fn>;
+  let onClick: Mock<(id: number) => void>;
 
   beforeEach(() => {
     onClick = vi.fn();

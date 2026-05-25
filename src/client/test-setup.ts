@@ -69,7 +69,7 @@ if (typeof window !== 'undefined') {
 const origStderrWrite = process.stderr.write.bind(process.stderr);
 process.stderr.write = ((chunk: unknown, ...args: unknown[]) => {
   if (typeof chunk === 'string' && chunk.includes('Not implemented:')) return true;
-  return origStderrWrite(chunk, ...args);
+  return origStderrWrite(chunk as string | Uint8Array, ...(args as []));
 }) as typeof process.stderr.write;
 
 // isContentEditable polyfill — jsdom doesn't implement this getter

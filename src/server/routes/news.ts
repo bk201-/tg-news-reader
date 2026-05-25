@@ -1,15 +1,15 @@
+import { and, asc, eq, gt, inArray, max, notInArray, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { ChannelType, NewsItem } from '../../shared/types.js';
 import { db } from '../db/index.js';
-import { news, channels, downloads } from '../db/schema.js';
-import { eq, and, asc, max, sql, gt, notInArray, inArray, type SQL } from 'drizzle-orm';
-import type { NewsItem } from '../../shared/types.js';
-import { readChannelHistory, fetchMessageById } from '../services/telegram.js';
-import { getChannelStrategy } from '../services/channelStrategies.js';
-import type { ChannelType } from '../../shared/types.js';
-import { logger } from '../logger.js';
 import { toNewsItem } from '../db/mappers.js';
-import { readAllNewsSchema, markReadSchema, parseOptionalBody } from './schemas.js';
+import { channels, downloads, news } from '../db/schema.js';
+import { logger } from '../logger.js';
+import { getChannelStrategy } from '../services/channelStrategies.js';
+import { fetchMessageById, readChannelHistory } from '../services/telegram.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
+import { markReadSchema, parseOptionalBody, readAllNewsSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -42,6 +42,7 @@ router.post('/read-all', async (c) => {
           .select({ count: sql<number>`count(*)` })
           .from(news)
           .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+
         await db
           .update(channels)
           .set({ unreadCount: result?.count ?? 0 })

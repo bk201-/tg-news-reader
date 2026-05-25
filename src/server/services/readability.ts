@@ -1,13 +1,15 @@
-import { logger } from '../logger.js';
+import type { Readability } from '@mozilla/readability';
+import type { JSDOM } from 'jsdom';
 import TurndownService from 'turndown';
+import { logger } from '../logger.js';
 
 // jsdom + Readability are lazy-loaded on first use, not at import time.
 // This keeps worker thread startup fast: if the worker never receives an article
 // task, it never pays the ~2s / ~100MB jsdom load cost.
 // Each worker thread has its own module scope, so these cached references
 // are per-thread — no shared state between workers.
-let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null;
-let ReadabilityClass: (typeof import('@mozilla/readability'))['Readability'] | null = null;
+let JSDOMClass: typeof JSDOM | null = null;
+let ReadabilityClass: typeof Readability | null = null;
 
 async function getLibs() {
   if (JSDOMClass && ReadabilityClass) return { JSDOM: JSDOMClass, Readability: ReadabilityClass };

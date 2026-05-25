@@ -1,4 +1,4 @@
-import type { NewsItem, Filter } from '@shared/types.ts';
+import type { Filter, NewsItem } from '@shared/types.ts';
 
 // Filter logic helper — active filters EXCLUDE matching news
 export function applyFilters(items: NewsItem[], filters: Filter[]): Set<number> {
@@ -30,7 +30,7 @@ export function applyFilters(items: NewsItem[], filters: Filter[]): Set<number> 
     if (tagFilterSet.size > 0 && hashtags.some((h) => tagFilterSet.has(h))) continue;
 
     // Exclude if any keyword is found in the text
-    if (keywordFilters.length > 0 && keywordFilters.some((kw) => text.includes(kw))) continue;
+    if (keywordFilters.some((kw) => text.includes(kw))) continue;
 
     passedIds.add(item.id);
   }

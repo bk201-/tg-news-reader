@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NewsItem } from '@shared/types.ts';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import React from 'react';
-import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
-import type { NewsItem } from '@shared/types.ts';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NewsResponse } from '../../../api/news';
 import { useLightboxNav } from './useLightboxNav';
 

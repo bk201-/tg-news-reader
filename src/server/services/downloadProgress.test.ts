@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
+import { describe, expect, it, vi } from 'vitest';
 import type { DownloadTask } from '../../shared/types.js';
+import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 
 describe('downloadProgress', () => {
   it('emits task_update event with the task payload', () => {

@@ -11,13 +11,13 @@
  *   2. 2FA password (optional — use "-" to skip, prompts if Telegram requires it)
  *   3. "deploy" — update Azure secret + restart container (optional)
  */
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as readline from 'readline';
 import 'dotenv/config';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
-import * as readline from 'readline';
-import * as fs from 'fs';
-import * as path from 'path';
-import { execSync } from 'child_process';
 
 const API_ID = parseInt(process.env.TG_API_ID || '0', 10);
 const API_HASH = process.env.TG_API_HASH || '';
@@ -119,9 +119,9 @@ async function main() {
     phoneNumber: () => Promise.resolve(phone),
     password: async () => {
       if (password) return password;
-      return await question('🔐 Enter your 2FA password: ');
+      return question('🔐 Enter your 2FA password: ');
     },
-    phoneCode: async () => await question('📬 Enter the code from Telegram: '),
+    phoneCode: async () => question('📬 Enter the code from Telegram: '),
     onError: (err) => console.error('Error:', err),
   });
 

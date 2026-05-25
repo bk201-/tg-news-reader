@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Progress, Spin, Typography, Alert } from 'antd';
-import { CopyOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CloseOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Alert, Button, Drawer, message, Progress, Spin, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { message } from 'antd';
-import { streamDigest, type DigestParams } from '../../../api/digest';
+import { streamDigest } from '../../../api/digest';
+import type { DigestParams } from '../../../api/digest';
 import { useUIStore } from '../../../store/uiStore';
 import { DigestBody } from './DigestBody';
 
@@ -57,6 +57,11 @@ const useStyles = createStyles(({ css, token }) => ({
     gap: 8px;
   `,
 }));
+
+const ICON_CLOSE = <CloseOutlined />;
+const ICON_RELOAD = <ReloadOutlined />;
+const ICON_COPY = <CopyOutlined />;
+const DRAWER_BODY_STYLES = { body: { padding: 0 } };
 
 interface DigestDrawerProps {
   open: boolean;
@@ -138,7 +143,7 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
     if (open && !text && !loading && !error) {
       void run();
     }
-  }, [open, paramsKey]); // oxlint-disable-line react/exhaustive-deps
+  }, [open, paramsKey, text, loading, error, run]);
 
   // Abort on unmount
   useEffect(() => {
@@ -152,10 +157,13 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
     [setSelectedNewsId],
   );
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(text);
     void message.success(t('digest.copied'));
-  };
+  }, [text, t]);
+
+  const handleRunVoid = useCallback(() => void run(), [run]);
+  const handleCopyVoid = useCallback(() => void handleCopy(), [handleCopy]);
 
   const isPrefetching = loading && prefetchProgress !== null;
 
@@ -166,9 +174,9 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
       size="large"
       open={open}
       onClose={onClose}
-      closeIcon={<CloseOutlined />}
+      closeIcon={ICON_CLOSE}
       mask={false}
-      styles={{ body: { padding: 0 } }}
+      styles={DRAWER_BODY_STYLES}
     >
       <div className={styles.body}>
         {error && <Alert type="error" title={error} showIcon />}
@@ -209,10 +217,10 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
           <div className={styles.footer}>
             <span className={styles.poweredBy}>{t('digest.powered_by')}</span>
             <div className={styles.footerActions}>
-              <Button icon={<ReloadOutlined />} size="small" onClick={() => void run()}>
+              <Button icon={ICON_RELOAD} size="small" onClick={handleRunVoid}>
                 {t('digest.refresh')}
               </Button>
-              <Button icon={<CopyOutlined />} size="small" onClick={() => void handleCopy()}>
+              <Button icon={ICON_COPY} size="small" onClick={handleCopyVoid}>
                 {t('digest.copy')}
               </Button>
             </div>

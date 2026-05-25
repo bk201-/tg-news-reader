@@ -1,6 +1,7 @@
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import type { Channel, NewsItem } from '@shared/types.ts';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { api } from './client';
-import type { NewsItem, Channel } from '@shared/types.ts';
 
 export const newsKeys = {
   byChannel: (channelId: number, filtered = false) => ['news', channelId, filtered ? 'filtered' : 'all'] as const,

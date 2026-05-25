@@ -1,11 +1,17 @@
-import React, { useCallback, useState } from 'react';
+import { CloseOutlined, LinkOutlined, LoadingOutlined, RetweetOutlined, ShareAltOutlined } from '@ant-design/icons';
+import type { NewsItem } from '@shared/types.ts';
 import { Button, Typography } from 'antd';
-import { CloseOutlined, LinkOutlined, ShareAltOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem } from '@shared/types.ts';
 import { mediaUrl } from '../../../api/mediaUrl';
+
+const ICON_LINK = <LinkOutlined />;
+const ICON_CLOSE = <CloseOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
+const ICON_SHARE = <ShareAltOutlined />;
+const ICON_RETWEET = <RetweetOutlined />;
 
 interface LightboxToolbarProps {
   item: NewsItem | null | undefined;
@@ -48,6 +54,18 @@ const useStyles = createStyles(({ css }) => ({
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
+  `,
+  forwardTag: css`
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   `,
   closeBtn: css`
     flex-shrink: 0;
@@ -124,6 +142,9 @@ export function LightboxToolbar({
     }
   }, [currentMediaPath, shareUrl, channelName]);
 
+  const handleShareVoid = useCallback(() => void handleShare(), [handleShare]);
+  const handleOpenUrl = useCallback(() => window.open(openUrl, '_blank', 'noopener,noreferrer'), [openUrl]);
+
   return (
     <div className={styles.toolbar}>
       <div className={styles.info}>
@@ -131,15 +152,21 @@ export function LightboxToolbar({
         <div className={styles.meta}>
           <Text>{date}</Text>
           {positionLabel && <Text>· {positionLabel}</Text>}
+          {item?.forwardFromName && (
+            <span className={styles.forwardTag} title={t('news.detail.forwarded_from', { name: item.forwardFromName })}>
+              {ICON_RETWEET}
+              {item.forwardFromName}
+            </span>
+          )}
         </div>
       </div>
 
       {canShare && currentMediaPath && (
         <Button
           size="small"
-          icon={sharing ? <LoadingOutlined /> : <ShareAltOutlined />}
+          icon={sharing ? ICON_LOADING : ICON_SHARE}
           className={styles.linkBtn}
-          onClick={() => void handleShare()}
+          onClick={handleShareVoid}
           disabled={sharing}
           title={t('lightbox.share')}
         />
@@ -148,16 +175,16 @@ export function LightboxToolbar({
       {openUrl && (
         <Button
           size="small"
-          icon={<LinkOutlined />}
+          icon={ICON_LINK}
           className={styles.linkBtn}
-          onClick={() => window.open(openUrl, '_blank', 'noopener,noreferrer')}
+          onClick={handleOpenUrl}
           title={t('lightbox.open_in_telegram')}
         />
       )}
 
       <Button
         size="small"
-        icon={<CloseOutlined />}
+        icon={ICON_CLOSE}
         className={styles.closeBtn}
         onClick={onClose}
         title={t('lightbox.close')}

@@ -1,16 +1,21 @@
-import React, { useRef, useCallback } from 'react';
-import { Button, Typography, Divider, Modal, Radio } from 'antd';
-import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
+import { DownloadOutlined, LoadingOutlined, MinusOutlined, PlusOutlined, RetweetOutlined } from '@ant-design/icons';
 import type { NewsItem } from '@shared/types.ts';
+import { Button, Divider, Modal, Radio, Typography } from 'antd';
+import type { RadioChangeEvent } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useUIStore } from '../../../store/uiStore';
 import { isYouTubeUrl } from '../newsUtils';
-import { NewsDetailMedia } from './NewsDetailMedia';
-import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
-import { NewsTextBlock } from './NewsTextBlock';
 import { NewsArticleBody } from './NewsArticleBody';
+import { NewsDetailMedia } from './NewsDetailMedia';
+import { NewsTextBlock } from './NewsTextBlock';
+import { NewsYouTubeEmbeds } from './NewsYouTubeEmbeds';
 
 const DOUBLE_TAP_MS = 350;
+const FONT_SIZE_STEP = 10;
+const FONT_SIZE_MIN = 100;
+const FONT_SIZE_MAX = 200;
 
 /** Tags that should NOT trigger double-tap (interactive / media elements) */
 const DOUBLE_TAP_EXCLUDED_TAGS = new Set(['a', 'button', 'img', 'video', 'audio', 'input', 'textarea', 'svg', 'path']);
@@ -31,6 +36,11 @@ const useStyles = createStyles(({ css, token }) => ({
     scrollbar-width: none;
     &::-webkit-scrollbar {
       display: none;
+    }
+    /* Show font size controls on hover */
+    &:hover .font-size-bar {
+      opacity: 1;
+      pointer-events: auto;
     }
   `,
   contentInline: css`
@@ -69,7 +79,55 @@ const useStyles = createStyles(({ css, token }) => ({
   radioLink: css`
     font-size: 12px;
   `,
+  fontSizeBar: css`
+    position: sticky;
+    bottom: 16px;
+    align-self: flex-end;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: ${token.colorBgElevated};
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 20px;
+    padding: 2px 6px;
+    box-shadow: ${token.boxShadowSecondary};
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s;
+    z-index: 5;
+  `,
+  fontSizeLabel: css`
+    font-size: 11px;
+    color: ${token.colorTextSecondary};
+    min-width: 36px;
+    text-align: center;
+    user-select: none;
+  `,
+  forwardBadge: css`
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: ${token.colorTextTertiary};
+    margin-bottom: 4px;
+    width: 100%;
+  `,
+  forwardName: css`
+    font-style: italic;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
 }));
+
+const ICON_DOWNLOAD = <DownloadOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
+const ICON_MINUS = <MinusOutlined />;
+const ICON_PLUS = <PlusOutlined />;
+const TOUCH_ACTION_MANIPULATION = { touchAction: 'manipulation' as const };
+const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
 interface NewsDetailBodyProps {
   item: NewsItem;
@@ -101,6 +159,8 @@ interface NewsDetailBodyProps {
   variant?: 'panel' | 'inline';
   /** Double-tap on body text area (mobile) — triggers mark-read */
   onDoubleTap?: () => void;
+  /** Ref forwarded to the active <video> element (for pausing before lightbox opens) */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
 export function NewsDetailBody({
@@ -131,9 +191,28 @@ export function NewsDetailBody({
   onModalCancel,
   variant = 'panel',
   onDoubleTap,
+  videoRef,
 }: NewsDetailBodyProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
+  const { newsFontSize, setNewsFontSize } = useUIStore();
+
+  const handleDecrease = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setNewsFontSize(newsFontSize - FONT_SIZE_STEP);
+    },
+    [newsFontSize, setNewsFontSize],
+  );
+  const handleIncrease = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setNewsFontSize(newsFontSize + FONT_SIZE_STEP);
+    },
+    [newsFontSize, setNewsFontSize],
+  );
+
+  const textBodyStyle = useMemo(() => ({ fontSize: `${newsFontSize}%` }), [newsFontSize]);
 
   // ── Double-tap detection (mobile mark-read on body text) ──────────
   const lastTapRef = useRef(0);
@@ -155,6 +234,11 @@ export function NewsDetailBody({
     [onDoubleTap],
   );
 
+  const handleUrlChange = useCallback(
+    (e: RadioChangeEvent) => onSelectedUrlChange(e.target.value as string),
+    [onSelectedUrlChange],
+  );
+
   // Show the text infoblock only when there's actual post text
   const showTextBlock = item.textInPanel !== 1 && !(item.canLoadArticle === 1 && item.fullContent) && !!item.text;
 
@@ -171,7 +255,7 @@ export function NewsDetailBody({
       <div
         className={cx(styles.content, variant === 'inline' && styles.contentInline)}
         onTouchEnd={handleTouchEnd}
-        style={onDoubleTap ? { touchAction: 'manipulation' } : undefined}
+        style={onDoubleTap ? TOUCH_ACTION_MANIPULATION : undefined}
       >
         <NewsDetailMedia
           item={item}
@@ -188,9 +272,21 @@ export function NewsDetailBody({
           mediaTaskStatus={mediaTaskStatus}
           mediaTaskError={mediaTaskError}
           onDownload={onDownload}
+          videoRef={videoRef}
         />
 
-        <div className={styles.textBody}>
+        <div className={styles.textBody} style={textBodyStyle}>
+          {/* Forward badge — shown when the post is a repost from another channel */}
+          {item.forwardFromName && (
+            <div
+              className={styles.forwardBadge}
+              title={t('news.detail.forwarded_from', { name: item.forwardFromName })}
+            >
+              <RetweetOutlined />
+              <span className={styles.forwardName}>{item.forwardFromName}</span>
+            </div>
+          )}
+
           {/* Zone 2: post text infoblock */}
           {showTextBlock && <NewsTextBlock text={item.text} />}
 
@@ -198,7 +294,7 @@ export function NewsDetailBody({
           {showLoadBtn && (
             <div className={styles.loadBtnWrap}>
               <Button
-                icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+                icon={articleLoading ? ICON_LOADING : ICON_DOWNLOAD}
                 onClick={onExtractClick}
                 loading={articleLoading}
                 disabled={articleQueued}
@@ -231,6 +327,27 @@ export function NewsDetailBody({
 
           <NewsYouTubeEmbeds links={links} />
         </div>
+
+        {/* Font size controls — appear on hover at bottom-right of the content area */}
+        <div className={cx(styles.fontSizeBar, 'font-size-bar')} onClick={stopPropagation}>
+          <Button
+            type="text"
+            size="small"
+            icon={ICON_MINUS}
+            onClick={handleDecrease}
+            disabled={newsFontSize <= FONT_SIZE_MIN}
+            aria-label={t('news.detail.font_size_decrease')}
+          />
+          <span className={styles.fontSizeLabel}>{newsFontSize}%</span>
+          <Button
+            type="text"
+            size="small"
+            icon={ICON_PLUS}
+            onClick={handleIncrease}
+            disabled={newsFontSize >= FONT_SIZE_MAX}
+            aria-label={t('news.detail.font_size_increase')}
+          />
+        </div>
       </div>
 
       <Modal
@@ -241,11 +358,7 @@ export function NewsDetailBody({
         onOk={onModalConfirm}
         onCancel={onModalCancel}
       >
-        <Radio.Group
-          value={selectedUrl}
-          onChange={(e) => onSelectedUrlChange(e.target.value as string)}
-          className={styles.radioGroup}
-        >
+        <Radio.Group value={selectedUrl} onChange={handleUrlChange} className={styles.radioGroup}>
           {links
             .filter((l) => !isYouTubeUrl(l))
             .map((link) => (

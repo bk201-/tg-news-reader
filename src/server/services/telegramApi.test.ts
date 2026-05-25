@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TelegramMessage } from './telegramParser.js';
 
 // ─── Hoisted mocks (available before vi.mock factories) ──────────────────────
@@ -51,10 +51,18 @@ const {
   const _mockParseMessageFields = vi.fn();
   const _mockExtractInstantViewText = vi.fn();
 
+  class _MockPeerChannel {
+    channelId: bigint;
+    constructor(channelId: bigint) {
+      this.channelId = channelId;
+    }
+  }
+
   const _mockApi = {
     Message: _MockMessage,
     WebPage: _MockWebPage,
     Page: _MockPage,
+    PeerChannel: _MockPeerChannel,
     messages: {
       GetWebPage: class {
         url: string;
@@ -110,8 +118,8 @@ vi.mock('./telegramParser.js', () => ({
   extractInstantViewText: (...args: unknown[]) => mockExtractInstantViewText(...args),
 }));
 
-import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 import { logger } from '../logger.js';
+import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 

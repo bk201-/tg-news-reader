@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { useAuthStore } from './authStore';
 
 /** Create a fake JWT with a given payload (no signature verification on client) */

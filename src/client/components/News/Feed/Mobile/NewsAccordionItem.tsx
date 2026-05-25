@@ -1,8 +1,8 @@
-import React, { memo } from 'react';
-import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsListItem } from '../NewsListItem';
+import { createStyles } from 'antd-style';
+import React, { memo, useCallback } from 'react';
 import { NewsDetail } from '../../Detail/NewsDetail';
+import { NewsListItem } from '../NewsListItem';
 
 const useStyles = createStyles(({ css, token }) => ({
   item: css`
@@ -46,6 +46,8 @@ export const NewsAccordionItem = memo(
   }: NewsAccordionItemProps) {
     const { styles, cx } = useStyles();
 
+    const handleHeaderClick = useCallback(() => onSelect(null), [onSelect]);
+
     if (!isFiltered && !showAll) return null;
 
     const dimmed = !isFiltered && showAll;
@@ -63,7 +65,7 @@ export const NewsAccordionItem = memo(
             channelTelegramId={channelTelegramId}
             onMarkedRead={onMarkedRead}
             variant="inline"
-            onHeaderClick={() => onSelect(null)}
+            onHeaderClick={handleHeaderClick}
             onTagClick={onTagClick}
           />
         ) : (
@@ -72,7 +74,7 @@ export const NewsAccordionItem = memo(
             isSelected={false}
             isFiltered={isFiltered}
             showAll={showAll}
-            onClick={() => onSelect(item.id)}
+            onClick={onSelect}
             onTagClick={onTagClick}
           />
         )}

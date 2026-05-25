@@ -4,13 +4,13 @@
 
 import { useMemo, useState } from 'react';
 import type { Channel } from '../../../../shared/types';
-import { useNews, flattenPaginatedItems } from '../../../api/news';
 import { useFilters } from '../../../api/filters';
+import { useMediaProgressSSE } from '../../../api/mediaProgress';
+import { flattenPaginatedItems, useNews } from '../../../api/news';
+import { useIsXl } from '../../../hooks/breakpoints';
 import { useUIStore } from '../../../store/uiStore';
 import { applyFilters } from '../filterUtils';
 import { useHashTagSync } from './useHashTagSync';
-import { useIsXl } from '../../../hooks/breakpoints';
-import { useMediaProgressSSE } from '../../../api/mediaProgress';
 
 export function useNewsFeedData(channel: Channel) {
   const { selectedNewsId, showAll, newsViewMode } = useUIStore();

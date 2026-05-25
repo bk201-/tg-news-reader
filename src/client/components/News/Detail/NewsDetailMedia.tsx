@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
-import { Button, Typography } from 'antd';
-import { DownloadOutlined, LoadingOutlined, LeftOutlined, RightOutlined, SoundOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
+import { DownloadOutlined, LeftOutlined, LoadingOutlined, RightOutlined, SoundOutlined } from '@ant-design/icons';
 import type { NewsItem } from '@shared/types.ts';
+import { Button, Typography } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
-import { formatBytes } from '../newsUtils';
 import { useUIStore } from '../../../store/uiStore';
+import { formatBytes } from '../newsUtils';
 
 const { Text } = Typography;
+
+const CURSOR_POINTER = { cursor: 'pointer' as const };
+const ICON_DOWNLOAD = <DownloadOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
 
 const useStyles = createStyles(({ css, token }) => ({
   media: css`
@@ -154,6 +158,8 @@ interface NewsDetailMediaProps {
   mediaTaskStatus?: string;
   mediaTaskError?: string;
   onDownload: () => void;
+  /** Ref forwarded to the active <video> element so callers can pause it (e.g. before opening lightbox) */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
 export function NewsDetailMedia({
@@ -171,6 +177,7 @@ export function NewsDetailMedia({
   mediaTaskStatus,
   mediaTaskError,
   onDownload,
+  videoRef,
 }: NewsDetailMediaProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
@@ -206,17 +213,25 @@ export function NewsDetailMedia({
     return cacheBuster > 0 ? `${base}&_r=${cacheBuster}` : base;
   };
 
+  const handleMediaBroken = useCallback(() => setMediaBroken(true), []);
+  const handleNavPrev = useCallback(() => onAlbumNav(-1), [onAlbumNav]);
+  const handleNavNext = useCallback(() => onAlbumNav(1), [onAlbumNav]);
+  const handleOpenLightboxAlbum = useCallback(() => {
+    videoRef?.current?.pause();
+    openLightbox(item.id, albumIndex, item.channelId);
+  }, [openLightbox, item.id, albumIndex, item.channelId, videoRef]);
+  const handleOpenLightboxSingle = useCallback(() => {
+    videoRef?.current?.pause();
+    openLightbox(item.id, 0, item.channelId);
+  }, [openLightbox, item.id, item.channelId, videoRef]);
+  const downloadIcon = mediaLoading ? ICON_LOADING : ICON_DOWNLOAD;
+
   // When media file is missing on server (404), show re-download button
   if (mediaBroken && firstMediaPath) {
     return (
       <div className={styles.brokenMedia}>
         <span>{t('news.detail.media_missing')}</span>
-        <Button
-          icon={mediaLoading ? <LoadingOutlined /> : <DownloadOutlined />}
-          onClick={onDownload}
-          loading={mediaLoading}
-          disabled={mediaQueued}
-        >
+        <Button icon={downloadIcon} onClick={onDownload} loading={mediaLoading} disabled={mediaQueued}>
           {mediaQueued ? t('news.detail.queued') : t('news.detail.redownload_media')}
         </Button>
         {mediaTaskStatus === 'failed' && (
@@ -237,7 +252,7 @@ export function NewsDetailMedia({
         <div className={styles.carousel}>
           <button
             className={cx(styles.carouselBtn, styles.carouselBtnPrev, 'carousel-btn')}
-            onClick={() => onAlbumNav(-1)}
+            onClick={handleNavPrev}
             disabled={albumIndex === 0}
             aria-label={t('news.detail.prev')}
           >
@@ -245,6 +260,7 @@ export function NewsDetailMedia({
           </button>
           {currentIsVideo ? (
             <video
+              ref={videoRef}
               key={currentPath}
               src={murl(currentPath)}
               className={styles.mediaFile}
@@ -252,22 +268,23 @@ export function NewsDetailMedia({
               muted
               autoPlay
               loop
-              onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
-              onError={() => setMediaBroken(true)}
-              style={{ cursor: 'pointer' }}
+              disablePictureInPicture
+              onClick={handleOpenLightboxAlbum}
+              onError={handleMediaBroken}
+              style={CURSOR_POINTER}
             />
           ) : (
             <img
               src={murl(currentPath)}
               alt={t('news.detail.photo_alt', { current: albumIndex + 1, total: albumExpectedLength })}
               className={styles.mediaFile}
-              onClick={() => openLightbox(item.id, albumIndex, item.channelId)}
-              onError={() => setMediaBroken(true)}
+              onClick={handleOpenLightboxAlbum}
+              onError={handleMediaBroken}
             />
           )}
           <button
             className={cx(styles.carouselBtn, styles.carouselBtnNext, 'carousel-btn')}
-            onClick={() => onAlbumNav(1)}
+            onClick={handleNavNext}
             disabled={albumIndex === albumLength - 1}
             aria-label={t('news.detail.next')}
           >
@@ -295,32 +312,29 @@ export function NewsDetailMedia({
             <div className={styles.audioPlaceholder}>
               <SoundOutlined />
             </div>
-            <audio
-              src={murl(firstMediaPath)}
-              controls
-              className={styles.audioPlayer}
-              onError={() => setMediaBroken(true)}
-            />
+            <audio src={murl(firstMediaPath)} controls className={styles.audioPlayer} onError={handleMediaBroken} />
           </>
         ) : isVideo ? (
           <video
+            ref={videoRef}
             src={murl(firstMediaPath)}
             controls
             muted
             autoPlay
             loop
+            disablePictureInPicture
             className={styles.mediaFile}
-            onClick={() => openLightbox(item.id, 0, item.channelId)}
-            onError={() => setMediaBroken(true)}
-            style={{ cursor: 'pointer' }}
+            onClick={handleOpenLightboxSingle}
+            onError={handleMediaBroken}
+            style={CURSOR_POINTER}
           />
         ) : (
           <img
             src={murl(firstMediaPath)}
             alt="media"
             className={styles.mediaFile}
-            onClick={() => openLightbox(item.id, 0, item.channelId)}
-            onError={() => setMediaBroken(true)}
+            onClick={handleOpenLightboxSingle}
+            onError={handleMediaBroken}
           />
         )}
       </div>
@@ -330,12 +344,7 @@ export function NewsDetailMedia({
   if (item.mediaType && item.mediaType !== 'webpage' && item.mediaType !== 'other') {
     return (
       <div className={styles.download}>
-        <Button
-          icon={mediaLoading ? <LoadingOutlined /> : <DownloadOutlined />}
-          onClick={onDownload}
-          loading={mediaLoading}
-          disabled={mediaQueued}
-        >
+        <Button icon={downloadIcon} onClick={onDownload} loading={mediaLoading} disabled={mediaQueued}>
           {mediaQueued
             ? t('news.detail.queued')
             : mediaTaskStatus === 'failed'

@@ -1,5 +1,5 @@
-import { useAuthStore } from '../store/authStore';
 import type { CreateDigestInput } from '@shared/schemas.ts';
+import { useAuthStore } from '../store/authStore';
 
 export type DigestParams = CreateDigestInput;
 
@@ -12,6 +12,7 @@ export type DigestEvent =
  * Streams a digest from POST /api/digest.
  * Returns an async generator that yields DigestEvents (chunk or ref_map).
  * Caller is responsible for aborting via AbortController.
+ * @yields {DigestEvent} Streamed digest events from the server SSE response.
  */
 export async function* streamDigest(
   params: DigestParams,

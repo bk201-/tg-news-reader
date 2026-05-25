@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NewsItem } from '@shared/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
 
 // ── Mocks ──────────────────────────────────────────────────────────────

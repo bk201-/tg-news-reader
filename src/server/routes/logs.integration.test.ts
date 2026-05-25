@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -36,8 +36,9 @@ vi.mock('../services/logBuffer.js', () => {
 });
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -50,9 +51,9 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import logsRouter from './logs.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getLogEntries, getBufferSize } from '../services/logBuffer.js';
+import logsRouter from './logs.js';
 
 function createApp() {
   const app = new Hono();

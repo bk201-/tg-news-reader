@@ -1,26 +1,26 @@
-import React, { useState } from 'react';
-import { Button, Modal, Form, Typography } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { FolderFilled, PlusOutlined, OrderedListOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
+import { FolderFilled, OrderedListOutlined, PlusOutlined } from '@ant-design/icons';
 import type { Group } from '@shared/types.ts';
-import {
-  useGroups,
-  useCreateGroup,
-  useUpdateGroup,
-  useDeleteGroup,
-  useVerifyGroupPIN,
-  useReorderGroups,
-} from '../../api/groups';
+import { Button, Form, Modal, Typography } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChannels } from '../../api/channels';
-import { useUIStore } from '../../store/uiStore';
+import {
+  useCreateGroup,
+  useDeleteGroup,
+  useGroups,
+  useReorderGroups,
+  useUpdateGroup,
+  useVerifyGroupPIN,
+} from '../../api/groups';
 import { useAuthStore } from '../../store/authStore';
-import { GroupItem } from './GroupItem';
-import { useGroupItemStyles } from './groupItemStyles';
-import { GroupFormModal } from './GroupFormModal';
+import { useUIStore } from '../../store/uiStore';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import { PRESET_COLORS } from './groupFormConstants';
 import type { GroupFormValues } from './groupFormConstants';
+import { GroupFormModal } from './GroupFormModal';
+import { GroupItem } from './GroupItem';
+import { useGroupItemStyles } from './groupItemStyles';
 import { GroupPinModal } from './GroupPinModal';
 import { SortModal } from './SortModal';
 
@@ -56,6 +56,9 @@ const useStyles = createStyles(({ css, token }) => ({
     color: ${token.colorTextSecondary};
   `,
 }));
+
+const ICON_PLUS = <PlusOutlined />;
+const ICON_ORDERED_LIST = <OrderedListOutlined />;
 
 export function GroupPanel() {
   const { data: groups = [] } = useGroups();
@@ -95,22 +98,25 @@ export function GroupPanel() {
   }, {});
 
   // ── Handlers ──────────────────────────────────────────────────────────
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingGroup(null);
     setSelectedColor(PRESET_COLORS[0]);
     form.resetFields();
     form.setFieldValue('color', PRESET_COLORS[0]);
     setModalOpen(true);
-  };
+  }, [form]);
 
-  const openEdit = (g: Group) => {
-    setEditingGroup(g);
-    setSelectedColor(g.color);
-    form.setFieldsValue({ name: g.name, color: g.color });
-    setModalOpen(true);
-  };
+  const openEdit = useCallback(
+    (g: Group) => {
+      setEditingGroup(g);
+      setSelectedColor(g.color);
+      form.setFieldsValue({ name: g.name, color: g.color });
+      setModalOpen(true);
+    },
+    [form],
+  );
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const values = await form.validateFields();
     if (editingGroup) {
       await updateGroup.mutateAsync({
@@ -128,50 +134,87 @@ export function GroupPanel() {
       });
     }
     setModalOpen(false);
-  };
+  }, [form, editingGroup, updateGroup, createGroup, selectedColor]);
 
-  const handleDelete = (g: Group) => {
-    Modal.confirm({
-      title: t('groups.delete_confirm_title', { name: g.name }),
-      content: t('groups.delete_confirm_content'),
-      okText: t('common.delete'),
-      okType: 'danger',
-      cancelText: t('common.cancel'),
-      onOk: () =>
-        deleteGroup.mutateAsync(g.id).then(() => {
-          if (selectedGroupId === g.id) setSelectedGroupId(null);
-        }),
-    });
-  };
+  const handleSaveVoid = useCallback(() => void handleSave(), [handleSave]);
 
-  const handleGroupClick = (g: Group) => {
-    if (g.hasPIN && !unlockedGroupIds.includes(g.id)) {
-      setPinTarget(g);
-      setPinValue('');
-      setPinError('');
-      setPinModalOpen(true);
-      return;
-    }
-    setSelectedGroupId(g.id);
-  };
+  const handleDelete = useCallback(
+    (g: Group) => {
+      Modal.confirm({
+        title: t('groups.delete_confirm_title', { name: g.name }),
+        content: t('groups.delete_confirm_content'),
+        okText: t('common.delete'),
+        okType: 'danger',
+        cancelText: t('common.cancel'),
+        onOk: () =>
+          deleteGroup.mutateAsync(g.id).then(() => {
+            if (selectedGroupId === g.id) setSelectedGroupId(null);
+          }),
+      });
+    },
+    [t, deleteGroup, selectedGroupId, setSelectedGroupId],
+  );
 
-  const handleVerifyPIN = async (pin?: string) => {
-    if (!pinTarget) return;
-    const value = pin ?? pinValue;
-    if (!value) return;
-    try {
-      await verifyPIN.mutateAsync({ id: pinTarget.id, pin: value });
-      setSelectedGroupId(pinTarget.id);
-      setPinModalOpen(false);
-    } catch {
-      setPinError(t('groups.pin_modal.wrong_pin'));
-    }
-  };
+  const handleGroupClick = useCallback(
+    (g: Group) => {
+      if (g.hasPIN && !unlockedGroupIds.includes(g.id)) {
+        setPinTarget(g);
+        setPinValue('');
+        setPinError('');
+        setPinModalOpen(true);
+        return;
+      }
+      setSelectedGroupId(g.id);
+    },
+    [unlockedGroupIds, setSelectedGroupId],
+  );
 
-  const handlePinChange = (val: string) => {
+  const handleVerifyPIN = useCallback(
+    async (pin?: string) => {
+      if (!pinTarget) return;
+      const value = pin ?? pinValue;
+      if (!value) return;
+      try {
+        await verifyPIN.mutateAsync({ id: pinTarget.id, pin: value });
+        setSelectedGroupId(pinTarget.id);
+        setPinModalOpen(false);
+      } catch {
+        setPinError(t('groups.pin_modal.wrong_pin'));
+      }
+    },
+    [pinTarget, pinValue, verifyPIN, setSelectedGroupId, t],
+  );
+
+  const handleVerifyPINVoid = useCallback((pin?: string) => void handleVerifyPIN(pin), [handleVerifyPIN]);
+
+  const handlePinChange = useCallback((val: string) => {
     setPinValue(val);
     setPinError('');
-  };
+  }, []);
+
+  const handleSelectGeneral = useCallback(() => setSelectedGroupId(null), [setSelectedGroupId]);
+  const handleGeneralKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setSelectedGroupId(null);
+      }
+    },
+    [setSelectedGroupId],
+  );
+  const handleOpenSortModal = useCallback(() => setSortModalOpen(true), []);
+  const handleCloseSortModal = useCallback(() => setSortModalOpen(false), []);
+  const handleCloseModal = useCallback(() => setModalOpen(false), []);
+  const handleClosePinModal = useCallback(() => setPinModalOpen(false), []);
+
+  const sortItems = useMemo(() => groups.map((g) => ({ id: g.id, name: g.name, color: g.color })), [groups]);
+
+  const handleSortSave = useCallback(
+    (ordered: { id: number; sortOrder: number }[]) => {
+      reorderGroups.mutate(ordered, { onSuccess: handleCloseSortModal });
+    },
+    [reorderGroups, handleCloseSortModal],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -183,13 +226,8 @@ export function GroupPanel() {
           aria-selected={selectedGroupId === null}
           tabIndex={0}
           className={cx(itemStyles.item, selectedGroupId === null && itemStyles.itemActive)}
-          onClick={() => setSelectedGroupId(null)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setSelectedGroupId(null);
-            }
-          }}
+          onClick={handleSelectGeneral}
+          onKeyDown={handleGeneralKeyDown}
         >
           <div className={itemStyles.iconWrap}>
             <FolderFilled className={styles.generalIcon} />
@@ -209,26 +247,21 @@ export function GroupPanel() {
           isActive={selectedGroupId === g.id}
           isLocked={g.hasPIN && !unlockedGroupIds.includes(g.id)}
           count={groupCounts[g.id] || 0}
-          onClick={() => handleGroupClick(g)}
-          onEdit={() => openEdit(g)}
-          onDelete={() => handleDelete(g)}
+          onClick={handleGroupClick}
+          onEdit={openEdit}
+          onDelete={handleDelete}
         />
       ))}
 
       {/* Add group button */}
       <Tooltip title={t('groups.new_group_tooltip')} placement="right">
-        <Button type="dashed" icon={<PlusOutlined />} className={styles.addBtn} onClick={openCreate} size="small" />
+        <Button type="dashed" icon={ICON_PLUS} className={styles.addBtn} onClick={openCreate} size="small" />
       </Tooltip>
 
       {/* Sort groups button — only shown when there are groups to sort */}
       {groups.length > 1 && (
         <Tooltip title={t('groups.sort_tooltip')} placement="right">
-          <Button
-            icon={<OrderedListOutlined />}
-            className={styles.addBtn}
-            onClick={() => setSortModalOpen(true)}
-            size="small"
-          />
+          <Button icon={ICON_ORDERED_LIST} className={styles.addBtn} onClick={handleOpenSortModal} size="small" />
         </Tooltip>
       )}
 
@@ -239,8 +272,8 @@ export function GroupPanel() {
         selectedColor={selectedColor}
         onColorChange={setSelectedColor}
         confirmLoading={createGroup.isPending || updateGroup.isPending}
-        onClose={() => setModalOpen(false)}
-        onSave={() => void handleSave()}
+        onClose={handleCloseModal}
+        onSave={handleSaveVoid}
       />
 
       <GroupPinModal
@@ -249,20 +282,18 @@ export function GroupPanel() {
         pinValue={pinValue}
         pinError={pinError}
         confirmLoading={verifyPIN.isPending}
-        onClose={() => setPinModalOpen(false)}
-        onConfirm={(pin?: string) => void handleVerifyPIN(pin)}
+        onClose={handleClosePinModal}
+        onConfirm={handleVerifyPINVoid}
         onPinChange={handlePinChange}
       />
 
       <SortModal
         open={sortModalOpen}
         title={t('groups.sort_title')}
-        items={groups.map((g) => ({ id: g.id, name: g.name, color: g.color }))}
+        items={sortItems}
         loading={reorderGroups.isPending}
-        onClose={() => setSortModalOpen(false)}
-        onSave={(ordered) => {
-          reorderGroups.mutate(ordered, { onSuccess: () => setSortModalOpen(false) });
-        }}
+        onClose={handleCloseSortModal}
+        onSave={handleSortSave}
       />
     </nav>
   );

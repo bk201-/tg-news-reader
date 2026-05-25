@@ -1,8 +1,8 @@
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from './schema.js';
-import { mkdirSync } from 'fs';
-import { join } from 'path';
 
 let clientUrl: string;
 let authToken: string | undefined;

@@ -1,10 +1,12 @@
-import React from 'react';
 import { Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 const { Paragraph } = Typography;
+
+const REMARK_PLUGINS = [remarkGfm];
 
 const useStyles = createStyles(({ css, token }) => ({
   wrapper: css`
@@ -139,7 +141,7 @@ export function NewsArticleBody({ content, format }: NewsArticleBodyProps) {
     <div className={styles.wrapper}>
       {format === 'markdown' ? (
         <div className={styles.markdown}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{content}</ReactMarkdown>
         </div>
       ) : (
         <Paragraph className={styles.plainText}>{content}</Paragraph>

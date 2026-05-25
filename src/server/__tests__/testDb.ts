@@ -3,8 +3,10 @@
  * and runs the full migration so all tables/indexes exist.
  */
 
-import { createClient, type Client } from '@libsql/client';
-import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
+import { createClient } from '@libsql/client';
+import type { Client } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import * as schema from '../db/schema.js';
 
 export interface TestDb {
@@ -65,6 +67,7 @@ export async function createTestDb(): Promise<TestDb> {
       text_in_panel INTEGER NOT NULL DEFAULT 0,
       can_load_article INTEGER NOT NULL DEFAULT 0,
       full_content_format TEXT NOT NULL DEFAULT 'text',
+      forward_from_name TEXT,
       UNIQUE(channel_id, telegram_msg_id)
     );
     CREATE INDEX IF NOT EXISTS idx_news_channel_id ON news(channel_id);

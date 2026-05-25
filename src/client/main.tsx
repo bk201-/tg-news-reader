@@ -1,16 +1,15 @@
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Modal } from 'antd';
+import 'dayjs/locale/en';
+import 'dayjs/locale/ru';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
-import { Modal } from 'antd';
-import './styles.css';
-import './i18n';
-import 'dayjs/locale/ru';
-import 'dayjs/locale/en';
-import { registerMediaServiceWorker } from './services/serviceWorker';
-import { logger } from './logger';
 import { ApiError } from './api/client';
 import { App } from './App';
 import i18n from './i18n';
+import { logger } from './logger';
+import { registerMediaServiceWorker } from './services/serviceWorker';
+import './styles.css';
 
 registerMediaServiceWorker();
 

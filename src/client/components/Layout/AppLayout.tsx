@@ -1,21 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Drawer, Layout, Splitter, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { Button, Drawer, Layout, Splitter, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChannelSidebar } from '../Channels/ChannelSidebar';
-import { GroupPanel } from '../Channels/GroupPanel';
-import { NewsFeed } from '../News/NewsFeed';
-import { DownloadsPinnedContent } from './DownloadsPinnedContent';
-import { AppHeader } from './AppHeader';
-import { TelegramSessionBanner } from './TelegramSessionBanner';
-import { VersionBanner } from './VersionBanner';
-import { useUIStore } from '../../store/uiStore';
 import { useChannels } from '../../api/channels';
 import { useIsXl, useIsXxl } from '../../hooks/breakpoints';
 import { useBossKey } from '../../hooks/useBossKey';
+import { useUIStore } from '../../store/uiStore';
+import { ChannelSidebar } from '../Channels/ChannelSidebar';
+import { GroupPanel } from '../Channels/GroupPanel';
+import { NewsFeed } from '../News/NewsFeed';
+import { AppHeader } from './AppHeader';
+import { DownloadsPinnedContent } from './DownloadsPinnedContent';
+import { TelegramSessionBanner } from './TelegramSessionBanner';
+import { VersionBanner } from './VersionBanner';
 
 const { Text } = Typography;
+
+const ICON_PLUS = <PlusOutlined />;
+const SIDEBAR_DRAWER_BODY_STYLES = { body: { padding: 0, overflow: 'hidden', height: '100%' } };
+const NOOP = () => {};
 
 const useStyles = createStyles(({ css, token }) => ({
   sidebarWrap: css`
@@ -148,8 +152,7 @@ export function AppLayout() {
 
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [isAccordionMode]);
+  }, [isAccordionMode, setSidebarDrawerOpen]);
 
   useEffect(() => {
     if (initialized.current || channels.length === 0) return;
@@ -171,6 +174,15 @@ export function AppLayout() {
       history.replaceState(null, '', window.location.pathname);
     }
   }, [selectedChannelId]);
+
+  const handleCloseDrawer = useCallback(() => setSidebarDrawerOpen(false), [setSidebarDrawerOpen]);
+
+  const handleResizeEnd = useCallback(
+    (sizes: number[]) => {
+      if (!sidebarInDrawer) localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])));
+    },
+    [sidebarInDrawer],
+  );
 
   const sidebarContent = useMemo(
     () => (
@@ -203,7 +215,7 @@ export function AppLayout() {
             <Text type="secondary" className={styles.emptyText}>
               {t('sidebar.empty_no_channels')}
             </Text>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddChannel}>
+            <Button type="primary" icon={ICON_PLUS} onClick={handleAddChannel}>
               {t('sidebar.add_first_channel')}
             </Button>
           </>
@@ -221,11 +233,11 @@ export function AppLayout() {
   const sidebarDrawer = (
     <Drawer
       open={sidebarInDrawer && sidebarDrawerOpen}
-      onClose={() => setSidebarDrawerOpen(false)}
+      onClose={handleCloseDrawer}
       placement="left"
       size="default"
       mask={false}
-      styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
+      styles={SIDEBAR_DRAWER_BODY_STYLES}
       title={null}
       closable={false}
     >
@@ -258,13 +270,7 @@ export function AppLayout() {
       <AppHeader />
       <TelegramSessionBanner />
       {sidebarDrawer}
-      <Splitter
-        className={styles.splitter}
-        onResize={() => {}}
-        onResizeEnd={(sizes) => {
-          if (!sidebarInDrawer) localStorage.setItem('sidebarWidth', String(Math.round(sizes[0])));
-        }}
-      >
+      <Splitter className={styles.splitter} onResize={NOOP} onResizeEnd={handleResizeEnd}>
         <Splitter.Panel
           defaultSize={defaultSidebarWidth}
           min={sidebarInDrawer ? 0 : 200}

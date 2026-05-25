@@ -5,12 +5,12 @@
  * lives in `DownloadCoordinator.ts`.
  */
 
+import { asc, desc, eq, sql } from 'drizzle-orm';
+import type { DownloadTask, DownloadType } from '../../shared/types.js';
 import { db } from '../db/index.js';
-import { downloads, news, channels } from '../db/schema.js';
-import { eq, desc, asc, sql } from 'drizzle-orm';
-import { downloadProgressEmitter } from './downloadProgress.js';
-import type { DownloadType, DownloadTask } from '../../shared/types.js';
+import { channels, downloads, news } from '../db/schema.js';
 import { DownloadCoordinator } from './DownloadCoordinator.js';
+import { downloadProgressEmitter } from './downloadProgress.js';
 
 const WAKEUP_EVENT = 'wakeup';
 

@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import type { Channel, Group } from '@shared/types.ts';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Group, Channel } from '@shared/types.ts';
+import { useEffect, useRef } from 'react';
+import { groupKeys, useLockAllGroups } from '../api/groups';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
-import { useLockAllGroups, groupKeys } from '../api/groups';
 
 /**
  * Global "boss key" — press Esc twice within 400 ms to instantly lock all PIN groups.
@@ -55,7 +55,8 @@ export function useBossKey() {
         const pinnedGroupIds = new Set(groups.filter((g) => g.hasPIN).map((g) => g.id));
         const currentGroupIsPinned = selectedGroupId !== null && pinnedGroupIds.has(selectedGroupId);
         const selectedCh = channels.find((c) => c.id === selectedChannelId);
-        const selectedChannelInPinnedGroup = selectedCh?.groupId != null && pinnedGroupIds.has(selectedCh.groupId);
+        const selectedChannelInPinnedGroup =
+          selectedCh?.groupId !== null && selectedCh?.groupId !== undefined && pinnedGroupIds.has(selectedCh.groupId);
 
         if (currentGroupIsPinned || selectedChannelInPinnedGroup) {
           // setSelectedGroupId also clears selectedChannelId + selectedNewsId (uiStore)

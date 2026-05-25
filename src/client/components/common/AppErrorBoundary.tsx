@@ -1,6 +1,6 @@
 import React from 'react';
-import { ErrorPage } from './ErrorPage';
 import { logger } from '../../logger';
+import { ErrorPage } from './ErrorPage';
 
 interface State {
   error: Error | null;

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -31,9 +31,10 @@ vi.mock('../services/mediaProgress.js', () => ({
 }));
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
 import { seedChannel, seedGroup } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -46,12 +47,11 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import channelsRouter from './channels.js';
-import { authMiddleware } from '../middleware/auth.js';
-import { getChannelInfo } from '../services/telegram.js';
-import { readChannelHistory } from '../services/telegram.js';
-import { fetchChannelNews } from '../services/channelFetchService.js';
 import { news } from '../db/schema.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { fetchChannelNews } from '../services/channelFetchService.js';
+import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
+import channelsRouter from './channels.js';
 
 function createApp() {
   const app = new Hono();

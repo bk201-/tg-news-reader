@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/authStore';
 
 // Mock logger to silence output
@@ -43,7 +43,7 @@ describe('api', () => {
     expect(result).toEqual({ data: 42 });
     const [url, opts] = vi.mocked(globalThis.fetch).mock.calls[0];
     expect(url).toBe('/api/test');
-    expect((opts?.headers as Record<string, string>)['Authorization']).toBe('Bearer test-token');
+    expect((opts!.headers as Record<string, string>)['Authorization']).toBe('Bearer test-token');
   });
 
   it('POST sends JSON body', async () => {
@@ -220,6 +220,6 @@ describe('api', () => {
     await api.get('/public');
 
     const [, opts] = vi.mocked(globalThis.fetch).mock.calls[0];
-    expect((opts?.headers as Record<string, string>)['Authorization']).toBeUndefined();
+    expect((opts!.headers as Record<string, string>)['Authorization']).toBeUndefined();
   });
 });
