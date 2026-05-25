@@ -205,18 +205,31 @@ export function LightboxOverlay({ fetchNextPage, hasNextPage }: LightboxOverlayP
     hasNextPage,
   );
 
-  // ── Prefetch adjacent images: 1 behind + 2 ahead ────────────────────
+  // ── Prefetch adjacent images: 1 behind + 2 ahead (full albums) ──────
   useEffect(() => {
     const { entries, cursor } = nav;
-    [entries[cursor - 1], entries[cursor + 1], entries[cursor + 2]].forEach((e) => {
-      const p = e?.item.localMediaPaths?.[0] ?? e?.item.localMediaPath;
-      // Skip videos — no point preloading them
-      if (p && !/\.(mp4|webm|mov)$/i.test(p)) {
-        const img = new Image();
-        img.src = mediaUrl(p);
-      }
+
+    /** All non-video paths for an entry (full album or single image) */
+    const entryPaths = (e: (typeof entries)[number] | undefined): string[] => {
+      if (!e) return [];
+      const paths = e.item.localMediaPaths ?? (e.item.localMediaPath ? [e.item.localMediaPath] : []);
+      return paths.filter((p) => !/\.(mp4|webm|mov)$/i.test(p));
+    };
+
+    const toPreload: string[] = [
+      // Remaining images in the current album (from current position onwards)
+      ...entryPaths(entries[cursor]).slice(albumIndex + 1),
+      // Full album of 1 item behind + 2 items ahead
+      ...entryPaths(entries[cursor - 1]),
+      ...entryPaths(entries[cursor + 1]),
+      ...entryPaths(entries[cursor + 2]),
+    ];
+
+    toPreload.forEach((p) => {
+      const img = new Image();
+      img.src = mediaUrl(p);
     });
-  }, [nav]);
+  }, [nav, albumIndex]);
 
   // Auto-mark as read on open (media channels) — only when media is already downloaded
   useEffect(() => {
