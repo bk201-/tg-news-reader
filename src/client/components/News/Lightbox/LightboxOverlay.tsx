@@ -127,7 +127,6 @@ export function LightboxOverlay({ fetchNextPage, hasNextPage }: LightboxOverlayP
   const isLightboxOpen = lightbox !== null;
   const markReadMutate = markRead.mutate;
 
-
   // ── History API ───────────────────────────────────────────────────────
   const closedByBackRef = useRef(false);
   useEffect(() => {
@@ -195,7 +194,16 @@ export function LightboxOverlay({ fetchNextPage, hasNextPage }: LightboxOverlayP
     [openLightbox, channelId, channels, markRead, qc],
   );
 
-  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, () => { fetchNextPage(); }, hasNextPage);
+  const nav = useLightboxNav(
+    channelId,
+    newsId,
+    albumIndex,
+    navigate,
+    () => {
+      fetchNextPage();
+    },
+    hasNextPage,
+  );
 
   // ── Prefetch adjacent images: 1 behind + 2 ahead ────────────────────
   useEffect(() => {
