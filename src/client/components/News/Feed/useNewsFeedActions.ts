@@ -2,13 +2,13 @@
  * useNewsFeedActions — handlers: mark read, fetch, tag, auto-advance.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { App } from 'antd';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channel, NewsItem } from '../../../../shared/types';
-import { useMarkAllRead, useMarkRead } from '../../../api/news';
+import { useChannels, useFetchChannel, useMarkReadAndFetch } from '../../../api/channels';
 import { useCreateFilter } from '../../../api/filters';
-import { useFetchChannel, useChannels, useMarkReadAndFetch } from '../../../api/channels';
+import { useMarkAllRead, useMarkRead } from '../../../api/news';
 import { useUIStore } from '../../../store/uiStore';
 
 export function useNewsFeedActions(

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -12,11 +12,12 @@ vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn(), debug: vi.fn() },
 }));
 
-import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
+import { Hono } from 'hono';
 import { createTestUser, createTestSession, authHeaders } from '../__tests__/auth.js';
 import { seedChannel, seedGroup } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -29,10 +30,10 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import groupsRouter from './groups.js';
-import { authMiddleware } from '../middleware/auth.js';
-import { groups, channels } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { groups, channels } from '../db/schema.js';
+import { authMiddleware } from '../middleware/auth.js';
+import groupsRouter from './groups.js';
 
 function createApp() {
   const app = new Hono();

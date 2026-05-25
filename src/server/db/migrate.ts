@@ -1,5 +1,5 @@
-import { client } from './index.js';
 import { logger } from '../logger.js';
+import { client } from './index.js';
 
 export async function runMigration(): Promise<void> {
   await client.execute('PRAGMA foreign_keys = ON');

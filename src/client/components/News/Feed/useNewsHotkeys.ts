@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import type { NewsItem } from '@shared/types.ts';
+import { useEffect } from 'react';
 
 /**
  * Binds ↑/↓ navigation and Space key for the news list.

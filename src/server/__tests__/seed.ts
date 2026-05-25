@@ -4,7 +4,7 @@
 
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import type * as schema from '../db/schema.js';
-import { channels, news, downloads, groups } from '../db/schema.js';
+import { channels, downloads, groups, news } from '../db/schema.js';
 
 let _channelSeq = 0;
 let _newsSeq = 0;

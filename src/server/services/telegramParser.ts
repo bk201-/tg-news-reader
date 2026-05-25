@@ -211,7 +211,7 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
     mediaType,
     mediaSizeBytes,
     rawMedia: msg.media ?? undefined,
-    groupedId: msg.groupedId != null ? String(msg.groupedId) : undefined,
+    groupedId: msg.groupedId !== null && msg.groupedId !== undefined ? String(msg.groupedId) : undefined,
     instantViewContent,
     instantViewUrl,
     instantViewPartial,

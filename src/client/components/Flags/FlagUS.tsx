@@ -1,5 +1,5 @@
-import React from 'react';
 import { createStyles } from 'antd-style';
+import React from 'react';
 
 const useStyles = createStyles(({ css }) => ({
   flag: css`
@@ -47,6 +47,8 @@ const STARS = buildStars();
 const SH = 100 / 13;
 const CANTON_W = 76;
 const CANTON_H = 7 * SH;
+// Pre-computed stripe y-positions — used as stable React keys (no index needed)
+const STRIPE_Y = Array.from({ length: 13 }, (_, i) => i * SH);
 
 /** US flag: 13 stripes + blue canton with 50 stars */
 export function FlagUS({ size = 20 }: FlagProps) {
@@ -55,12 +57,12 @@ export function FlagUS({ size = 20 }: FlagProps) {
   const h = Math.round((size * 10) / 19);
   return (
     <svg width={w} height={h} viewBox="0 0 190 100" className={styles.flag}>
-      {Array.from({ length: 13 }, (_, i) => (
-        <rect key={i} x="0" y={i * SH} width="190" height={SH} fill={i % 2 === 0 ? '#B22234' : '#FFF'} />
+      {STRIPE_Y.map((y) => (
+        <rect key={y} x="0" y={y} width="190" height={SH} fill={Math.round(y / SH) % 2 === 0 ? '#B22234' : '#FFF'} />
       ))}
       <rect x="0" y="0" width={CANTON_W} height={CANTON_H} fill="#3C3B6E" />
-      {STARS.map(([cx, cy], i) => (
-        <path key={i} d={starPath(cx, cy)} fill="#FFF" />
+      {STARS.map(([cx, cy]) => (
+        <path key={`${cx}-${cy}`} d={starPath(cx, cy)} fill="#FFF" />
       ))}
     </svg>
   );

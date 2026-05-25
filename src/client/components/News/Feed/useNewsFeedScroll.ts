@@ -2,10 +2,10 @@
  * useNewsFeedScroll — FAB visibility, scroll-to-top, sentinel, refs, auto-advance on filter.
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { VirtuosoHandle } from 'react-virtuoso';
 import type { NewsItem } from '../../../../shared/types';
 import { useUIStore } from '../../../store/uiStore';
-import type { VirtuosoHandle } from 'react-virtuoso';
 
 export function useNewsFeedScroll(
   displayItems: NewsItem[],

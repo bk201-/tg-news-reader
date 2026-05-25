@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
+import { act, renderHook } from '@testing-library/react';
 import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./client', () => ({
   api: {
@@ -11,6 +12,7 @@ vi.mock('./client', () => ({
   },
 }));
 
+import type { NewsItem, Channel } from '@shared/types';
 import { api } from './client';
 import {
   updatePaginatedItems,
@@ -21,9 +23,8 @@ import {
   useExtractContent,
   useDownloadMedia,
   useRefreshNewsItem,
-  type NewsResponse,
 } from './news';
-import type { NewsItem, Channel } from '@shared/types';
+import type { NewsResponse } from './news';
 
 const mockedApi = vi.mocked(api);
 

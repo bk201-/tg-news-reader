@@ -7,14 +7,15 @@
 
 // Type-only imports — zero runtime cost, used only for TypeScript annotations
 import type { Api, TelegramClient } from 'telegram';
+import type { StringSession } from 'telegram/sessions/index.js';
+import { TG_CONNECT_DELAY_MS } from '../config.js';
 import { logger } from '../logger.js';
 import { setReconnectCallback } from './telegramCircuitBreaker.js';
-import { TG_CONNECT_DELAY_MS } from '../config.js';
 
 // Lazy runtime references — gramjs loads TL schema on import (~2.5s), so defer until first use
 let _Api: typeof Api;
 let _TelegramClient: typeof TelegramClient;
-let _StringSession: (typeof import('telegram/sessions/index.js'))['StringSession'];
+let _StringSession: typeof StringSession;
 
 async function ensureTgLibs(): Promise<void> {
   if (_Api) return;

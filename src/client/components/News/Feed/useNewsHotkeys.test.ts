@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import { useNewsHotkeys } from './useNewsHotkeys';
 import type { NewsItem } from '@shared/types';
+import { renderHook } from '@testing-library/react';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useNewsHotkeys } from './useNewsHotkeys';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -25,8 +26,8 @@ function fireKey(key: string, target?: HTMLElement) {
 
 describe('useNewsHotkeys', () => {
   const items = [makeItem(1), makeItem(2), makeItem(3)];
-  let setSelectedNewsId: ReturnType<typeof vi.fn>;
-  let onSpaceKey: ReturnType<typeof vi.fn>;
+  let setSelectedNewsId: Mock<(id: number | null) => void>;
+  let onSpaceKey: Mock<() => void>;
 
   beforeEach(() => {
     setSelectedNewsId = vi.fn();

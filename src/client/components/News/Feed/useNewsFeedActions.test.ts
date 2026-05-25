@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from '@testing-library/react';
 import type { Channel, NewsItem } from '@shared/types';
+import { act } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
@@ -28,8 +28,8 @@ vi.mock('../../../api/channels', () => ({
   useMarkReadAndFetch: () => ({ mutate: mockMarkReadAndFetchMutate }),
 }));
 
-import { useNewsFeedActions } from './useNewsFeedActions';
 import { useUIStore } from '../../../store/uiStore';
+import { useNewsFeedActions } from './useNewsFeedActions';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 
 function fireKey(code: string, opts: Partial<KeyboardEvent> = {}) {
@@ -13,10 +14,10 @@ function fireKeyWithTarget(code: string, target: HTMLElement) {
 }
 
 describe('useNewsFeedHotkeys', () => {
-  let onFetch: ReturnType<typeof vi.fn>;
-  let onToggleShowAll: ReturnType<typeof vi.fn>;
-  let onMarkAllRead: ReturnType<typeof vi.fn>;
-  let onOpenFilters: ReturnType<typeof vi.fn>;
+  let onFetch: Mock<() => void>;
+  let onToggleShowAll: Mock<() => void>;
+  let onMarkAllRead: Mock<() => void>;
+  let onOpenFilters: Mock<() => void>;
 
   beforeEach(() => {
     onFetch = vi.fn();

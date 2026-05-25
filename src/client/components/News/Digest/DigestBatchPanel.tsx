@@ -1,9 +1,14 @@
-import React, { memo } from 'react';
+import { CheckOutlined, ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button, Progress, Spin, Tag, Tooltip } from 'antd';
-import { CheckOutlined, ReloadOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
+import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { BatchDigestStatus, BatchDigestProgress } from './useBatchDigest';
+import type { BatchDigestProgress, BatchDigestStatus } from './useBatchDigest';
+
+const ICON_CHECK = <CheckOutlined />;
+const ICON_RELOAD = <ReloadOutlined />;
+const ICON_CLOCK = <ClockCircleOutlined />;
+const SPIN_SMALL = <Spin size="small" />;
 
 const useStyles = createStyles(({ css, token }) => ({
   row: css`
@@ -95,14 +100,14 @@ export const DigestBatchPanel = memo(function DigestBatchPanel({
               {t('digest.batch_show')}
             </Button>
             <Tooltip title={digestOpened ? '' : t('digest.batch_mark_read_disabled')}>
-              <Button size="small" disabled={!digestOpened} onClick={onMarkRead} icon={<CheckOutlined />}>
+              <Button size="small" disabled={!digestOpened} onClick={onMarkRead} icon={ICON_CHECK}>
                 {t('digest.batch_mark_read')}
               </Button>
             </Tooltip>
           </>
         )}
         {status === 'error' && (
-          <Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>
+          <Button size="small" icon={ICON_RELOAD} onClick={onRetry}>
             {t('digest.batch_retry')}
           </Button>
         )}
@@ -143,7 +148,7 @@ function StatusLine({
   if (status === 'idle') {
     return (
       <span className={styles.wrap}>
-        <Tag icon={<ClockCircleOutlined />} color="default">
+        <Tag icon={ICON_CLOCK} color="default">
           {t('digest.batch_status_pending')}
         </Tag>
       </span>
@@ -169,7 +174,7 @@ function StatusLine({
   if (status === 'generating') {
     return (
       <span className={styles.wrap}>
-        <Tag color="processing" icon={<Spin size="small" />}>
+        <Tag color="processing" icon={SPIN_SMALL}>
           {t('digest.batch_status_generating')}
         </Tag>
       </span>
@@ -179,7 +184,7 @@ function StatusLine({
   if (status === 'done') {
     return (
       <span className={styles.wrap}>
-        <Tag color="success" icon={<CheckOutlined />}>
+        <Tag color="success" icon={ICON_CHECK}>
           {t('digest.batch_status_done')}
         </Tag>
       </span>

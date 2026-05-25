@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Channel, Filter, NewsItem } from '@shared/types';
 import { renderHook } from '@testing-library/react';
-import type { Channel, NewsItem, Filter } from '@shared/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 const mockNewsItems: NewsItem[] = [];
@@ -45,8 +45,8 @@ vi.mock('./useHashTagSync', () => ({
   }),
 }));
 
-import { useNewsFeedData } from './useNewsFeedData';
 import { useUIStore } from '../../../store/uiStore';
+import { useNewsFeedData } from './useNewsFeedData';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {

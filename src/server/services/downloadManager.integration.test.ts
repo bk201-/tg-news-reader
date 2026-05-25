@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -31,8 +31,9 @@ vi.mock('./DownloadCoordinator.js', () => {
   };
 });
 
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { seedChannel, seedNews } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 

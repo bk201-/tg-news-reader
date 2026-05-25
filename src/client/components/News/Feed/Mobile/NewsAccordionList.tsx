@@ -1,11 +1,14 @@
-import React, { useCallback } from 'react';
-import { Spin, Empty } from 'antd';
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsAccordionItem } from './NewsAccordionItem';
+import { Empty, Spin } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Virtuoso } from 'react-virtuoso';
+import type { VirtuosoHandle } from 'react-virtuoso';
 import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../../hooks/breakpoints';
+import { NewsAccordionItem } from './NewsAccordionItem';
+
+const VIRTUOSO_HEIGHT_FULL = { height: '100%' };
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
@@ -118,6 +121,8 @@ export function NewsAccordionList({
     [isFetchingNextPage, styles.loadingWrap],
   );
 
+  const virtuosoComponents = useMemo(() => ({ Footer: footer }), [footer]);
+
   return (
     <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion}>
       {isLoading && (
@@ -133,10 +138,10 @@ export function NewsAccordionList({
           data={items}
           overscan={500}
           useWindowScroll={windowScroll}
-          style={windowScroll ? undefined : { height: '100%' }}
+          style={windowScroll ? undefined : VIRTUOSO_HEIGHT_FULL}
           itemContent={renderItem}
           endReached={hasNextPage ? onEndReached : undefined}
-          components={{ Footer: footer }}
+          components={virtuosoComponents}
         />
       )}
     </div>

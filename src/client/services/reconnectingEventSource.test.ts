@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
 vi.mock('../logger', () => ({
@@ -140,6 +140,7 @@ describe('createReconnectingEventSource', () => {
     for (let i = 0; i < 10; i++) {
       const last = MockEventSource.instances[MockEventSource.instances.length - 1];
       last.simulateError();
+
       await vi.runAllTimersAsync(); // flush async IIFE in onerror
     }
 
@@ -182,15 +183,15 @@ describe('createReconnectingEventSource', () => {
 
   it('does not reconnect if close() is called during onBeforeReconnect', async () => {
     const { createReconnectingEventSource } = await importFresh();
-    let handle: ReturnType<typeof createReconnectingEventSource>;
-    const onBeforeReconnect = vi.fn().mockImplementation(async () => {
-      // Simulate React closing the SSE hook during token refresh
-      handle.close();
-    });
-    handle = createReconnectingEventSource({
+    const onBeforeReconnect = vi.fn();
+    const handle = createReconnectingEventSource({
       getUrl: () => 'http://test/stream',
       onConnect: vi.fn(),
       onBeforeReconnect,
+    });
+    onBeforeReconnect.mockImplementation(async () => {
+      // Simulate React closing the SSE hook during token refresh
+      handle.close();
     });
 
     MockEventSource.instances[0].simulateError();

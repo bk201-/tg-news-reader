@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TelegramMessage } from './telegramParser.js';
 
 // ─── Hoisted mocks (available before vi.mock factories) ──────────────────────
@@ -110,8 +110,8 @@ vi.mock('./telegramParser.js', () => ({
   extractInstantViewText: (...args: unknown[]) => mockExtractInstantViewText(...args),
 }));
 
-import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 import { logger } from '../logger.js';
+import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 

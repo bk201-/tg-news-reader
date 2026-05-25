@@ -1,6 +1,6 @@
-import React from 'react';
 import { createStyles } from 'antd-style';
-import { isYouTubeUrl, getYouTubeEmbedId } from '../newsUtils';
+import React from 'react';
+import { getYouTubeEmbedId, isYouTubeUrl } from '../newsUtils';
 
 const useStyles = createStyles(({ css, token }) => ({
   wrapper: css`

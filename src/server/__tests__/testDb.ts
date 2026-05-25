@@ -3,8 +3,10 @@
  * and runs the full migration so all tables/indexes exist.
  */
 
-import { createClient, type Client } from '@libsql/client';
-import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
+import { createClient } from '@libsql/client';
+import type { Client } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import * as schema from '../db/schema.js';
 
 export interface TestDb {

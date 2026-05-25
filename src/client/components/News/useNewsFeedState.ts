@@ -9,13 +9,13 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Channel } from '../../../shared/types';
+import type { DigestParams } from '../../api/digest';
 import { useUIStore } from '../../store/uiStore';
-import { useNewsFeedData } from './Feed/useNewsFeedData';
 import { useNewsFeedActions } from './Feed/useNewsFeedActions';
+import { useNewsFeedData } from './Feed/useNewsFeedData';
+import { useNewsFeedHotkeys } from './Feed/useNewsFeedHotkeys';
 import { useNewsFeedScroll } from './Feed/useNewsFeedScroll';
 import { useNewsHotkeys } from './Feed/useNewsHotkeys';
-import { useNewsFeedHotkeys } from './Feed/useNewsFeedHotkeys';
-import type { DigestParams } from '../../api/digest';
 
 export function useNewsFeedState(channel: Channel) {
   const {
@@ -42,11 +42,11 @@ export function useNewsFeedState(channel: Channel) {
   const { setHashTagFilter } = data;
   const { handleTagClick: actionsHandleTagClick } = actions;
   const handleTagClick = useCallback(
-    (tag: string, action: 'show' | 'addFilter') => {
+    (tag: string | null, action: 'show' | 'addFilter') => {
       if (action === 'show') {
         setHashTagFilter(tag);
         setShowAll(false);
-      } else {
+      } else if (tag !== null) {
         actionsHandleTagClick(tag, action);
       }
     },

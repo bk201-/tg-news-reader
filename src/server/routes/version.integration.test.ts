@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
+import { describe, expect, it } from 'vitest';
+import packageJson from '../../../package.json' with { type: 'json' };
 import { authMiddleware } from '../middleware/auth.js';
 import versionRouter from './version.js';
-import packageJson from '../../../package.json' with { type: 'json' };
 
 const APP_VERSION: string = packageJson.version;
 

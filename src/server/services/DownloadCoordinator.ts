@@ -10,22 +10,22 @@
  */
 
 import { Worker } from 'worker_threads';
-import { db } from '../db/index.js';
-import { downloads, news, channels } from '../db/schema.js';
-import { eq, and, desc, asc } from 'drizzle-orm';
-import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
+import { and, asc, desc, eq } from 'drizzle-orm';
+import type { DownloadTask } from '../../shared/types.js';
 import {
+  ARTICLE_WORKER_CONCURRENCY,
   DOWNLOAD_TASK_CLEANUP_DELAY_MS,
   WORKER_POOL_CRASH_THRESHOLD_RATIO,
   WORKER_POOL_CRASH_WINDOW_MS,
   WORKER_RESTART_BASE_MS,
   WORKER_RESTART_JITTER_MS,
-  ARTICLE_WORKER_CONCURRENCY,
 } from '../config.js';
-import type { DownloadTask } from '../../shared/types.js';
+import { db } from '../db/index.js';
+import { channels, downloads, news } from '../db/schema.js';
 import { logger } from '../logger.js';
+import { DB_POLL_POLICY, withRetry } from '../utils/retry.js';
 import { sendAlert } from './alertBot.js';
-import { withRetry, DB_POLL_POLICY } from '../utils/retry.js';
+import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 import { handleBridgeMessage, isBridgeMessage } from './telegramBridge.js';
 
 const WAKEUP_EVENT = 'wakeup';

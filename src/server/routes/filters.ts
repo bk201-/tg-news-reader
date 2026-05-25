@@ -1,10 +1,10 @@
-import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { db, client } from '../db/index.js';
+import { and, eq, inArray } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { client, db } from '../db/index.js';
 import { filters } from '../db/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
 import { reprocessChannelFilters } from '../services/filterEngine.js';
-import { createFilterSchema, updateFilterSchema, batchFiltersSchema } from './schemas.js';
+import { batchFiltersSchema, createFilterSchema, updateFilterSchema } from './schemas.js';
 
 const router = new Hono();
 

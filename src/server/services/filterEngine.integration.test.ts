@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config.js', () => ({
   JWT_SECRET: 'test-secret-key',
@@ -8,8 +8,9 @@ vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn(), debug: vi.fn() },
 }));
 
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { seedChannel, seedNews } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -22,9 +23,9 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import { applyFiltersToInserted, reprocessChannelFilters } from './filterEngine.js';
-import { filters, news } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { filters, news } from '../db/schema.js';
+import { applyFiltersToInserted, reprocessChannelFilters } from './filterEngine.js';
 
 describe('filterEngine (integration)', () => {
   beforeAll(async () => {
@@ -41,8 +42,7 @@ describe('filterEngine (integration)', () => {
   describe('applyFiltersToInserted', () => {
     it('does nothing when insertedItems is empty', async () => {
       const ch = await seedChannel(testDb.db);
-      await applyFiltersToInserted(ch.id, []);
-      // No error = pass
+      await expect(applyFiltersToInserted(ch.id, [])).resolves.toBeUndefined();
     });
 
     it('does nothing when no active filters exist', async () => {

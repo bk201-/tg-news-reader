@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -13,9 +13,10 @@ vi.mock('../logger.js', () => ({
 }));
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
 import { seedChannel } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -28,10 +29,10 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import filtersRouter from './filters.js';
-import { authMiddleware } from '../middleware/auth.js';
-import { filters } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { filters } from '../db/schema.js';
+import { authMiddleware } from '../middleware/auth.js';
+import filtersRouter from './filters.js';
 
 function createApp() {
   const app = new Hono();

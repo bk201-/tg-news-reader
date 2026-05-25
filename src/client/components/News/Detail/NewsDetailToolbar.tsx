@@ -1,7 +1,7 @@
 import React from 'react';
-import type { NewsDetailToolbarProps } from './newsDetailToolbarTypes';
 import { NewsDetailToolbarPanel } from './Desktop/NewsDetailToolbarPanel';
 import { NewsDetailToolbarInline } from './Mobile/NewsDetailToolbarInline';
+import type { NewsDetailToolbarProps } from './newsDetailToolbarTypes';
 
 export type { NewsDetailToolbarProps } from './newsDetailToolbarTypes';
 

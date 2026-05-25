@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import type { Group } from '@shared/types';
+import { fireEvent, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { renderWithProviders } from '../../__tests__/renderWithProviders';
 import { GroupPinModal } from './GroupPinModal';
-import type { Group } from '@shared/types';
 
 const mockGroup: Group = {
   id: 1,

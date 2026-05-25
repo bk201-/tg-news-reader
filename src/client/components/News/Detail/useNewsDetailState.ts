@@ -2,13 +2,13 @@
  * useNewsDetailState — derived values + stable handler refs for NewsDetail.
  */
 
-import { useCallback } from 'react';
-import { App } from 'antd';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead, useExtractContent, useDownloadMedia, useRefreshNewsItem } from '../../../api/news';
+import { App } from 'antd';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNewsDownloadTask } from '../../../api/downloads';
-import { isYouTubeUrl, getNewsTitle } from '../newsUtils';
+import { useDownloadMedia, useExtractContent, useMarkRead, useRefreshNewsItem } from '../../../api/news';
+import { getNewsTitle, isYouTubeUrl } from '../newsUtils';
 import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
 
 interface UseNewsDetailStateArgs {

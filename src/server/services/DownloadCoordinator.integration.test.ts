@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,6 @@ vi.mock('../utils/retry.js', async () => {
   };
 });
 
-// oxlint-disable-next-line typescript/no-explicit-any
 const createdWorkers: any[] = [];
 
 vi.mock('worker_threads', async () => {
@@ -49,8 +48,9 @@ vi.mock('./telegramBridge.js', () => ({
 
 // ─── DB mock ────────────────────────────────────────────────────────────────
 
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { seedChannel, seedNews, seedDownload } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -68,9 +68,9 @@ vi.mock('./downloadProgress.js', () => ({
   emitTaskUpdate: vi.fn(),
 }));
 
+import { sendAlert } from './alertBot.js';
 import { DownloadCoordinator } from './DownloadCoordinator.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
-import { sendAlert } from './alertBot.js';
 import { handleBridgeMessage } from './telegramBridge.js';
 
 describe('DownloadCoordinator (integration)', () => {

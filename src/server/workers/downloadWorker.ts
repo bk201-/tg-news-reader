@@ -11,21 +11,21 @@
  *   - Its own libsql client (created when the module is first imported)
  *   - Its own jsdom + Readability instances (lazy-loaded on first article task)
  */
-
-import { parentPort, workerData, isMainThread } from 'worker_threads';
+/* oxlint-disable import/first */
+import { isMainThread, parentPort, workerData } from 'worker_threads';
 
 if (isMainThread) {
   throw new Error('downloadWorker.ts must be run as a worker_threads Worker, not directly.');
 }
 
+import { eq } from 'drizzle-orm';
+import { ARTICLE_MAX_HTML_BYTES } from '../config.js';
 import { db } from '../db/index.js';
 import { news, channels } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { withRetry, TASK_POLICY, HTTP_FETCH_POLICY } from '../utils/retry.js';
-import { parseHtml, buildFullContent } from '../services/readability.js';
 import { logger } from '../logger.js';
+import { parseHtml, buildFullContent } from '../services/readability.js';
 import type { TgDownloadMediaMsg, MainToWorkerBridgeMsg } from '../services/telegramBridge.js';
-import { ARTICLE_MAX_HTML_BYTES } from '../config.js';
+import { withRetry, TASK_POLICY, HTTP_FETCH_POLICY } from '../utils/retry.js';
 
 // ─── Worker identity ──────────────────────────────────────────────────────────
 

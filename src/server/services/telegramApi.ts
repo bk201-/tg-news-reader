@@ -2,14 +2,15 @@
  * Telegram API — public functions: fetch messages, channel info, read history, download media.
  */
 
-import type { Api } from 'telegram';
-import { mkdirSync, existsSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import type { Api } from 'telegram';
+import { MAX_IMG_DOC_SIZE_BYTES, MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '../config.js';
 import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
-import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
-import { getTelegramClient, ensureAndGetApi } from './telegramClient.js';
-import { parseMessageFields, extractInstantViewText, type TelegramMessage } from './telegramParser.js';
+import { ensureAndGetApi, getTelegramClient } from './telegramClient.js';
+import { extractInstantViewText, parseMessageFields } from './telegramParser.js';
+import type { TelegramMessage } from './telegramParser.js';
 
 const BATCH_SIZE = 100;
 
@@ -253,8 +254,7 @@ export async function downloadMessageMedia(
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
     try {
-      // oxlint-disable-next-line typescript/no-explicit-any, typescript/no-unsafe-argument
-      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
+      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath });
       if (!result) return null;
       return `${channelTelegramId}/${filename}`;
     } catch (err) {

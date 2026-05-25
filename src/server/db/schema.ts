@@ -1,6 +1,6 @@
-import { sqliteTable, integer, text, primaryKey, unique } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
-import { jsonStringArray, jsonNumberArray } from './customTypes.js';
+import { integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import { jsonNumberArray, jsonStringArray } from './customTypes.js';
 
 export const groups = sqliteTable('groups', {
   id: integer('id').primaryKey({ autoIncrement: true }),

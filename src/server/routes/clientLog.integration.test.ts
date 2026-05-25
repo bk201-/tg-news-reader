@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -13,8 +13,9 @@ vi.mock('../logger.js', () => ({
 }));
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -27,9 +28,9 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import clientLogRouter from './clientLog.js';
-import { authMiddleware } from '../middleware/auth.js';
 import { logger } from '../logger.js';
+import { authMiddleware } from '../middleware/auth.js';
+import clientLogRouter from './clientLog.js';
 
 function createApp() {
   const app = new Hono();
@@ -107,7 +108,7 @@ describe('Client Log routes (integration)', () => {
     });
 
     it('ignores entries with disallowed levels', async () => {
-      await app.request('/api/log/client', {
+      const res = await app.request('/api/log/client', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -115,20 +116,20 @@ describe('Client Log routes (integration)', () => {
         }),
       });
 
-      // info is not in ALLOWED_LEVELS, but the schema only allows 'warn'|'error',
-      // so this should fail validation and return 400
-      // Actually the schema enforces z.enum(['warn', 'error']), so invalid level = 400
+      // Schema enforces z.enum(['warn', 'error']) — 'info' fails validation.
+      // parseOptionalBody converts ZodError → HTTPException(400).
+      expect(res.status).toBe(400);
     });
 
-    it('returns 500 for body that fails Zod validation', async () => {
+    it('returns 400 for body that fails Zod validation', async () => {
       const res = await app.request('/api/log/client', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: '{}',
       });
 
-      // parseOptionalBody throws ZodError for present-but-invalid body → 500
-      expect(res.status).toBe(500);
+      // Missing required `entries` field → ZodError → HTTPException(400)
+      expect(res.status).toBe(400);
     });
 
     it('returns 400 for malformed JSON', async () => {

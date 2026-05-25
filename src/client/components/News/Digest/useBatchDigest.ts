@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { streamDigest as defaultStreamDigest, type DigestParams, type DigestEvent } from '../../../api/digest';
+import { streamDigest as defaultStreamDigest } from '../../../api/digest';
+import type { DigestEvent, DigestParams } from '../../../api/digest';
 
 export type BatchDigestStatus = 'idle' | 'prefetching' | 'generating' | 'done' | 'error';
 
@@ -155,8 +156,7 @@ export function useBatchDigest(
     if (!enabled) {
       lastRunRef.current = false;
     }
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [enabled, manual]);
+  }, [enabled, manual, run]);
 
   // Abort on unmount
   useEffect(() => {

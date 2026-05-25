@@ -3,10 +3,10 @@
  * Usage: npm run tg:auth
  * Copy the session string to your .env file as TG_SESSION=...
  */
+import * as readline from 'readline';
 import 'dotenv/config';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
-import * as readline from 'readline';
 
 const API_ID = parseInt(process.env.TG_API_ID || '0', 10);
 const API_HASH = process.env.TG_API_HASH || '';
@@ -29,9 +29,9 @@ async function main() {
   });
 
   await client.start({
-    phoneNumber: async () => await question('📱 Enter your phone number (with country code, e.g. +79001234567): '),
-    password: async () => await question('🔐 Enter your 2FA password (leave empty if none): '),
-    phoneCode: async () => await question('📬 Enter the code from Telegram: '),
+    phoneNumber: async () => question('📱 Enter your phone number (with country code, e.g. +79001234567): '),
+    password: async () => question('🔐 Enter your 2FA password (leave empty if none): '),
+    phoneCode: async () => question('📬 Enter the code from Telegram: '),
     onError: (err) => console.error('Error:', err),
   });
 

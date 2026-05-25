@@ -1,6 +1,7 @@
-import { useAuthStore, type AuthUser } from '../store/authStore';
-import { useRateLimitStore } from '../store/rateLimitStore';
 import { logger } from '../logger';
+import { useAuthStore } from '../store/authStore';
+import type { AuthUser } from '../store/authStore';
+import { useRateLimitStore } from '../store/rateLimitStore';
 
 /** How long (ms) to show the rate-limit banner when a 429 is received. */
 const RATE_LIMIT_WINDOW_MS = 60_000;
