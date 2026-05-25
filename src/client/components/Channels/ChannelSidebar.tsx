@@ -1,30 +1,30 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Modal, Button, Space, Typography, Form, Switch } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { PlusOutlined, ReloadOutlined, OrderedListOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import dayjs from 'dayjs';
+import { OrderedListOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { Channel, ChannelType } from '@shared/types.ts';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button, Form, Modal, Space, Switch, Typography } from 'antd';
+import { createStyles } from 'antd-style';
+import dayjs from 'dayjs';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
+  channelKeys,
+  useChannelLookup,
   useChannels,
   useCreateChannel,
-  useUpdateChannel,
   useDeleteChannel,
   useFetchChannel,
-  useChannelLookup,
   useReorderChannels,
-  channelKeys,
+  useUpdateChannel,
 } from '../../api/channels';
-import { useGroups } from '../../api/groups';
-import { SortModal } from './SortModal';
-import { useUIStore } from '../../store/uiStore';
-import { ChannelItem } from './ChannelItem';
-import { ChannelFormModal } from './ChannelFormModal';
-import { ChannelFetchModal } from './ChannelFetchModal';
-import { useChannelHotkeys } from './useChannelHotkeys';
 import { ApiError } from '../../api/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useGroups } from '../../api/groups';
+import { useUIStore } from '../../store/uiStore';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { ChannelFetchModal } from './ChannelFetchModal';
+import { ChannelFormModal } from './ChannelFormModal';
+import { ChannelItem } from './ChannelItem';
+import { SortModal } from './SortModal';
+import { useChannelHotkeys } from './useChannelHotkeys';
 
 const { Text } = Typography;
 
@@ -57,6 +57,10 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 14px;
   `,
 }));
+
+const ICON_PLUS = <PlusOutlined />;
+const ICON_ORDERED_LIST = <OrderedListOutlined />;
+const ICON_RELOAD = <ReloadOutlined />;
 
 export function ChannelSidebar() {
   const { data: allChannels = [], isLoading } = useChannels();
@@ -98,12 +102,12 @@ export function ChannelSidebar() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [form] = Form.useForm();
 
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingChannel(null);
     form.resetFields();
     form.setFieldValue('groupId', selectedGroupId ?? undefined);
     setModalOpen(true);
-  };
+  }, [form, selectedGroupId]);
 
   // Auto-open create modal when triggered from empty state CTA
   const openAddChannel = useUIStore((s) => s.openAddChannel);
@@ -112,22 +116,24 @@ export function ChannelSidebar() {
       openCreate();
       useUIStore.getState().setOpenAddChannel(false);
     }
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [openAddChannel]);
+  }, [openAddChannel, openCreate]);
 
-  const openEdit = (ch: Channel) => {
-    setEditingChannel(ch);
-    form.setFieldsValue({
-      telegramId: ch.telegramId,
-      name: ch.name,
-      description: ch.description,
-      channelType: ch.channelType,
-      groupId: ch.groupId ?? undefined,
-    });
-    setModalOpen(true);
-  };
+  const openEdit = useCallback(
+    (ch: Channel) => {
+      setEditingChannel(ch);
+      form.setFieldsValue({
+        telegramId: ch.telegramId,
+        name: ch.name,
+        description: ch.description,
+        channelType: ch.channelType,
+        groupId: ch.groupId ?? undefined,
+      });
+      setModalOpen(true);
+    },
+    [form],
+  );
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const values = (await form.validateFields()) as {
       telegramId: string;
       name: string;
@@ -150,23 +156,25 @@ export function ChannelSidebar() {
         throw err;
       }
     }
-  };
+  }, [form, editingChannel, updateChannel, createChannel, t]);
 
-  const handleTelegramIdBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-    if (editingChannel) return;
-    const raw = e.target.value.trim();
-    // Auto-fill name/description from Telegram (only if name not yet filled)
-    if (!raw || (form.getFieldValue('name') as string | undefined)) return;
-    setLookupLoading(true);
-    try {
-      const info = await lookupChannel.mutateAsync(raw);
-      form.setFieldsValue({ name: info.name, ...(info.description ? { description: info.description } : {}) });
-    } catch {
-      /* silent */
-    } finally {
-      setLookupLoading(false);
-    }
-  };
+  const handleTelegramIdBlur = useCallback(
+    async (e: React.FocusEvent<HTMLInputElement>) => {
+      if (editingChannel) return;
+      const raw = e.target.value.trim();
+      if (!raw || (form.getFieldValue('name') as string | undefined)) return;
+      setLookupLoading(true);
+      try {
+        const info = await lookupChannel.mutateAsync(raw);
+        form.setFieldsValue({ name: info.name, ...(info.description ? { description: info.description } : {}) });
+      } catch {
+        /* silent */
+      } finally {
+        setLookupLoading(false);
+      }
+    },
+    [editingChannel, form, lookupChannel],
+  );
 
   // ── Fetch modal state ─────────────────────────────────────────────────
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -176,28 +184,46 @@ export function ChannelSidebar() {
   // ── Sort modal state ──────────────────────────────────────────────────
   const [sortModalOpen, setSortModalOpen] = useState(false);
 
-  const openFetchModal = (ch: Channel) => {
+  const openFetchModal = useCallback((ch: Channel) => {
     setFetchTargetId(ch.id);
     setFetchSince(ch.lastFetchedAt ? dayjs.unix(ch.lastFetchedAt) : null);
     setFetchModalOpen(true);
-  };
+  }, []);
 
-  const handleFetch = async () => {
+  const handleFetch = useCallback(async () => {
     if (!fetchTargetId) return;
     await fetchChannel.mutateAsync({ id: fetchTargetId, since: fetchSince ? fetchSince.toISOString() : undefined });
     setFetchModalOpen(false);
-  };
+  }, [fetchTargetId, fetchChannel, fetchSince]);
 
-  const handleDelete = (ch: Channel) => {
-    Modal.confirm({
-      title: t('channels.delete_confirm_title', { name: ch.name }),
-      content: t('channels.delete_confirm_content'),
-      okText: t('common.delete'),
-      okType: 'danger',
-      cancelText: t('common.cancel'),
-      onOk: () => deleteChannel.mutateAsync(ch.id),
-    });
-  };
+  const handleDelete = useCallback(
+    (ch: Channel) => {
+      Modal.confirm({
+        title: t('channels.delete_confirm_title', { name: ch.name }),
+        content: t('channels.delete_confirm_content'),
+        okText: t('common.delete'),
+        okType: 'danger',
+        cancelText: t('common.cancel'),
+        onOk: () => deleteChannel.mutateAsync(ch.id),
+      });
+    },
+    [t, deleteChannel],
+  );
+
+  const handleOpenSortModal = useCallback(() => setSortModalOpen(true), []);
+  const handleCloseSortModal = useCallback(() => setSortModalOpen(false), []);
+  const handleCloseModal = useCallback(() => setModalOpen(false), []);
+  const handleCloseFetchModal = useCallback(() => setFetchModalOpen(false), []);
+  const handleRefreshAllClick = useCallback(() => void handleRefreshAll(), [handleRefreshAll]);
+
+  const sortItems = useMemo(() => channels.map((ch) => ({ id: ch.id, name: ch.name })), [channels]);
+
+  const handleSortSave = useCallback(
+    (ordered: { id: number; sortOrder: number }[]) => {
+      reorderChannels.mutate(ordered, { onSuccess: handleCloseSortModal });
+    },
+    [reorderChannels, handleCloseSortModal],
+  );
 
   return (
     <nav className={styles.sidebar} aria-label={t('sidebar.channels')}>
@@ -210,13 +236,13 @@ export function ChannelSidebar() {
             <Switch size="small" checked={autoAdvance} onChange={toggleAutoAdvance} />
           </Tooltip>
           <Tooltip title={t('sidebar.add_tooltip')}>
-            <Button icon={<PlusOutlined />} onClick={openCreate} />
+            <Button icon={ICON_PLUS} onClick={openCreate} />
           </Tooltip>
           <Tooltip title={t('sidebar.sort_tooltip')}>
-            <Button icon={<OrderedListOutlined />} onClick={() => setSortModalOpen(true)} />
+            <Button icon={ICON_ORDERED_LIST} onClick={handleOpenSortModal} />
           </Tooltip>
           <Tooltip title={t('sidebar.refresh_tooltip')}>
-            <Button icon={<ReloadOutlined />} onClick={() => void handleRefreshAll()} loading={isFetchingAll} />
+            <Button icon={ICON_RELOAD} onClick={handleRefreshAllClick} loading={isFetchingAll} />
           </Tooltip>
         </Space>
       </div>
@@ -230,10 +256,10 @@ export function ChannelSidebar() {
             isSelected={selectedChannelId === ch.id}
             isFetchingThis={fetchChannel.isPending && fetchTargetId === ch.id}
             unreadCount={ch.unreadCount || 0}
-            onSelect={() => setSelectedChannelId(ch.id)}
-            onFetch={() => openFetchModal(ch)}
-            onEdit={() => openEdit(ch)}
-            onDelete={() => handleDelete(ch)}
+            onSelect={setSelectedChannelId}
+            onFetch={openFetchModal}
+            onEdit={openEdit}
+            onDelete={handleDelete}
           />
         ))}
       </div>
@@ -246,7 +272,7 @@ export function ChannelSidebar() {
         groups={groups}
         lookupLoading={lookupLoading}
         confirmLoading={createChannel.isPending || updateChannel.isPending}
-        onClose={() => setModalOpen(false)}
+        onClose={handleCloseModal}
         onSave={handleSave}
         onTelegramIdBlur={handleTelegramIdBlur}
       />
@@ -256,19 +282,17 @@ export function ChannelSidebar() {
         fetchSince={fetchSince}
         loading={fetchChannel.isPending}
         onChangeSince={setFetchSince}
-        onClose={() => setFetchModalOpen(false)}
+        onClose={handleCloseFetchModal}
         onConfirm={handleFetch}
       />
 
       <SortModal
         open={sortModalOpen}
         title={t('sidebar.sort_title')}
-        items={channels.map((ch) => ({ id: ch.id, name: ch.name }))}
+        items={sortItems}
         loading={reorderChannels.isPending}
-        onClose={() => setSortModalOpen(false)}
-        onSave={(ordered) => {
-          reorderChannels.mutate(ordered, { onSuccess: () => setSortModalOpen(false) });
-        }}
+        onClose={handleCloseSortModal}
+        onSave={handleSortSave}
       />
     </nav>
   );

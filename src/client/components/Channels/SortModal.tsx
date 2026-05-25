@@ -1,28 +1,24 @@
-import React, { useState, useCallback } from 'react';
-import { Modal, Button, Typography } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, HolderOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import { useIsMd } from '../../hooks/breakpoints';
+import { ArrowDownOutlined, ArrowUpOutlined, HolderOutlined } from '@ant-design/icons';
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
-  arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Button, Modal, Typography } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useIsMd } from '../../hooks/breakpoints';
 
 const { Text } = Typography;
+
+const ICON_ARROW_UP = <ArrowUpOutlined />;
+const ICON_ARROW_DOWN = <ArrowDownOutlined />;
 
 export interface SortItem {
   id: number;
@@ -107,15 +103,20 @@ function SortableRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = useMemo(
+    () => ({
+      transform: CSS.Transform.toString(transform),
+      transition,
+    }),
+    [transform, transition],
+  );
+
+  const colorDotStyle = useMemo(() => (item.color ? { background: item.color } : undefined), [item.color]);
 
   return (
     <div ref={setNodeRef} style={style} className={cx(styles.item, isDragging && styles.itemDragging)}>
       <HolderOutlined className={styles.dragHandle} {...attributes} {...listeners} />
-      {item.color && <span className={styles.colorDot} style={{ background: item.color }} />}
+      {item.color && <span className={styles.colorDot} style={colorDotStyle} />}
       <Text className={styles.name}>{item.name}</Text>
     </div>
   );
@@ -135,16 +136,20 @@ function StaticRow({
   index: number;
   total: number;
   styles: ReturnType<typeof useStyles>['styles'];
-  onMoveUp: () => void;
-  onMoveDown: () => void;
+  onMoveUp: (index: number) => void;
+  onMoveDown: (index: number) => void;
 }) {
+  const colorDotStyle = useMemo(() => (item.color ? { background: item.color } : undefined), [item.color]);
+  const handleMoveUp = useCallback(() => onMoveUp(index), [onMoveUp, index]);
+  const handleMoveDown = useCallback(() => onMoveDown(index), [onMoveDown, index]);
+
   return (
     <div className={styles.item}>
-      {item.color && <span className={styles.colorDot} style={{ background: item.color }} />}
+      {item.color && <span className={styles.colorDot} style={colorDotStyle} />}
       <Text className={styles.name}>{item.name}</Text>
       <div className={styles.arrowBtns}>
-        <Button size="small" icon={<ArrowUpOutlined />} disabled={index === 0} onClick={onMoveUp} />
-        <Button size="small" icon={<ArrowDownOutlined />} disabled={index === total - 1} onClick={onMoveDown} />
+        <Button size="small" icon={ICON_ARROW_UP} disabled={index === 0} onClick={handleMoveUp} />
+        <Button size="small" icon={ICON_ARROW_DOWN} disabled={index === total - 1} onClick={handleMoveDown} />
       </div>
     </div>
   );
@@ -184,25 +189,29 @@ export function SortModal({ open, title, items: initialItems, onClose, onSave, l
     setItems((prev) => arrayMove(prev, index, index + direction));
   }, []);
 
-  const handleSave = () => {
+  const handleMoveUp = useCallback((index: number) => moveItem(index, -1), [moveItem]);
+  const handleMoveDown = useCallback((index: number) => moveItem(index, 1), [moveItem]);
+
+  const handleSave = useCallback(() => {
     onSave(items.map((item, idx) => ({ id: item.id, sortOrder: idx })));
-  };
+  }, [items, onSave]);
+
+  const sortableIds = useMemo(() => items.map((i) => i.id), [items]);
+
+  const footer = useMemo(
+    () => [
+      <Button key="cancel" onClick={onClose}>
+        {t('common.cancel')}
+      </Button>,
+      <Button key="save" type="primary" loading={loading} onClick={handleSave}>
+        {t('common.save')}
+      </Button>,
+    ],
+    [t, onClose, loading, handleSave],
+  );
 
   return (
-    <Modal
-      open={open}
-      title={title}
-      onCancel={onClose}
-      footer={[
-        <Button key="cancel" onClick={onClose}>
-          {t('common.cancel')}
-        </Button>,
-        <Button key="save" type="primary" loading={loading} onClick={handleSave}>
-          {t('common.save')}
-        </Button>,
-      ]}
-      destroyOnHidden
-    >
+    <Modal open={open} title={title} onCancel={onClose} footer={footer} destroyOnHidden>
       {isMobile ? (
         <div className={styles.list}>
           {items.map((item, idx) => (
@@ -212,14 +221,14 @@ export function SortModal({ open, title, items: initialItems, onClose, onSave, l
               index={idx}
               total={items.length}
               styles={styles}
-              onMoveUp={() => moveItem(idx, -1)}
-              onMoveDown={() => moveItem(idx, 1)}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
             />
           ))}
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             <div className={styles.list}>
               {items.map((item) => (
                 <SortableRow key={item.id} item={item} styles={styles} cx={cx} />

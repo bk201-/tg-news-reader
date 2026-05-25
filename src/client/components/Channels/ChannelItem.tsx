@@ -1,19 +1,19 @@
-import React from 'react';
-import { Button, Badge, Typography, Dropdown } from 'antd';
-import type { MenuProps } from 'antd';
-import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 import {
-  ReloadOutlined,
-  EditOutlined,
   DeleteOutlined,
-  WarningOutlined,
+  EditOutlined,
   LinkOutlined,
   MoreOutlined,
+  ReloadOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import dayjs from 'dayjs';
 import type { Channel } from '@shared/types.ts';
+import { Badge, Button, Dropdown, Typography } from 'antd';
+import type { MenuProps } from 'antd';
+import { createStyles } from 'antd-style';
+import dayjs from 'dayjs';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 
 const { Text } = Typography;
 
@@ -61,15 +61,23 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
 }));
 
+const ICON_MORE = <MoreOutlined />;
+const ICON_LINK = <LinkOutlined />;
+const ICON_EDIT = <EditOutlined />;
+const ICON_DELETE = <DeleteOutlined />;
+const DROPDOWN_TRIGGER: ('click' | 'hover' | 'contextMenu')[] = ['click'];
+
+const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
 interface ChannelItemProps {
   channel: Channel;
   isSelected: boolean;
   isFetchingThis: boolean;
   unreadCount: number;
-  onSelect: () => void;
-  onFetch: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onSelect: (id: number) => void;
+  onFetch: (channel: Channel) => void;
+  onEdit: (channel: Channel) => void;
+  onDelete: (channel: Channel) => void;
 }
 
 export function ChannelItem({
@@ -85,46 +93,68 @@ export function ChannelItem({
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
 
-  const menuItems: MenuProps['items'] = [
-    {
-      key: 'open',
-      icon: <LinkOutlined />,
-      label: (
-        <a href={`https://t.me/${ch.telegramId}`} target="_blank" rel="noopener noreferrer">
-          {t('channels.open_tg_tooltip')}
-        </a>
-      ),
-    },
-    {
-      key: 'fetch',
-      icon: <ReloadOutlined spin={isFetchingThis} />,
-      label: t('channels.fetch_tooltip'),
-      disabled: isFetchingThis,
-      onClick: ({ domEvent }) => {
-        domEvent.stopPropagation();
-        onFetch();
+  const reloadIcon = useMemo(() => <ReloadOutlined spin={isFetchingThis} />, [isFetchingThis]);
+
+  const handleSelect = useCallback(() => onSelect(ch.id), [onSelect, ch.id]);
+  const handleFetch = useCallback(() => onFetch(ch), [onFetch, ch]);
+  const handleEdit = useCallback(() => onEdit(ch), [onEdit, ch]);
+  const handleDelete = useCallback(() => onDelete(ch), [onDelete, ch]);
+
+  const menuItems: MenuProps['items'] = useMemo(
+    () => [
+      {
+        key: 'open',
+        icon: ICON_LINK,
+        label: (
+          <a href={`https://t.me/${ch.telegramId}`} target="_blank" rel="noopener noreferrer">
+            {t('channels.open_tg_tooltip')}
+          </a>
+        ),
       },
-    },
-    {
-      key: 'edit',
-      icon: <EditOutlined />,
-      label: t('channels.edit_tooltip'),
-      onClick: ({ domEvent }) => {
-        domEvent.stopPropagation();
-        onEdit();
+      {
+        key: 'fetch',
+        icon: reloadIcon,
+        label: t('channels.fetch_tooltip'),
+        disabled: isFetchingThis,
+        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+          domEvent.stopPropagation();
+          handleFetch();
+        },
       },
-    },
-    {
-      key: 'delete',
-      icon: <DeleteOutlined />,
-      label: t('channels.delete_tooltip'),
-      danger: true,
-      onClick: ({ domEvent }) => {
-        domEvent.stopPropagation();
-        onDelete();
+      {
+        key: 'edit',
+        icon: ICON_EDIT,
+        label: t('channels.edit_tooltip'),
+        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+          domEvent.stopPropagation();
+          handleEdit();
+        },
       },
+      {
+        key: 'delete',
+        icon: ICON_DELETE,
+        label: t('channels.delete_tooltip'),
+        danger: true,
+        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+          domEvent.stopPropagation();
+          handleDelete();
+        },
+      },
+    ],
+    [ch.telegramId, isFetchingThis, reloadIcon, t, handleFetch, handleEdit, handleDelete],
+  );
+
+  const dropdownMenu = useMemo(() => ({ items: menuItems }), [menuItems]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleSelect();
+      }
     },
-  ];
+    [handleSelect],
+  );
 
   return (
     <div
@@ -132,13 +162,8 @@ export function ChannelItem({
       aria-selected={isSelected}
       tabIndex={0}
       className={cx(styles.item, isSelected && styles.itemActive)}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
+      onClick={handleSelect}
+      onKeyDown={handleKeyDown}
     >
       <div className={styles.info}>
         <Text strong ellipsis>
@@ -160,8 +185,8 @@ export function ChannelItem({
       </div>
       <div className={styles.rightSide}>
         <Badge count={unreadCount} size="small" overflowCount={999} />
-        <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-          <Button icon={<MoreOutlined />} size="small" type="text" onClick={(e) => e.stopPropagation()} />
+        <Dropdown menu={dropdownMenu} trigger={DROPDOWN_TRIGGER} placement="bottomRight">
+          <Button icon={ICON_MORE} size="small" type="text" onClick={stopPropagation} />
         </Dropdown>
       </div>
     </div>

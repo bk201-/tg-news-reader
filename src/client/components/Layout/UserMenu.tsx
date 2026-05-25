@@ -1,23 +1,77 @@
-import React from 'react';
-import { Typography, Button, Modal } from 'antd';
 import {
-  LogoutOutlined,
-  SafetyCertificateOutlined,
-  QrcodeOutlined,
   ClearOutlined,
-  TranslationOutlined,
+  LogoutOutlined,
+  QrcodeOutlined,
+  SafetyCertificateOutlined,
   TagOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import { FlagRU, FlagUS } from '../Flags';
-import { clearSwCache } from '../../services/serviceWorker';
-import { APP_VERSION } from '../../appVersion';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../api/client';
+import { Button, Modal, Typography } from 'antd';
 import type { App } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { api } from '../../api/client';
+import { APP_VERSION } from '../../appVersion';
+import { clearSwCache } from '../../services/serviceWorker';
+import { useAuthStore } from '../../store/authStore';
+import { FlagRU, FlagUS } from '../Flags';
 
 const { Text } = Typography;
+
+const ICON_CLEAR = <ClearOutlined />;
+const ICON_TRANSLATION = <TranslationOutlined />;
+const ICON_TAG = <TagOutlined />;
+const ICON_LOGOUT = <LogoutOutlined />;
+const ICON_QRCODE = <QrcodeOutlined />;
+
+const stopPropagation = (e: React.MouseEvent | React.KeyboardEvent) => e.stopPropagation();
+
+/** Language switcher row content — extracted to keep menu items free of inline closures. */
+function LangSwitcher({
+  className,
+  labelClassName,
+  btnClassName,
+  label,
+  currentLang,
+}: {
+  className: string;
+  labelClassName: string;
+  btnClassName: string;
+  label: string;
+  currentLang: string;
+}) {
+  const { i18n } = useTranslation();
+  const isRu = currentLang.startsWith('ru');
+
+  const handleEn = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      void i18n.changeLanguage('en');
+    },
+    [i18n],
+  );
+
+  const handleRu = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      void i18n.changeLanguage('ru');
+    },
+    [i18n],
+  );
+
+  return (
+    <div className={className} onClick={stopPropagation}>
+      <span className={labelClassName}>{label}:</span>
+      <Button size="small" type={!isRu ? 'primary' : 'default'} onClick={handleEn} className={btnClassName}>
+        <FlagUS size={18} /> EN
+      </Button>
+      <Button size="small" type={isRu ? 'primary' : 'default'} onClick={handleRu} className={btnClassName}>
+        <FlagRU size={18} /> RU
+      </Button>
+    </div>
+  );
+}
 
 const useStyles = createStyles(({ css, token }) => ({
   emailText: css`
@@ -84,6 +138,11 @@ export function useUserMenuItems({ message, onOpenTotp }: UserMenuProps) {
     });
   };
 
+  const totpIcon = useMemo(
+    () => (user?.hasTOTP ? <SafetyCertificateOutlined className={styles.totpActiveIcon} /> : ICON_QRCODE),
+    [user?.hasTOTP, styles.totpActiveIcon],
+  );
+
   return [
     {
       key: 'email',
@@ -97,53 +156,35 @@ export function useUserMenuItems({ message, onOpenTotp }: UserMenuProps) {
     { type: 'divider' as const },
     {
       key: 'totp',
-      icon: user?.hasTOTP ? <SafetyCertificateOutlined className={styles.totpActiveIcon} /> : <QrcodeOutlined />,
+      icon: totpIcon,
       label: user?.hasTOTP ? t('header.user_menu.manage_2fa') : t('header.user_menu.enable_2fa'),
       onClick: user?.hasTOTP ? handleDisableTOTP : onOpenTotp,
     },
     { type: 'divider' as const },
     {
       key: 'clear-cache',
-      icon: <ClearOutlined />,
+      icon: ICON_CLEAR,
       label: t('header.user_menu.clear_cache'),
       onClick: handleClearMediaCache,
     },
     { type: 'divider' as const },
     {
       key: 'language',
-      icon: <TranslationOutlined />,
+      icon: ICON_TRANSLATION,
       label: (
-        <div className={styles.langSwitcher} onClick={(e) => e.stopPropagation()}>
-          <span className={styles.langLabel}>{t('header.user_menu.language')}:</span>
-          <Button
-            size="small"
-            type={!i18n.language.startsWith('ru') ? 'primary' : 'default'}
-            onClick={(e) => {
-              e.stopPropagation();
-              void i18n.changeLanguage('en');
-            }}
-            className={styles.langBtn}
-          >
-            <FlagUS size={18} /> EN
-          </Button>
-          <Button
-            size="small"
-            type={i18n.language.startsWith('ru') ? 'primary' : 'default'}
-            onClick={(e) => {
-              e.stopPropagation();
-              void i18n.changeLanguage('ru');
-            }}
-            className={styles.langBtn}
-          >
-            <FlagRU size={18} /> RU
-          </Button>
-        </div>
+        <LangSwitcher
+          className={styles.langSwitcher}
+          labelClassName={styles.langLabel}
+          btnClassName={styles.langBtn}
+          label={t('header.user_menu.language')}
+          currentLang={i18n.language}
+        />
       ),
     },
     { type: 'divider' as const },
     {
       key: 'version',
-      icon: <TagOutlined />,
+      icon: ICON_TAG,
       label: (
         <Text type="secondary" className={styles.emailText}>
           {t('header.user_menu.version', { version: APP_VERSION })}
@@ -154,7 +195,7 @@ export function useUserMenuItems({ message, onOpenTotp }: UserMenuProps) {
     { type: 'divider' as const },
     {
       key: 'logout',
-      icon: <LogoutOutlined />,
+      icon: ICON_LOGOUT,
       label: t('header.user_menu.logout'),
       danger: true,
       onClick: () => void handleLogout(),

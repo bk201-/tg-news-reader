@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { Form, Input, Button, Typography, Card, Alert, Space } from 'antd';
 import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Form, Input, Space, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import type { AuthUser } from '../../store/authStore';
 
 const { Title, Text } = Typography;
+
+const ICON_MAIL = <MailOutlined />;
+const ICON_LOCK = <LockOutlined />;
+const ICON_SAFE = <SafetyCertificateOutlined />;
 
 const useStyles = createStyles(({ css }) => ({
   page: css`
@@ -60,49 +64,66 @@ export function LoginPage() {
   const [form] = Form.useForm<LoginFormValues>();
   const { t } = useTranslation();
 
-  const doLogin = async (email: string, password: string, totpCodeVal?: string) => {
-    setLoading(true);
+  const handleBack = useCallback(() => {
+    setStep('credentials');
     setError(null);
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password, ...(totpCodeVal ? { totpCode: totpCodeVal } : {}) }),
-      });
+  }, []);
 
-      const data = (await res.json()) as {
-        accessToken?: string;
-        user?: AuthUser;
-        error?: string;
-        requiresTOTP?: boolean;
-      };
+  const emailRules = useMemo(
+    () => [{ required: true, type: 'email' as const, message: t('auth.email_required') }],
+    [t],
+  );
+  const passwordRules = useMemo(() => [{ required: true, message: t('auth.password_required') }], [t]);
 
-      if (!res.ok) {
-        if (data.requiresTOTP) {
-          setPending({ email, password });
-          setStep('totp');
-          setError(null);
-        } else {
-          setError(data.error ?? 'Login failed');
+  const doLogin = useCallback(
+    async (email: string, password: string, totpCodeVal?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password, ...(totpCodeVal ? { totpCode: totpCodeVal } : {}) }),
+        });
+
+        const data = (await res.json()) as {
+          accessToken?: string;
+          user?: AuthUser;
+          error?: string;
+          requiresTOTP?: boolean;
+        };
+
+        if (!res.ok) {
+          if (data.requiresTOTP) {
+            setPending({ email, password });
+            setStep('totp');
+            setError(null);
+          } else {
+            setError(data.error ?? 'Login failed');
+          }
+          return;
         }
-        return;
+
+        setAuth(data.accessToken!, data.user!);
+      } finally {
+        setLoading(false);
       }
+    },
+    [setAuth],
+  );
 
-      setAuth(data.accessToken!, data.user!);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleCredentials = useCallback(
+    async (values: LoginFormValues) => {
+      await doLogin(values.email, values.password);
+    },
+    [doLogin],
+  );
 
-  const handleCredentials = async (values: LoginFormValues) => {
-    await doLogin(values.email, values.password);
-  };
-
-  const handleTOTP = async () => {
+  const handleTOTP = useCallback(async () => {
     if (!pending) return;
     await doLogin(pending.email, pending.password, totpCode);
-  };
+  }, [pending, totpCode, doLogin]);
 
   return (
     <div className={styles.page}>
@@ -120,21 +141,17 @@ export function LoginPage() {
 
           {step === 'credentials' ? (
             <Form form={form} layout="vertical" onFinish={handleCredentials} autoComplete="off">
-              <Form.Item name="email" rules={[{ required: true, type: 'email', message: t('auth.email_required') }]}>
+              <Form.Item name="email" rules={emailRules}>
                 <Input
-                  prefix={<MailOutlined />}
+                  prefix={ICON_MAIL}
                   placeholder={t('auth.email_placeholder')}
                   autoComplete="username"
                   size="large"
                 />
               </Form.Item>
-              <Form.Item
-                name="password"
-                rules={[{ required: true, message: t('auth.password_required') }]}
-                className={styles.passwordField}
-              >
+              <Form.Item name="password" rules={passwordRules} className={styles.passwordField}>
                 <Input.Password
-                  prefix={<LockOutlined />}
+                  prefix={ICON_LOCK}
                   placeholder={t('auth.password_placeholder')}
                   autoComplete="current-password"
                   size="large"
@@ -151,17 +168,10 @@ export function LoginPage() {
               <Text>{t('auth.totp_prompt')}</Text>
               <Input.OTP length={6} value={totpCode} onChange={setTotpCode} size="large" />
               <Space className={styles.totpActions}>
-                <Button
-                  onClick={() => {
-                    setStep('credentials');
-                    setError(null);
-                  }}
-                >
-                  {t('auth.back')}
-                </Button>
+                <Button onClick={handleBack}>{t('auth.back')}</Button>
                 <Button
                   type="primary"
-                  icon={<SafetyCertificateOutlined />}
+                  icon={ICON_SAFE}
                   onClick={handleTOTP}
                   loading={loading}
                   disabled={totpCode.length < 6}

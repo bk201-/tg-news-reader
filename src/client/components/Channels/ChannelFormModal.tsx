@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Spin } from 'antd';
+import type { Channel, Group } from '@shared/types.ts';
+import { Form, Input, Modal, Select, Spin } from 'antd';
 import type { FormInstance } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Channel, Group } from '@shared/types.ts';
 
 const useStyles = createStyles(({ css }) => ({
   form: css`
@@ -19,6 +19,10 @@ function normalizeTelegramId(raw: string): string {
     .replace(/^@/, '')
     .split('/')[0];
 }
+
+const VALIDATE_TRIGGER = ['onBlur'];
+const OK_BTN_DISABLED = { disabled: true };
+const OK_BTN_ENABLED = { disabled: false };
 
 interface ChannelFormModalProps {
   open: boolean;
@@ -48,20 +52,56 @@ export function ChannelFormModal({
 }: ChannelFormModalProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-  const [hasErrors, setHasErrors] = useState(false);
+  const [hasErrors, setHasErrors] = React.useState(false);
 
-  const telegramIdRules = [
-    { required: true, message: t('channels.form.telegram_id_required') },
-    {
-      validator: (_: unknown, value: string) => {
-        if (!value || editingChannel) return Promise.resolve();
-        const normalized = normalizeTelegramId(value);
-        const dup = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
-        if (dup) return Promise.reject(new Error(t('channels.form.already_exists')));
-        return Promise.resolve();
+  const handleFieldsChange = useCallback(
+    (_: unknown, allFields: { errors?: string[] }[]) =>
+      setHasErrors(allFields.some((f) => (f.errors?.length ?? 0) > 0)),
+    [],
+  );
+
+  const telegramIdRules = useMemo(
+    () => [
+      { required: true, message: t('channels.form.telegram_id_required') },
+      {
+        validator: (_: unknown, value: string) => {
+          if (!value || editingChannel) return Promise.resolve();
+          const normalized = normalizeTelegramId(value);
+          const dup = allChannels.find((ch) => ch.telegramId.toLowerCase() === normalized.toLowerCase());
+          if (dup) return Promise.reject(new Error(t('channels.form.already_exists')));
+          return Promise.resolve();
+        },
       },
-    },
-  ];
+    ],
+    [t, editingChannel, allChannels],
+  );
+
+  const nameRules = useMemo(() => [{ required: true, message: t('channels.form.name_required') }], [t]);
+
+  const channelTypeOptions = useMemo(
+    () => [
+      { value: 'news', label: t('channels.form.type_news') },
+      { value: 'news_link', label: t('channels.form.type_news_link') },
+      { value: 'media', label: t('channels.form.type_media') },
+      { value: 'blog', label: t('channels.form.type_blog') },
+    ],
+    [t],
+  );
+
+  const groupOptions = useMemo(
+    () =>
+      groups.map((g) => ({
+        value: g.id,
+        label: (
+          <>
+            {/* runtime color from DB — inline style is an accepted exception per AGENTS.md */}
+            {/* oxlint-disable-next-line react-perf/jsx-no-new-object-as-prop */}
+            <span style={{ color: g.color }}>■</span> {g.name}
+          </>
+        ),
+      })),
+    [groups],
+  );
 
   return (
     <Modal
@@ -72,20 +112,20 @@ export function ChannelFormModal({
       okText={t('common.save')}
       cancelText={t('common.cancel')}
       confirmLoading={confirmLoading}
-      okButtonProps={{ disabled: hasErrors }}
+      okButtonProps={hasErrors ? OK_BTN_DISABLED : OK_BTN_ENABLED}
     >
       <Form
         form={form}
         layout="vertical"
         className={styles.form}
         autoComplete="off"
-        onFieldsChange={(_, allFields) => setHasErrors(allFields.some((f) => (f.errors?.length ?? 0) > 0))}
+        onFieldsChange={handleFieldsChange}
       >
         <Form.Item
           name="telegramId"
           label={t('channels.form.telegram_id_label')}
           rules={telegramIdRules}
-          validateTrigger={['onBlur']}
+          validateTrigger={VALIDATE_TRIGGER}
         >
           <Input
             placeholder={t('channels.form.telegram_id_placeholder')}
@@ -94,11 +134,7 @@ export function ChannelFormModal({
           />
         </Form.Item>
         <Spin spinning={lookupLoading} size="small">
-          <Form.Item
-            name="name"
-            label={t('channels.form.name_label')}
-            rules={[{ required: true, message: t('channels.form.name_required') }]}
-          >
+          <Form.Item name="name" label={t('channels.form.name_label')} rules={nameRules}>
             <Input placeholder={t('channels.form.name_placeholder')} autoComplete="off" />
           </Form.Item>
           <Form.Item name="description" label={t('channels.form.description_label')}>
@@ -106,21 +142,10 @@ export function ChannelFormModal({
           </Form.Item>
         </Spin>
         <Form.Item name="channelType" label={t('channels.form.channel_type_label')} initialValue="news">
-          <Select>
-            <Select.Option value="news">{t('channels.form.type_news')}</Select.Option>
-            <Select.Option value="news_link">{t('channels.form.type_news_link')}</Select.Option>
-            <Select.Option value="media">{t('channels.form.type_media')}</Select.Option>
-            <Select.Option value="blog">{t('channels.form.type_blog')}</Select.Option>
-          </Select>
+          <Select options={channelTypeOptions} />
         </Form.Item>
         <Form.Item name="groupId" label={t('channels.form.group_label')}>
-          <Select allowClear placeholder={t('channels.form.group_placeholder')}>
-            {groups.map((g) => (
-              <Select.Option key={g.id} value={g.id}>
-                <span style={{ color: g.color }}>■</span> {g.name}
-              </Select.Option>
-            ))}
-          </Select>
+          <Select allowClear placeholder={t('channels.form.group_placeholder')} options={groupOptions} />
         </Form.Item>
       </Form>
     </Modal>
