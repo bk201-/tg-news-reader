@@ -1,23 +1,34 @@
-import React from 'react';
-import { Button, Space, Typography, Tag, Segmented } from 'antd';
-import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
 import {
-  FilterOutlined,
-  EyeOutlined,
-  CheckSquareOutlined,
-  SyncOutlined,
-  CloseCircleOutlined,
-  LayoutOutlined,
-  ProfileOutlined,
   BulbOutlined,
+  CheckSquareOutlined,
+  CloseCircleOutlined,
+  EyeOutlined,
+  FilterOutlined,
+  LayoutOutlined,
   LinkOutlined,
+  ProfileOutlined,
+  SyncOutlined,
   TagsOutlined,
 } from '@ant-design/icons';
+import { Button, Segmented, Space, Tag, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
 import type { NewsFeedToolbarProps } from '../newsFeedToolbarTypes';
 
 const { Text } = Typography;
+
+const ICON_SYNC = <SyncOutlined />;
+const ICON_LINK = <LinkOutlined />;
+const ICON_EYE = <EyeOutlined />;
+const ICON_CHECK_SQUARE = <CheckSquareOutlined />;
+const ICON_FILTER = <FilterOutlined />;
+const ICON_BULB = <BulbOutlined />;
+const ICON_TAGS = <TagsOutlined />;
+const ICON_CLOSE_CIRCLE = <CloseCircleOutlined />;
+const ICON_LAYOUT = <LayoutOutlined />;
+const ICON_PROFILE = <ProfileOutlined />;
 
 const useStyles = createStyles(({ css, token }) => ({
   toolbar: css`
@@ -75,26 +86,32 @@ export function NewsFeedToolbarDesktop({
   const { t } = useTranslation();
   const { styles } = useStyles();
 
-  const periodOptions = [
-    { value: '1', label: t('news.period.1d') },
-    { value: '3', label: t('news.period.3d') },
-    { value: '5', label: t('news.period.5d') },
-    { value: '7', label: t('news.period.7d') },
-    { value: '14', label: t('news.period.14d') },
-  ];
+  const periodOptions = useMemo(
+    () => [
+      { value: '1', label: t('news.period.1d') },
+      { value: '3', label: t('news.period.3d') },
+      { value: '5', label: t('news.period.5d') },
+      { value: '7', label: t('news.period.7d') },
+      { value: '14', label: t('news.period.14d') },
+    ],
+    [t],
+  );
+
+  const handleSetViewList = useCallback(() => onSetViewMode('list'), [onSetViewMode]);
+  const handleSetViewAccordion = useCallback(() => onSetViewMode('accordion'), [onSetViewMode]);
 
   return (
     <div className={styles.toolbar}>
       <Space wrap>
         <Tooltip title={t('news.toolbar.fetch_default_tooltip')}>
-          <Button icon={<SyncOutlined />} onClick={onFetchDefault} loading={fetchPending} />
+          <Button icon={ICON_SYNC} onClick={onFetchDefault} loading={fetchPending} />
         </Tooltip>
         <Segmented options={periodOptions} value={fetchPeriod} onChange={onFetchPeriod} disabled={fetchPending} />
         {channelTelegramId && (
           <Tooltip title={t('channels.open_tg_tooltip')}>
             <Button
               size="small"
-              icon={<LinkOutlined />}
+              icon={ICON_LINK}
               href={`https://t.me/${channelTelegramId}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -102,34 +119,34 @@ export function NewsFeedToolbarDesktop({
           </Tooltip>
         )}
         <Tooltip title={t('news.toolbar.show_all_tooltip')}>
-          <Button icon={<EyeOutlined />} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
+          <Button icon={ICON_EYE} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
             {showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all')}
           </Button>
         </Tooltip>
         <Tooltip title={t('news.toolbar.mark_all_read_tooltip')}>
-          <Button icon={<CheckSquareOutlined />} onClick={onMarkAllRead} loading={markAllPending}>
+          <Button icon={ICON_CHECK_SQUARE} onClick={onMarkAllRead} loading={markAllPending}>
             {t('news.toolbar.mark_all_read')}
           </Button>
         </Tooltip>
         <Tooltip title={t('news.toolbar.filter_tooltip')}>
-          <Button icon={<FilterOutlined />} onClick={onOpenFilters}>
+          <Button icon={ICON_FILTER} onClick={onOpenFilters}>
             {t('news.toolbar.filter')}
           </Button>
         </Tooltip>
         {showDigest && (
           <Tooltip title={t('digest.tooltip')}>
-            <Button icon={<BulbOutlined />} onClick={onOpenDigest}>
+            <Button icon={ICON_BULB} onClick={onOpenDigest}>
               {t('digest.button')}
             </Button>
           </Tooltip>
         )}
         {hasTags && onOpenTagBrowser && (
           <Tooltip title={t('tags.button_tooltip')}>
-            <Button icon={<TagsOutlined />} onClick={onOpenTagBrowser} />
+            <Button icon={ICON_TAGS} onClick={onOpenTagBrowser} />
           </Tooltip>
         )}
         {hashTagFilter && (
-          <Tag color="blue" closeIcon={<CloseCircleOutlined />} onClose={onClearHashTag} className={styles.hashTag}>
+          <Tag color="blue" closeIcon={ICON_CLOSE_CIRCLE} onClose={onClearHashTag} className={styles.hashTag}>
             {hashTagFilter}
           </Tag>
         )}
@@ -138,17 +155,17 @@ export function NewsFeedToolbarDesktop({
           <Tooltip title={t('news.toolbar.view_list')}>
             <Button
               size="small"
-              icon={<LayoutOutlined />}
+              icon={ICON_LAYOUT}
               type={newsViewMode === 'list' ? 'primary' : 'default'}
-              onClick={() => onSetViewMode('list')}
+              onClick={handleSetViewList}
             />
           </Tooltip>
           <Tooltip title={t('news.toolbar.view_accordion')}>
             <Button
               size="small"
-              icon={<ProfileOutlined />}
+              icon={ICON_PROFILE}
               type={newsViewMode === 'accordion' ? 'primary' : 'default'}
-              onClick={() => onSetViewMode('accordion')}
+              onClick={handleSetViewAccordion}
             />
           </Tooltip>
         </>

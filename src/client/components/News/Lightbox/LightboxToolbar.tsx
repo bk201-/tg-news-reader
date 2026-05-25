@@ -1,11 +1,16 @@
-import React, { useCallback, useState } from 'react';
+import { CloseOutlined, LinkOutlined, LoadingOutlined, ShareAltOutlined } from '@ant-design/icons';
+import type { NewsItem } from '@shared/types.ts';
 import { Button, Typography } from 'antd';
-import { CloseOutlined, LinkOutlined, ShareAltOutlined, LoadingOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { NewsItem } from '@shared/types.ts';
 import { mediaUrl } from '../../../api/mediaUrl';
+
+const ICON_LINK = <LinkOutlined />;
+const ICON_CLOSE = <CloseOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
+const ICON_SHARE = <ShareAltOutlined />;
 
 interface LightboxToolbarProps {
   item: NewsItem | null | undefined;
@@ -124,6 +129,9 @@ export function LightboxToolbar({
     }
   }, [currentMediaPath, shareUrl, channelName]);
 
+  const handleShareVoid = useCallback(() => void handleShare(), [handleShare]);
+  const handleOpenUrl = useCallback(() => window.open(openUrl, '_blank', 'noopener,noreferrer'), [openUrl]);
+
   return (
     <div className={styles.toolbar}>
       <div className={styles.info}>
@@ -137,9 +145,9 @@ export function LightboxToolbar({
       {canShare && currentMediaPath && (
         <Button
           size="small"
-          icon={sharing ? <LoadingOutlined /> : <ShareAltOutlined />}
+          icon={sharing ? ICON_LOADING : ICON_SHARE}
           className={styles.linkBtn}
-          onClick={() => void handleShare()}
+          onClick={handleShareVoid}
           disabled={sharing}
           title={t('lightbox.share')}
         />
@@ -148,16 +156,16 @@ export function LightboxToolbar({
       {openUrl && (
         <Button
           size="small"
-          icon={<LinkOutlined />}
+          icon={ICON_LINK}
           className={styles.linkBtn}
-          onClick={() => window.open(openUrl, '_blank', 'noopener,noreferrer')}
+          onClick={handleOpenUrl}
           title={t('lightbox.open_in_telegram')}
         />
       )}
 
       <Button
         size="small"
-        icon={<CloseOutlined />}
+        icon={ICON_CLOSE}
         className={styles.closeBtn}
         onClick={onClose}
         title={t('lightbox.close')}
