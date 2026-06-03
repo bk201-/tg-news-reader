@@ -188,6 +188,33 @@ export function NewsDetailMedia({
   // Video is unmounted while the lightbox is open — this reliably stops playback
   // (pause() via ref can be ignored by the browser when autoPlay is active).
   // The video remounts when the lightbox closes.
+  //
+  // BUT: Chromium has a long-standing quirk where a <video> element removed from
+  // the DOM mid-playback can keep its audio pipeline alive briefly (until GC),
+  // so the user hears ghost audio from the "removed" element while the lightbox
+  // video plays in parallel. We use React 19's ref-callback cleanup form to
+  // synchronously tear down the media element before React unmounts it:
+  // pause → mute → drop src → load(). This forces the browser to release the
+  // decoder pipeline immediately, so audio stops the instant the lightbox opens.
+  const videoRefCallback = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (videoRef) videoRef.current = el;
+      if (!el) return;
+      return () => {
+        try {
+          el.pause();
+          el.muted = true;
+          el.removeAttribute('src');
+          el.load();
+        } catch {
+          // Best-effort cleanup — never throw from a ref callback
+        }
+        if (videoRef) videoRef.current = null;
+      };
+    },
+    [videoRef],
+  );
+
   // Cache-buster: incremented after a successful re-download so the browser
   // doesn't serve the previously-cached 404 response for the same URL.
   const [cacheBuster, setCacheBuster] = useState(0);
@@ -266,7 +293,7 @@ export function NewsDetailMedia({
           {currentIsVideo ? (
             !isLightboxOpen ? (
               <video
-                ref={videoRef}
+                ref={videoRefCallback}
                 key={currentPath}
                 src={murl(currentPath)}
                 className={styles.mediaFile}
@@ -324,7 +351,7 @@ export function NewsDetailMedia({
         ) : isVideo ? (
           !isLightboxOpen ? (
             <video
-              ref={videoRef}
+              ref={videoRefCallback}
               src={murl(firstMediaPath)}
               controls
               muted

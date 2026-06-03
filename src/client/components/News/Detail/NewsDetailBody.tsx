@@ -37,10 +37,12 @@ const useStyles = createStyles(({ css, token }) => ({
     &::-webkit-scrollbar {
       display: none;
     }
-    /* Show font size controls on hover */
-    &:hover .font-size-bar {
-      opacity: 1;
-      pointer-events: auto;
+    /* Show font size controls on hover — desktop / pointer devices only */
+    @media (hover: hover) and (pointer: fine) {
+      &:hover .font-size-bar {
+        opacity: 1;
+        pointer-events: auto;
+      }
     }
   `,
   contentInline: css`
@@ -97,6 +99,10 @@ const useStyles = createStyles(({ css, token }) => ({
     pointer-events: none;
     transition: opacity 0.18s;
     z-index: 5;
+    /* Touch devices have no hover — hide the bar entirely (it would never appear) */
+    @media (hover: none), (pointer: coarse) {
+      display: none;
+    }
   `,
   fontSizeLabel: css`
     font-size: 11px;

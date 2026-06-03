@@ -319,6 +319,35 @@ describe('News routes (integration)', () => {
       const body = (await res2.json()) as { items: Array<{ localMediaPath?: string }> };
       expect(body.items[0].localMediaPath).toBe('ch/1.jpg');
     });
+
+    it('ETag changes when an item is marked as read (prevents stale 304 reverting checkboxes)', async () => {
+      // Regression: opening the lightbox auto-marks items as read via PATCH /:id/read.
+      // If ETag does not include isRead, a subsequent /api/news refetch returns 304
+      // and the browser HTTP cache replays the OLD body with isRead=0 → the
+      // just-flipped read checkboxes "fall off" in the news panel.
+      const ch = await seedChannel(testDb.db);
+      const n = await seedNews(testDb.db, ch.id, { postedAt: 7000, isRead: 0 });
+
+      // First request — item is unread
+      const res1 = await app.request(`/api/news?channelId=${ch.id}`, { headers });
+      expect(res1.status).toBe(200);
+      const etag1 = res1.headers.get('ETag');
+      const body1 = (await res1.json()) as { items: Array<{ isRead: number }> };
+      expect(body1.items[0].isRead).toBe(0);
+
+      // Simulate the PATCH /:id/read effect (or lightbox auto-mark-read)
+      await testDb.client.execute(`UPDATE news SET is_read = 1 WHERE id = ${n.id}`);
+
+      // Second request — ETag should differ, MUST NOT return 304
+      const res2 = await app.request(`/api/news?channelId=${ch.id}`, {
+        headers: { ...headers, 'If-None-Match': etag1! },
+      });
+      expect(res2.status).toBe(200);
+      const etag2 = res2.headers.get('ETag');
+      expect(etag2).not.toBe(etag1);
+      const body2 = (await res2.json()) as { items: Array<{ isRead: number }> };
+      expect(body2.items[0].isRead).toBe(1);
+    });
   });
 
   // ── POST /api/news/read-all (global) ───────────────────────────────────
