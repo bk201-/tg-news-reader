@@ -201,13 +201,17 @@ router.get('/', async (c) => {
 
   // ETag: must capture ALL dimensions of response state — including fields
   // that change asynchronously after insertion (localMediaPath via download worker,
-  // fullContent via article extractor). Without these, the browser HTTP cache
-  // serves stale 304 responses when TanStack Query refetches, wiping SSE-patched
-  // media paths from the client cache and making images vanish.
+  // fullContent via article extractor) AND the per-item isRead flag. Without
+  // isRead in the ETag, marking items as read (e.g. when opening the lightbox)
+  // does not invalidate the previously cached 200 response: a subsequent
+  // refetch sees identical count/maxPostedAt/mediaCount/contentCount, the
+  // server returns 304, and the browser HTTP cache replays the OLD body with
+  // isRead=0, reverting the just-flipped checkboxes in the news list.
   const maxPostedAt = pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : 0;
   const mediaCount = pageRows.filter((r) => r.localMediaPath).length;
   const contentCount = pageRows.filter((r) => r.fullContent).length;
-  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}"`;
+  const readCount = pageRows.filter((r) => r.isRead === 1).length;
+  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}-${readCount}"`;
 
   const ifNoneMatch = c.req.header('If-None-Match');
   if (ifNoneMatch === etag) {
