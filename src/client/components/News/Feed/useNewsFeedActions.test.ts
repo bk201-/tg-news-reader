@@ -75,6 +75,7 @@ describe('useNewsFeedActions', () => {
       selectedNewsId: null,
       showAll: false,
       autoAdvance: false,
+      hashTagFilter: null,
     });
   });
 
@@ -133,6 +134,36 @@ describe('useNewsFeedActions', () => {
     });
 
     expect(setSelectedNewsId).toHaveBeenCalledWith(2);
+  });
+
+  // Regression: previously, finishing the last visible item while a hashtag filter was active
+  // would call markAllRead({ channelId }) and silently mark every other unread news as read,
+  // losing news that didn't match the tag.
+  it('handleMarkedRead does NOT mark whole channel as read when hashTagFilter is active', () => {
+    const items = [makeItem(1, { isRead: 0 })]; // last visible (filtered) unread
+    useUIStore.setState({ showAll: false, hashTagFilter: '#tech' });
+    // serverFilteredOut > 0 to simulate user-filter-hidden items present
+    const { result } = renderActions(items, 5, 3);
+
+    act(() => {
+      result.current.handleMarkedRead(1);
+    });
+
+    expect(mockMarkAllReadMutate).not.toHaveBeenCalled();
+  });
+
+  // Original semantics preserved: when there's NO tag filter, finishing the last visible item
+  // while server-filtered items exist still triggers the channel-wide mark-read sweep.
+  it('handleMarkedRead marks whole channel as read when no hashTagFilter and serverFilteredOut>0', () => {
+    const items = [makeItem(1, { isRead: 0 })];
+    useUIStore.setState({ showAll: false, hashTagFilter: null });
+    const { result } = renderActions(items, 5, 3);
+
+    act(() => {
+      result.current.handleMarkedRead(1);
+    });
+
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
   });
 
   it('handleTagClick addFilter creates a filter', async () => {

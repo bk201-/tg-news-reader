@@ -70,11 +70,15 @@ export function useNewsFeedActions(
         setSelectedNewsId(nextUnread.id);
       } else {
         const remainingVisible = displayItems.filter((item) => item.id !== currentId && item.isRead === 0);
-        if (!showAll && remainingVisible.length === 0 && serverFilteredOut > 0)
+        // When a hashtag filter is active, the items hidden from view are NOT user-filtered junk —
+        // they're news that simply don't match the current tag. Marking the whole channel as read
+        // here would silently lose all of them. Only "consume" server-filtered items (junk filters)
+        // when no tag filter is narrowing the view.
+        if (!hashTagFilter && !showAll && remainingVisible.length === 0 && serverFilteredOut > 0)
           markAllRead.mutate({ channelId: channel.id });
       }
     },
-    [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id],
+    [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id, hashTagFilter],
   );
 
   const handleTagClick = useCallback(
