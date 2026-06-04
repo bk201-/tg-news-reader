@@ -121,9 +121,14 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
 
   const sinceDate = await computeSinceDate(channel, opts.since);
 
+  // When the user explicitly requests a date range (rare: Fetch-period dropdown),
+  // honour it fully — no message-count cap. Otherwise apply NEWS_FETCH_LIMIT
+  // to bound the routine "give me what's new" auto-fetch.
+  const fetchLimit = opts.limit ?? (opts.since ? undefined : NEWS_FETCH_LIMIT);
+
   const messages = await fetchChannelMessages(channel.telegramId, {
     sinceDate,
-    limit: opts.limit || NEWS_FETCH_LIMIT,
+    limit: fetchLimit,
   });
 
   const strategy = getChannelStrategy(channel.channelType as ChannelType);

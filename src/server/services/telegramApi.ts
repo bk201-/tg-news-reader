@@ -52,7 +52,10 @@ async function _fetchChannelMessages(
 ): Promise<TelegramMessage[]> {
   const _Api = await ensureAndGetApi();
   const tg = await getTelegramClient();
-  const { sinceDate, limit = 500 } = options;
+  // `limit === undefined` means "no cap" — keep paging until sinceDate / empty result.
+  // This is used when the user explicitly asks for a date range via the Fetch-period UI:
+  // they want EVERYTHING since that date, not just the first N messages.
+  const { sinceDate, limit } = options;
   const allMessages: TelegramMessage[] = [];
   let offsetId = options.offsetId ?? 0;
 
@@ -79,7 +82,7 @@ async function _fetchChannelMessages(
 
       if (reachedSinceDate) break;
       if (result.length < BATCH_SIZE) break;
-      if (allMessages.length >= limit) break;
+      if (limit !== undefined && allMessages.length >= limit) break;
 
       const lastMsg = result[result.length - 1];
       if (lastMsg instanceof _Api.Message) {
