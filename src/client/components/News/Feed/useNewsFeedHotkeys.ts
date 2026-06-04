@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 interface NewsFeedHotkeysOptions {
   onFetch: () => void;
-  onToggleShowAll: () => void;
+  onCycleFilterMode: () => void;
   onMarkAllRead: () => void;
   onOpenFilters: () => void;
 }
@@ -12,11 +12,16 @@ interface NewsFeedHotkeysOptions {
  * Uses e.code so they work regardless of keyboard layout (Russian, Czech, etc.).
  *
  * U — fetch / update channel from Telegram  (↻ button)
- * A — toggle show all / filtered only
+ * A — cycle filter mode: filtered → all → hidden → filtered
  * M — mark all as read
  * P — open filter panel
  */
-export function useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, onOpenFilters }: NewsFeedHotkeysOptions) {
+export function useNewsFeedHotkeys({
+  onFetch,
+  onCycleFilterMode,
+  onMarkAllRead,
+  onOpenFilters,
+}: NewsFeedHotkeysOptions) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -30,7 +35,7 @@ export function useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, on
           break;
         case 'KeyA':
           e.preventDefault();
-          onToggleShowAll();
+          onCycleFilterMode();
           break;
         case 'KeyM':
           e.preventDefault();
@@ -45,5 +50,5 @@ export function useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, on
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onFetch, onToggleShowAll, onMarkAllRead, onOpenFilters]);
+  }, [onFetch, onCycleFilterMode, onMarkAllRead, onOpenFilters]);
 }

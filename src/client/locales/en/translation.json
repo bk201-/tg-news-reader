@@ -98,6 +98,13 @@
       "show_all": "Show all",
       "show_all_tooltip": "Toggle filtered / show all · [A]",
       "hide_filtered": "Filtered only",
+      "mode_label": {
+        "filtered": "Filtered",
+        "all": "All",
+        "hidden": "Hidden only"
+      },
+      "mode_tooltip": "View mode (click to cycle): Filtered → All → Hidden · [A]",
+      "mode_cycle_label": "View: {{current}} (tap to cycle)",
       "mark_all_read": "Mark all read",
       "mark_all_read_tooltip": "Mark all as read and clear list · [M]",
       "filter": "Filter",

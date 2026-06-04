@@ -85,7 +85,12 @@ describe('useNewsFeedData', () => {
     mockIsXl = true;
     mockHashTagFilter = null;
     mockSetHashTagFilter.mockClear();
-    useUIStore.setState({ selectedNewsId: null, showAll: false, newsViewMode: 'list', hashTagFilter: null });
+    useUIStore.setState({
+      selectedNewsId: null,
+      newsFilterMode: 'filtered',
+      newsViewMode: 'list',
+      hashTagFilter: null,
+    });
   });
 
   it('returns displayItems from newsItems', () => {
@@ -121,11 +126,23 @@ describe('useNewsFeedData', () => {
     expect(result.current.effectiveViewMode).toBe('list');
   });
 
-  it('showAll=true returns all items including filtered-out', () => {
+  it('newsFilterMode="all" returns all items including filtered-out', () => {
     const f: Filter = { id: 1, channelId: 1, name: 'tag', type: 'tag', value: 'hidden', isActive: 1, createdAt: 0 };
     mockFilters.push(f);
     mockNewsItems.push(makeItem(1, { hashtags: ['hidden'] }), makeItem(2));
-    useUIStore.setState({ showAll: true });
+    useUIStore.setState({ newsFilterMode: 'all' });
+    const { result } = renderHook(() => useNewsFeedData(makeChannel()));
+    expect(result.current.displayItems).toHaveLength(2);
+  });
+
+  it('newsFilterMode="hidden" trusts server output as-is', () => {
+    // In 'hidden' mode the server already returns only filtered items; the
+    // hook must NOT re-apply client filters (which would mark them as
+    // "not passing" and produce an empty displayItems).
+    const f: Filter = { id: 1, channelId: 1, name: 'tag', type: 'tag', value: 'hidden', isActive: 1, createdAt: 0 };
+    mockFilters.push(f);
+    mockNewsItems.push(makeItem(1, { hashtags: ['hidden'] }), makeItem(2, { hashtags: ['hidden'] }));
+    useUIStore.setState({ newsFilterMode: 'hidden' });
     const { result } = renderHook(() => useNewsFeedData(makeChannel()));
     expect(result.current.displayItems).toHaveLength(2);
   });
@@ -133,7 +150,7 @@ describe('useNewsFeedData', () => {
   it('filters by hashtag when hashTagFilter is set', () => {
     mockNewsItems.push(makeItem(1, { hashtags: ['#tech'] }), makeItem(2, { hashtags: ['#politics'] }));
     mockHashTagFilter = 'tech';
-    useUIStore.setState({ showAll: true });
+    useUIStore.setState({ newsFilterMode: 'all' });
     const { result } = renderHook(() => useNewsFeedData(makeChannel()));
     expect(result.current.displayItems).toHaveLength(1);
     expect(result.current.displayItems[0].id).toBe(1);

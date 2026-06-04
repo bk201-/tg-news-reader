@@ -421,5 +421,67 @@ describe('News routes (integration)', () => {
       expect(body.items).toHaveLength(1);
       expect(body.items[0].mediaType).toBe('photo');
     });
+
+    it('view=filtered behaves the same as filtered=1', async () => {
+      const ch = await seedChannel(testDb.db);
+      await seedNews(testDb.db, ch.id, { isFiltered: 0, postedAt: 100, telegramMsgId: 90 });
+      await seedNews(testDb.db, ch.id, { isFiltered: 1, postedAt: 200, telegramMsgId: 91 });
+
+      const res = await app.request(`/api/news?channelId=${ch.id}&view=filtered`, { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.items).toHaveLength(1);
+      expect(body.filteredOut).toBe(1);
+    });
+
+    it('view=hidden returns only isFiltered=1 items', async () => {
+      const ch = await seedChannel(testDb.db);
+      await seedNews(testDb.db, ch.id, { isFiltered: 0, postedAt: 100, telegramMsgId: 100 });
+      const hidden = await seedNews(testDb.db, ch.id, { isFiltered: 1, postedAt: 200, telegramMsgId: 101 });
+
+      const res = await app.request(`/api/news?channelId=${ch.id}&view=hidden`, { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].id).toBe(hidden.id);
+      // filteredOut is still the count of hidden items, regardless of view
+      expect(body.filteredOut).toBe(1);
+    });
+
+    it('view=hidden on media channel includes non-media items too', async () => {
+      const ch = await seedChannel(testDb.db, { channelType: 'media' });
+      await seedNews(testDb.db, ch.id, { mediaType: 'photo', postedAt: 100, telegramMsgId: 110 });
+      const nonMedia = await seedNews(testDb.db, ch.id, {
+        mediaType: 'webpage',
+        postedAt: 200,
+        telegramMsgId: 111,
+      });
+      const isFilteredOne = await seedNews(testDb.db, ch.id, {
+        mediaType: 'photo',
+        isFiltered: 1,
+        postedAt: 300,
+        telegramMsgId: 112,
+      });
+
+      const res = await app.request(`/api/news?channelId=${ch.id}&view=hidden`, { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.items).toHaveLength(2);
+      const ids = body.items.map((i: { id: number }) => i.id).sort((a: number, b: number) => a - b);
+      expect(ids).toEqual([nonMedia.id, isFilteredOne.id].sort((a, b) => a - b));
+    });
+
+    it('view=all returns every item including hidden ones', async () => {
+      const ch = await seedChannel(testDb.db);
+      await seedNews(testDb.db, ch.id, { isFiltered: 0, postedAt: 100, telegramMsgId: 120 });
+      await seedNews(testDb.db, ch.id, { isFiltered: 1, postedAt: 200, telegramMsgId: 121 });
+
+      const res = await app.request(`/api/news?channelId=${ch.id}&view=all`, { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.items).toHaveLength(2);
+      // filteredOut should still report the hidden count so the toolbar can show it
+      expect(body.filteredOut).toBe(1);
+    });
   });
 });

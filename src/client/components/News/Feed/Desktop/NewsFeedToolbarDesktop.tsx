@@ -2,6 +2,7 @@ import {
   BulbOutlined,
   CheckSquareOutlined,
   CloseCircleOutlined,
+  EyeInvisibleOutlined,
   EyeOutlined,
   FilterOutlined,
   LayoutOutlined,
@@ -22,6 +23,7 @@ const { Text } = Typography;
 const ICON_SYNC = <SyncOutlined />;
 const ICON_LINK = <LinkOutlined />;
 const ICON_EYE = <EyeOutlined />;
+const ICON_EYE_INVISIBLE = <EyeInvisibleOutlined />;
 const ICON_CHECK_SQUARE = <CheckSquareOutlined />;
 const ICON_FILTER = <FilterOutlined />;
 const ICON_BULB = <BulbOutlined />;
@@ -64,8 +66,8 @@ export function NewsFeedToolbarDesktop({
   fetchPeriod,
   onFetchDefault,
   onFetchPeriod,
-  showAll,
-  onToggleShowAll,
+  newsFilterMode,
+  onCycleFilterMode,
   markAllPending,
   onMarkAllRead,
   onOpenFilters,
@@ -100,6 +102,12 @@ export function NewsFeedToolbarDesktop({
   const handleSetViewList = useCallback(() => onSetViewMode('list'), [onSetViewMode]);
   const handleSetViewAccordion = useCallback(() => onSetViewMode('accordion'), [onSetViewMode]);
 
+  const filterModeIcon = newsFilterMode === 'hidden' ? ICON_EYE_INVISIBLE : ICON_EYE;
+  const filterModeLabel = t(`news.toolbar.mode_label.${newsFilterMode}`);
+  const filterModeButtonType: 'default' | 'primary' = newsFilterMode === 'all' ? 'primary' : 'default';
+  // 'hidden' gets danger styling to make the unusual state visually obvious
+  const filterModeDanger = newsFilterMode === 'hidden';
+
   return (
     <div className={styles.toolbar}>
       <Space wrap>
@@ -118,9 +126,14 @@ export function NewsFeedToolbarDesktop({
             />
           </Tooltip>
         )}
-        <Tooltip title={t('news.toolbar.show_all_tooltip')}>
-          <Button icon={ICON_EYE} type={showAll ? 'primary' : 'default'} onClick={onToggleShowAll}>
-            {showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all')}
+        <Tooltip title={t('news.toolbar.mode_tooltip')}>
+          <Button
+            icon={filterModeIcon}
+            type={filterModeButtonType}
+            danger={filterModeDanger}
+            onClick={onCycleFilterMode}
+          >
+            {filterModeLabel}
           </Button>
         </Tooltip>
         <Tooltip title={t('news.toolbar.mark_all_read_tooltip')}>

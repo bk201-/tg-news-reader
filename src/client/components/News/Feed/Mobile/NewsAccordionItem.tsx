@@ -1,6 +1,7 @@
 import type { NewsItem } from '@shared/types.ts';
 import { createStyles } from 'antd-style';
 import React, { memo, useCallback } from 'react';
+import type { NewsFilterMode } from '../../../../store/uiStore';
 import { NewsDetail } from '../../Detail/NewsDetail';
 import { NewsListItem } from '../NewsListItem';
 
@@ -26,7 +27,7 @@ interface NewsAccordionItemProps {
   item: NewsItem;
   isSelected: boolean;
   isFiltered: boolean;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
@@ -38,7 +39,7 @@ export const NewsAccordionItem = memo(
     item,
     isSelected,
     isFiltered,
-    showAll,
+    newsFilterMode,
     channelTelegramId,
     onSelect,
     onTagClick,
@@ -48,9 +49,9 @@ export const NewsAccordionItem = memo(
 
     const handleHeaderClick = useCallback(() => onSelect(null), [onSelect]);
 
-    if (!isFiltered && !showAll) return null;
+    if (newsFilterMode === 'filtered' && !isFiltered) return null;
 
-    const dimmed = !isFiltered && showAll;
+    const dimmed = newsFilterMode === 'all' && !isFiltered;
 
     return (
       <div
@@ -73,7 +74,7 @@ export const NewsAccordionItem = memo(
             item={item}
             isSelected={false}
             isFiltered={isFiltered}
-            showAll={showAll}
+            newsFilterMode={newsFilterMode}
             onClick={onSelect}
             onTagClick={onTagClick}
           />
@@ -85,6 +86,6 @@ export const NewsAccordionItem = memo(
     prev.item === next.item &&
     prev.isSelected === next.isSelected &&
     prev.isFiltered === next.isFiltered &&
-    prev.showAll === next.showAll &&
+    prev.newsFilterMode === next.newsFilterMode &&
     prev.channelTelegramId === next.channelTelegramId,
 );

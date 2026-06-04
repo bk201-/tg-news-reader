@@ -45,7 +45,7 @@ describe('NewsListItem', () => {
         item={makeItem(itemOverrides)}
         isSelected={false}
         isFiltered={true}
-        showAll={false}
+        newsFilterMode="filtered"
         onClick={onClick}
         {...props}
       />,
@@ -97,18 +97,41 @@ describe('NewsListItem', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
-  it('renders nothing when filtered out and showAll is false', () => {
+  it('renders nothing when filtered out and mode is "filtered"', () => {
     const { container } = renderWithProviders(
-      <NewsListItem item={makeItem()} isSelected={false} isFiltered={false} showAll={false} onClick={onClick} />,
+      <NewsListItem
+        item={makeItem()}
+        isSelected={false}
+        isFiltered={false}
+        newsFilterMode="filtered"
+        onClick={onClick}
+      />,
     );
     expect(container.querySelector('[role="option"]')).not.toBeInTheDocument();
   });
 
-  it('renders dimmed when filtered out and showAll is true', () => {
+  it('renders dimmed when filtered out and mode is "all"', () => {
     renderWithProviders(
-      <NewsListItem item={makeItem()} isSelected={false} isFiltered={false} showAll={true} onClick={onClick} />,
+      <NewsListItem item={makeItem()} isSelected={false} isFiltered={false} newsFilterMode="all" onClick={onClick} />,
     );
     expect(screen.getByRole('option')).toBeInTheDocument();
+  });
+
+  it('renders un-dimmed in "hidden" mode (server already returned only hidden items)', () => {
+    renderWithProviders(
+      <NewsListItem
+        item={makeItem()}
+        isSelected={false}
+        isFiltered={false}
+        newsFilterMode="hidden"
+        onClick={onClick}
+      />,
+    );
+    const option = screen.getByRole('option');
+    expect(option).toBeInTheDocument();
+    // No itemDimmed class — applying dim styling in 'hidden' mode would dim
+    // EVERY item the user is intentionally viewing.
+    expect(option.className).not.toMatch(/itemDimmed/);
   });
 
   it('renders fallback title when text is empty', () => {
@@ -126,7 +149,13 @@ describe('NewsListItem', () => {
 
   it('has aria-selected matching isSelected prop', () => {
     renderWithProviders(
-      <NewsListItem item={makeItem()} isSelected={true} isFiltered={true} showAll={false} onClick={onClick} />,
+      <NewsListItem
+        item={makeItem()}
+        isSelected={true}
+        isFiltered={true}
+        newsFilterMode="filtered"
+        onClick={onClick}
+      />,
     );
     expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'true');
   });

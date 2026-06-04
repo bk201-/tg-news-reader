@@ -102,7 +102,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
     filteredIds,
     selectedNewsId,
     selectedItem,
-    showAll,
+    newsFilterMode,
     hashTagFilter,
     activeFilterCount,
     effectiveViewMode,
@@ -155,7 +155,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
             isLoading={isLoading}
             items={displayItems}
             filteredIds={filteredIds}
-            showAll={showAll}
+            newsFilterMode={newsFilterMode}
             selectedNewsId={selectedNewsId}
             hashTagFilter={hashTagFilter}
             activeFilterCount={activeFilterCount}
@@ -175,7 +175,7 @@ export function NewsFeed({ channel }: NewsFeedProps) {
               isLoading={isLoading}
               items={displayItems}
               filteredIds={filteredIds}
-              showAll={showAll}
+              newsFilterMode={newsFilterMode}
               selectedNewsId={selectedNewsId}
               hashTagFilter={hashTagFilter}
               activeFilterCount={activeFilterCount}

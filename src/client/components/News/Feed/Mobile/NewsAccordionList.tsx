@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 import type { VirtuosoHandle } from 'react-virtuoso';
 import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../../hooks/breakpoints';
+import type { NewsFilterMode } from '../../../../store/uiStore';
 import { NewsAccordionItem } from './NewsAccordionItem';
 
 const VIRTUOSO_HEIGHT_FULL = { height: '100%' };
@@ -50,7 +51,7 @@ interface NewsAccordionListProps {
   isLoading: boolean;
   items: NewsItem[];
   filteredIds: Set<number>;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
@@ -70,7 +71,7 @@ export function NewsAccordionList({
   isLoading,
   items,
   filteredIds,
-  showAll,
+  newsFilterMode,
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
@@ -100,7 +101,7 @@ export function NewsAccordionList({
           item={item}
           isSelected={selectedNewsId === item.id}
           isFiltered={filteredIds.has(item.id)}
-          showAll={showAll}
+          newsFilterMode={newsFilterMode}
           channelTelegramId={channelTelegramId}
           onSelect={onSelect}
           onTagClick={onTagClick}
@@ -108,7 +109,7 @@ export function NewsAccordionList({
         />
       </div>
     ),
-    [selectedNewsId, filteredIds, showAll, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
+    [selectedNewsId, filteredIds, newsFilterMode, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
   );
 
   const footer = useCallback(

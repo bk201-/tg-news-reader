@@ -2,6 +2,7 @@ import {
   BulbOutlined,
   CheckSquareOutlined,
   CloseCircleOutlined,
+  EyeInvisibleOutlined,
   EyeOutlined,
   FilterOutlined,
   LinkOutlined,
@@ -21,6 +22,8 @@ const { Text } = Typography;
 const ICON_SYNC = <SyncOutlined />;
 const ICON_MORE = <MoreOutlined />;
 const ICON_CLOSE_CIRCLE = <CloseCircleOutlined />;
+const ICON_EYE = <EyeOutlined />;
+const ICON_EYE_INVISIBLE = <EyeInvisibleOutlined />;
 const DROPDOWN_TRIGGER: ['click'] = ['click'];
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -54,8 +57,8 @@ export function NewsFeedToolbarMobile({
   fetchPending,
   onFetchDefault,
   onFetchPeriod,
-  showAll,
-  onToggleShowAll,
+  newsFilterMode,
+  onCycleFilterMode,
   onMarkAllRead,
   onOpenFilters,
   hashTagFilter,
@@ -98,10 +101,12 @@ export function NewsFeedToolbarMobile({
       { key: 'p14', label: t('news.period.14d'), onClick: () => handleFetchPeriod('14') },
       { type: 'divider' },
       {
-        key: 'toggle_all',
-        icon: <EyeOutlined />,
-        label: showAll ? t('news.toolbar.hide_filtered') : t('news.toolbar.show_all'),
-        onClick: onToggleShowAll,
+        key: 'toggle_mode',
+        icon: newsFilterMode === 'hidden' ? ICON_EYE_INVISIBLE : ICON_EYE,
+        label: t('news.toolbar.mode_cycle_label', {
+          current: t(`news.toolbar.mode_label.${newsFilterMode}`),
+        }),
+        onClick: onCycleFilterMode,
       },
       {
         key: 'mark_read',
@@ -157,8 +162,8 @@ export function NewsFeedToolbarMobile({
       t,
       onFetchDefault,
       handleFetchPeriod,
-      showAll,
-      onToggleShowAll,
+      newsFilterMode,
+      onCycleFilterMode,
       onMarkAllRead,
       onOpenFilters,
       channelTelegramId,
