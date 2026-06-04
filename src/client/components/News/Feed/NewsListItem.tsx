@@ -7,6 +7,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
 import { useMarkRead } from '../../../api/news';
+import type { NewsFilterMode } from '../../../store/uiStore';
 import { useUIStore } from '../../../store/uiStore';
 import { NewsHashtags } from './NewsHashtags';
 
@@ -155,7 +156,7 @@ interface NewsListItemProps {
   item: NewsItem;
   isSelected: boolean;
   isFiltered: boolean; // true = passed filter, false = filtered out
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   onClick: (id: number) => void;
   onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
 }
@@ -167,7 +168,7 @@ function getTitle(item: NewsItem, fallback: string): string {
 }
 
 export const NewsListItem = memo(
-  function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, onTagClick }: NewsListItemProps) {
+  function NewsListItem({ item, isSelected, isFiltered, newsFilterMode, onClick, onTagClick }: NewsListItemProps) {
     const markRead = useMarkRead();
     const { styles, cx } = useStyles();
     const { t } = useTranslation();
@@ -215,10 +216,13 @@ export const NewsListItem = memo(
       [isAudio, item.mediaType, item.id, item.channelId, openLightbox],
     );
 
-    // If filtered out and not showAll, don't render
-    if (!isFiltered && !showAll) return null;
+    // Render rules per mode:
+    //   'filtered' — hide items rejected by filters (isFiltered=false)
+    //   'all'      — render everything; dim rejected ones
+    //   'hidden'   — render everything (server returned only rejected items); no dimming
+    if (newsFilterMode === 'filtered' && !isFiltered) return null;
 
-    const dimmed = !isFiltered && showAll;
+    const dimmed = newsFilterMode === 'all' && !isFiltered;
 
     return (
       <div

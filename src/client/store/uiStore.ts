@@ -3,6 +3,23 @@ import { BP_XL } from '../hooks/breakpoints';
 
 export type NewsViewMode = 'list' | 'accordion';
 
+/**
+ * Three-state filter mode for the news feed, cycled by a single toolbar button:
+ *   'filtered' — only items that pass active filters (default; legacy showAll=false)
+ *   'all'      — every loaded item, with filter-rejected ones dimmed (legacy showAll=true)
+ *   'hidden'   — only items rejected by filters (NEW)
+ *
+ * Cycle order: filtered → all → hidden → filtered.
+ */
+export type NewsFilterMode = 'filtered' | 'all' | 'hidden';
+
+export const NEWS_FILTER_MODE_CYCLE: NewsFilterMode[] = ['filtered', 'all', 'hidden'];
+
+export function nextNewsFilterMode(mode: NewsFilterMode): NewsFilterMode {
+  const idx = NEWS_FILTER_MODE_CYCLE.indexOf(mode);
+  return NEWS_FILTER_MODE_CYCLE[(idx + 1) % NEWS_FILTER_MODE_CYCLE.length];
+}
+
 export interface LightboxState {
   newsId: number;
   albumIndex: number;
@@ -17,8 +34,9 @@ interface UIStore {
   // null = "Общее" (ungrouped channels), number = specific group id
   selectedGroupId: number | null;
   setSelectedGroupId: (id: number | null) => void;
-  showAll: boolean;
-  setShowAll: (v: boolean) => void;
+  newsFilterMode: NewsFilterMode;
+  setNewsFilterMode: (mode: NewsFilterMode) => void;
+  cycleNewsFilterMode: () => void;
   filterPanelOpen: boolean;
   setFilterPanelOpen: (v: boolean) => void;
   hashTagFilter: string | null;
@@ -61,8 +79,9 @@ export const useUIStore = create<UIStore>()((set) => ({
   setSelectedNewsId: (id) => set({ selectedNewsId: id }),
   selectedGroupId: null,
   setSelectedGroupId: (id) => set({ selectedGroupId: id, selectedChannelId: null, selectedNewsId: null }),
-  showAll: false,
-  setShowAll: (v) => set({ showAll: v }),
+  newsFilterMode: 'filtered',
+  setNewsFilterMode: (mode) => set({ newsFilterMode: mode }),
+  cycleNewsFilterMode: () => set((state) => ({ newsFilterMode: nextNewsFilterMode(state.newsFilterMode) })),
   filterPanelOpen: false,
   setFilterPanelOpen: (v) => set({ filterPanelOpen: v }),
   hashTagFilter: null,

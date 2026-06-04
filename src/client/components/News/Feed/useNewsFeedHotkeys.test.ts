@@ -15,19 +15,19 @@ function fireKeyWithTarget(code: string, target: HTMLElement) {
 
 describe('useNewsFeedHotkeys', () => {
   let onFetch: Mock<() => void>;
-  let onToggleShowAll: Mock<() => void>;
+  let onCycleFilterMode: Mock<() => void>;
   let onMarkAllRead: Mock<() => void>;
   let onOpenFilters: Mock<() => void>;
 
   beforeEach(() => {
     onFetch = vi.fn();
-    onToggleShowAll = vi.fn();
+    onCycleFilterMode = vi.fn();
     onMarkAllRead = vi.fn();
     onOpenFilters = vi.fn();
   });
 
   const renderIt = () =>
-    renderHook(() => useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, onOpenFilters }));
+    renderHook(() => useNewsFeedHotkeys({ onFetch, onCycleFilterMode, onMarkAllRead, onOpenFilters }));
 
   it('U key calls onFetch', () => {
     renderIt();
@@ -35,10 +35,10 @@ describe('useNewsFeedHotkeys', () => {
     expect(onFetch).toHaveBeenCalled();
   });
 
-  it('A key calls onToggleShowAll', () => {
+  it('A key calls onCycleFilterMode', () => {
     renderIt();
     fireKey('KeyA');
-    expect(onToggleShowAll).toHaveBeenCalled();
+    expect(onCycleFilterMode).toHaveBeenCalled();
   });
 
   it('M key calls onMarkAllRead', () => {
@@ -57,7 +57,7 @@ describe('useNewsFeedHotkeys', () => {
     renderIt();
     fireKey('KeyX');
     expect(onFetch).not.toHaveBeenCalled();
-    expect(onToggleShowAll).not.toHaveBeenCalled();
+    expect(onCycleFilterMode).not.toHaveBeenCalled();
     expect(onMarkAllRead).not.toHaveBeenCalled();
     expect(onOpenFilters).not.toHaveBeenCalled();
   });

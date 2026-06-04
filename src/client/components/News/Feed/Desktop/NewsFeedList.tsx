@@ -5,6 +5,7 @@ import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 import type { VirtuosoHandle } from 'react-virtuoso';
+import type { NewsFilterMode } from '../../../../store/uiStore';
 import { NewsListItem } from '../NewsListItem';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -44,7 +45,7 @@ interface NewsFeedListProps {
   isLoading: boolean;
   items: NewsItem[];
   filteredIds: Set<number>;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
@@ -60,7 +61,7 @@ export function NewsFeedList({
   isLoading,
   items,
   filteredIds,
-  showAll,
+  newsFilterMode,
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
@@ -80,12 +81,12 @@ export function NewsFeedList({
         item={item}
         isSelected={selectedNewsId === item.id}
         isFiltered={filteredIds.has(item.id)}
-        showAll={showAll}
+        newsFilterMode={newsFilterMode}
         onClick={onSelect}
         onTagClick={onTagClick}
       />
     ),
-    [selectedNewsId, filteredIds, showAll, onSelect, onTagClick],
+    [selectedNewsId, filteredIds, newsFilterMode, onSelect, onTagClick],
   );
 
   const emptyDescription = hashTagFilter

@@ -21,8 +21,9 @@ export function useNewsFeedState(channel: Channel) {
   const {
     selectedNewsId,
     setSelectedNewsId,
-    showAll,
-    setShowAll,
+    newsFilterMode,
+    setNewsFilterMode,
+    cycleNewsFilterMode,
     setFilterPanelOpen,
     newsViewMode,
     setNewsViewMode,
@@ -45,12 +46,15 @@ export function useNewsFeedState(channel: Channel) {
     (tag: string | null, action: 'show' | 'addFilter') => {
       if (action === 'show') {
         setHashTagFilter(tag);
-        setShowAll(false);
+        // Clicking a tag should bring the user back to the default view so the
+        // newly chosen tag is visible (a tag click while in 'hidden' or 'all'
+        // is otherwise confusing).
+        setNewsFilterMode('filtered');
       } else if (tag !== null) {
         actionsHandleTagClick(tag, action);
       }
     },
-    [setHashTagFilter, setShowAll, actionsHandleTagClick],
+    [setHashTagFilter, setNewsFilterMode, actionsHandleTagClick],
   );
 
   const scroll = useNewsFeedScroll(
@@ -64,7 +68,7 @@ export function useNewsFeedState(channel: Channel) {
   useNewsHotkeys(data.displayItems, selectedNewsId, setSelectedNewsId, actions.handleSpaceKey);
   useNewsFeedHotkeys({
     onFetch: actions.handleFetchDefault,
-    onToggleShowAll: () => setShowAll(!showAll),
+    onCycleFilterMode: cycleNewsFilterMode,
     onMarkAllRead: actions.handleMarkAllReadAndAdvance,
     onOpenFilters: () => setFilterPanelOpen(true),
   });
@@ -89,8 +93,8 @@ export function useNewsFeedState(channel: Channel) {
     fetchPeriod: actions.fetchPeriod,
     onFetchDefault: actions.handleFetchDefault,
     onFetchPeriod: actions.handleFetchPeriod,
-    showAll,
-    onToggleShowAll: () => setShowAll(!showAll),
+    newsFilterMode,
+    onCycleFilterMode: cycleNewsFilterMode,
     markAllPending:
       actions.markAllRead.isPending ||
       actions.markReadAndFetch.isPending ||
@@ -121,7 +125,7 @@ export function useNewsFeedState(channel: Channel) {
     filteredIds: data.filteredIds,
     selectedNewsId,
     selectedItem: data.selectedItem,
-    showAll,
+    newsFilterMode,
     hashTagFilter: data.hashTagFilter,
     activeFilterCount: data.activeFilterCount,
     effectiveViewMode: data.effectiveViewMode,

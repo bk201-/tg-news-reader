@@ -67,7 +67,11 @@ describe('newsKeys', () => {
   });
 
   it('generates filtered key', () => {
-    expect(newsKeys.byChannel(5, true)).toEqual(['news', 5, 'filtered']);
+    expect(newsKeys.byChannel(5, 'filtered')).toEqual(['news', 5, 'filtered']);
+  });
+
+  it('generates hidden key', () => {
+    expect(newsKeys.byChannel(5, 'hidden')).toEqual(['news', 5, 'hidden']);
   });
 });
 

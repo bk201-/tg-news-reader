@@ -1,12 +1,12 @@
-import type { NewsViewMode } from '../../../store/uiStore';
+import type { NewsFilterMode, NewsViewMode } from '../../../store/uiStore';
 
 export interface NewsFeedToolbarProps {
   fetchPending: boolean;
   fetchPeriod: string;
   onFetchDefault: () => void;
   onFetchPeriod: (val: string | number) => void;
-  showAll: boolean;
-  onToggleShowAll: () => void;
+  newsFilterMode: NewsFilterMode;
+  onCycleFilterMode: () => void;
   markAllPending: boolean;
   onMarkAllRead: () => void;
   activeFilterCount: number;

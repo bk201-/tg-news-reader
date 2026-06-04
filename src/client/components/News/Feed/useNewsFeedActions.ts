@@ -20,7 +20,7 @@ export function useNewsFeedActions(
 ) {
   const { message } = App.useApp();
   const { t } = useTranslation();
-  const { setSelectedNewsId, showAll, setSelectedChannelId, autoAdvance, hashTagFilter } = useUIStore();
+  const { setSelectedNewsId, newsFilterMode, setSelectedChannelId, autoAdvance, hashTagFilter } = useUIStore();
   const { data: allChannels = [] } = useChannels();
 
   const markAllRead = useMarkAllRead();
@@ -73,12 +73,14 @@ export function useNewsFeedActions(
         // When a hashtag filter is active, the items hidden from view are NOT user-filtered junk —
         // they're news that simply don't match the current tag. Marking the whole channel as read
         // here would silently lose all of them. Only "consume" server-filtered items (junk filters)
-        // when no tag filter is narrowing the view.
-        if (!hashTagFilter && !showAll && remainingVisible.length === 0 && serverFilteredOut > 0)
+        // when no tag filter is narrowing the view AND we're in the default 'filtered' mode
+        // (not 'all' — user already sees everything, no need to sweep; not 'hidden' — user is
+        // intentionally working through hidden items only, don't touch the visible ones).
+        if (!hashTagFilter && newsFilterMode === 'filtered' && remainingVisible.length === 0 && serverFilteredOut > 0)
           markAllRead.mutate({ channelId: channel.id });
       }
     },
-    [displayItems, setSelectedNewsId, showAll, serverFilteredOut, markAllRead, channel.id, hashTagFilter],
+    [displayItems, setSelectedNewsId, newsFilterMode, serverFilteredOut, markAllRead, channel.id, hashTagFilter],
   );
 
   const handleTagClick = useCallback(
@@ -156,6 +158,14 @@ export function useNewsFeedActions(
       return;
     }
 
+    // 'hidden' mode: user is intentionally viewing only the filter-rejected items.
+    // Mark just the currently loaded hidden items, don't sweep the whole channel.
+    if (newsFilterMode === 'hidden') {
+      if (displayItems.length === 0) return;
+      markAllRead.mutate({ newsIds: displayItems.map((i) => i.id) });
+      return;
+    }
+
     if (!autoAdvance) {
       markAllRead.mutate({ channelId: channel.id });
       return;
@@ -168,6 +178,7 @@ export function useNewsFeedActions(
     });
   }, [
     hashTagFilter,
+    newsFilterMode,
     autoAdvance,
     markAllRead,
     channel.id,
