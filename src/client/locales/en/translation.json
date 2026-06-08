@@ -319,6 +319,23 @@
     "cleared_count": "Cleared {{count}} cached digest(s)",
     "auto_cleared_all_read": "All batches marked as read — digest cache cleared"
   },
+  "tts": {
+    "button": "Read",
+    "button_tooltip": "Read aloud",
+    "modal_title": "Read aloud",
+    "char_count": "{{count}} characters",
+    "choice_native": "Native (browser)",
+    "choice_ai": "AI (high quality)",
+    "ai_coming_soon": "Available in the next release",
+    "native_unsupported": "Your browser does not support speech synthesis.",
+    "empty_text": "Nothing to read — the text is empty.",
+    "play_tooltip": "Play",
+    "pause_tooltip": "Pause",
+    "prev_tooltip": "Previous sentence",
+    "next_tooltip": "Next sentence",
+    "stop": "Stop",
+    "position": "Sentence {{current}} / {{total}}"
+  },
   "tags": {
     "title": "Tags",
     "subtitle": "{{count}} tags",

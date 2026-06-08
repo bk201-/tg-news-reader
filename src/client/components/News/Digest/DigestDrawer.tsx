@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { streamDigest } from '../../../api/digest';
 import type { DigestParams } from '../../../api/digest';
 import { useUIStore } from '../../../store/uiStore';
+import { ReadAloudButton } from '../../ReadAloud/ReadAloudButton';
 import { DigestBody } from './DigestBody';
 
 const { Text } = Typography;
@@ -217,6 +218,7 @@ export function DigestDrawer({ open, params, onClose, initialText, initialRefMap
           <div className={styles.footer}>
             <span className={styles.poweredBy}>{t('digest.powered_by')}</span>
             <div className={styles.footerActions}>
+              <ReadAloudButton text={text} title={t('digest.title')} />
               <Button icon={ICON_RELOAD} size="small" onClick={handleRunVoid}>
                 {t('digest.refresh')}
               </Button>
