@@ -67,6 +67,33 @@ export const DIGEST_ARTICLE_PREFETCH_TIMEOUT_MS =
  */
 export const DIGEST_MAX_PREFETCH = parseInt(process.env.DIGEST_MAX_PREFETCH ?? '20', 10);
 
+// ─── OpenAI TTS (Read Aloud) ──────────────────────────────────────────────────
+/** TTS model name. Env: OPENAI_TTS_MODEL (default "gpt-4o-mini-tts") */
+export const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL ?? 'gpt-4o-mini-tts';
+/** Default voice. Env: OPENAI_TTS_VOICE_DEFAULT (default "nova") */
+export const OPENAI_TTS_VOICE_DEFAULT = process.env.OPENAI_TTS_VOICE_DEFAULT ?? 'nova';
+/**
+ * Azure OpenAI TTS deployment name. When set (along with Azure endpoint+key),
+ * Azure provider is used for TTS. Otherwise the service falls back to direct OPENAI_API_KEY.
+ * Env: AZURE_OPENAI_TTS_DEPLOYMENT
+ */
+export const AZURE_OPENAI_TTS_DEPLOYMENT = process.env.AZURE_OPENAI_TTS_DEPLOYMENT ?? '';
+/**
+ * Hard cap on input length for TTS. At gpt-4o-mini-tts pricing (~$12/M chars),
+ * 20 000 chars = ~$0.24 per request and ~10 min of audio.
+ * Env: TTS_MAX_INPUT_CHARS (default 20000)
+ */
+export const TTS_MAX_INPUT_CHARS = parseInt(process.env.TTS_MAX_INPUT_CHARS ?? '20000', 10);
+/**
+ * Per-call OpenAI TTS limit is 4096 chars; we use a slightly smaller chunk
+ * size and split at sentence boundaries. Env: TTS_CHUNK_SIZE_CHARS (default 4000)
+ */
+export const TTS_CHUNK_SIZE_CHARS = parseInt(process.env.TTS_CHUNK_SIZE_CHARS ?? '4000', 10);
+/** TTL for cached MP3s and DB rows in seconds. Env: TTS_CACHE_TTL_SEC (default 86400 = 1 day) */
+export const TTS_CACHE_TTL_SEC = parseInt(process.env.TTS_CACHE_TTL_SEC ?? '86400', 10);
+/** Cleanup interval in ms — how often the periodic cleanup job runs. Default 1h. */
+export const TTS_CLEANUP_INTERVAL_MS = parseInt(process.env.TTS_CLEANUP_INTERVAL_SEC ?? '3600', 10) * 1_000;
+
 // ─── Article download limits ──────────────────────────────────────────────────
 /**
  * Max number of workers that may process article (jsdom) tasks concurrently.

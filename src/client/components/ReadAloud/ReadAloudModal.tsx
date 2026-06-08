@@ -1,18 +1,13 @@
-import {
-  CaretRightOutlined,
-  PauseOutlined,
-  RobotOutlined,
-  SoundOutlined,
-  StepBackwardOutlined,
-  StepForwardOutlined,
-  StopOutlined,
-} from '@ant-design/icons';
-import { Alert, Button, Modal, Progress, Tooltip, Typography } from 'antd';
+import { RobotOutlined, SoundOutlined } from '@ant-design/icons';
+import { Alert, Button, Modal, Tooltip, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTtsConfig } from '../../api/tts';
+import { AiPlayer } from './AiPlayer';
+import { NativePlayer } from './NativePlayer';
 import { splitSentences } from './splitSentences';
-import { useNativeTts } from './useNativeTts';
+import { isNativeTtsSupported } from './useNativeTts';
 
 const { Text } = Typography;
 
@@ -33,35 +28,10 @@ const useStyles = createStyles(({ css, token }) => ({
     min-width: 160px;
     height: 56px;
   `,
-  playerWrap: css`
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  `,
-  controlsRow: css`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-content: center;
-  `,
-  positionLine: css`
-    text-align: center;
-    color: ${token.colorTextSecondary};
-    font-size: 12px;
-  `,
-  stopRow: css`
-    display: flex;
-    justify-content: flex-end;
-  `,
 }));
 
 const ICON_NATIVE = <SoundOutlined />;
 const ICON_AI = <RobotOutlined />;
-const ICON_PLAY = <CaretRightOutlined />;
-const ICON_PAUSE = <PauseOutlined />;
-const ICON_PREV = <StepBackwardOutlined />;
-const ICON_NEXT = <StepForwardOutlined />;
-const ICON_STOP = <StopOutlined />;
 
 export interface ReadAloudModalProps {
   open: boolean;
@@ -70,72 +40,68 @@ export interface ReadAloudModalProps {
   title?: string;
 }
 
-type ModalMode = 'choice' | 'native';
+type ModalMode = 'choice' | 'native' | 'ai';
 
 export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
 
-  const sentences = useMemo(() => splitSentences(text), [text]);
-  const charCount = text.length;
-  const tts = useNativeTts(sentences);
-
   const [mode, setMode] = useState<ModalMode>('choice');
 
-  // Reset to choice state and stop playback whenever the modal closes/opens with new text.
+  // Reset state whenever the modal closes
   useEffect(() => {
-    if (!open) {
-      tts.stop();
-      setMode('choice');
-    }
-    // Intentionally not including `tts` — its identity changes every render and we only want
-    // to react to open/text changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, text]);
+    if (!open) setMode('choice');
+  }, [open]);
 
-  const handlePickNative = useCallback(() => {
-    if (!tts.supported || sentences.length === 0) return;
-    setMode('native');
-    tts.start(0);
-  }, [tts, sentences.length]);
+  const ttsConfig = useTtsConfig();
+  const aiEnabled = ttsConfig.data?.enabled === true;
+  const aiDefaultVoice = ttsConfig.data?.defaultVoice ?? 'nova';
+  const aiMaxChars = ttsConfig.data?.maxInputChars ?? 20_000;
 
-  const handlePlayPause = useCallback(() => {
-    if (tts.status === 'playing') tts.pause();
-    else if (tts.status === 'paused') tts.resume();
-    else tts.start(tts.currentIndex);
-  }, [tts]);
-
-  const handleStop = useCallback(() => {
-    tts.stop();
-    setMode('choice');
-  }, [tts]);
+  const nativeSupported = isNativeTtsSupported();
+  const hasContent = !!text.trim();
+  // Cheap O(n) check to decide whether to enable the Native button — actual sentence
+  // playback happens inside <NativePlayer> only after the user picks Native.
+  const sentencesNonEmpty = useMemo(() => hasContent && splitSentences(text).length > 0, [text, hasContent]);
+  const aiTooLong = text.length > aiMaxChars;
 
   const modalTitle = title ? `${t('tts.modal_title')} — ${title}` : t('tts.modal_title');
-  const progressPct =
-    tts.total > 0 ? Math.round(((Math.min(tts.currentIndex, tts.total - 1) + 1) / tts.total) * 100) : 0;
+
+  const handleStop = useCallback(() => setMode('choice'), []);
+  const handlePickNative = useCallback(() => setMode('native'), []);
+  const handlePickAi = useCallback(() => setMode('ai'), []);
+
+  const aiTooltip = !aiEnabled ? t('tts.ai_unavailable') : aiTooLong ? t('tts.ai_too_long') : '';
 
   return (
-    <Modal title={modalTitle} open={open} onCancel={onClose} footer={null} destroyOnHidden>
+    <Modal title={modalTitle} open={open} onCancel={onClose} footer={null} destroyOnHidden width={520}>
       <div className={styles.meta}>
-        <Text type="secondary">{t('tts.char_count', { count: charCount })}</Text>
+        <Text type="secondary">{t('tts.char_count', { count: text.length })}</Text>
       </div>
 
       {mode === 'choice' && (
         <>
-          {!tts.supported && <Alert type="warning" title={t('tts.native_unsupported')} showIcon />}
-          {tts.supported && sentences.length === 0 && <Alert type="warning" title={t('tts.empty_text')} showIcon />}
+          {!nativeSupported && <Alert type="warning" title={t('tts.native_unsupported')} showIcon />}
+          {nativeSupported && !sentencesNonEmpty && <Alert type="warning" title={t('tts.empty_text')} showIcon />}
           <div className={styles.choiceRow}>
             <Button
               className={styles.choiceButton}
               icon={ICON_NATIVE}
               onClick={handlePickNative}
-              disabled={!tts.supported || sentences.length === 0}
+              disabled={!nativeSupported || !sentencesNonEmpty}
               size="large"
             >
               {t('tts.choice_native')}
             </Button>
-            <Tooltip title={t('tts.ai_coming_soon')}>
-              <Button className={styles.choiceButton} icon={ICON_AI} disabled size="large">
+            <Tooltip title={aiTooltip}>
+              <Button
+                className={styles.choiceButton}
+                icon={ICON_AI}
+                onClick={handlePickAi}
+                disabled={!aiEnabled || !hasContent || aiTooLong}
+                size="large"
+                type={aiEnabled && hasContent && !aiTooLong ? 'primary' : 'default'}
+              >
                 {t('tts.choice_ai')}
               </Button>
             </Tooltip>
@@ -143,55 +109,8 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
         </>
       )}
 
-      {mode === 'native' && (
-        <div className={styles.playerWrap}>
-          <div className={styles.controlsRow}>
-            <Tooltip title={t('tts.prev_tooltip')}>
-              <Button
-                icon={ICON_PREV}
-                shape="circle"
-                onClick={tts.prev}
-                disabled={tts.currentIndex <= 0}
-                aria-label={t('tts.prev_tooltip')}
-              />
-            </Tooltip>
-            <Tooltip title={tts.status === 'playing' ? t('tts.pause_tooltip') : t('tts.play_tooltip')}>
-              <Button
-                icon={tts.status === 'playing' ? ICON_PAUSE : ICON_PLAY}
-                shape="circle"
-                size="large"
-                type="primary"
-                onClick={handlePlayPause}
-                aria-label={tts.status === 'playing' ? t('tts.pause_tooltip') : t('tts.play_tooltip')}
-              />
-            </Tooltip>
-            <Tooltip title={t('tts.next_tooltip')}>
-              <Button
-                icon={ICON_NEXT}
-                shape="circle"
-                onClick={tts.next}
-                disabled={tts.currentIndex >= tts.total - 1}
-                aria-label={t('tts.next_tooltip')}
-              />
-            </Tooltip>
-          </div>
-
-          <Progress percent={progressPct} showInfo={false} />
-
-          <div className={styles.positionLine}>
-            {t('tts.position', {
-              current: Math.min(tts.currentIndex + 1, tts.total),
-              total: tts.total,
-            })}
-          </div>
-
-          <div className={styles.stopRow}>
-            <Button icon={ICON_STOP} onClick={handleStop} size="small">
-              {t('tts.stop')}
-            </Button>
-          </div>
-        </div>
-      )}
+      {mode === 'native' && <NativePlayer text={text} onStop={handleStop} />}
+      {mode === 'ai' && <AiPlayer text={text} defaultVoice={aiDefaultVoice} onStop={handleStop} />}
     </Modal>
   );
 }

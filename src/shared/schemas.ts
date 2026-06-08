@@ -122,6 +122,13 @@ export const clientLogSchema = z.object({
   ),
 });
 
+// ─── TTS (Read Aloud — AI mode) ───────────────────────────────────────────────
+
+export const createTtsSchema = z.object({
+  text: z.string().min(1, 'text is required'),
+  voice: z.string().optional(),
+});
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({

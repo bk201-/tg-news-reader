@@ -164,5 +164,22 @@ export async function runMigration(): Promise<void> {
     )
   `);
 
+  // TTS cache (idempotent)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS tts_cache (
+      content_hash TEXT PRIMARY KEY,
+      voice TEXT NOT NULL,
+      model TEXT NOT NULL,
+      char_count INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'done', 'failed')),
+      chunks_total INTEGER NOT NULL DEFAULT 0,
+      chunks_done INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      last_accessed_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `);
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_tts_cache_last_accessed ON tts_cache(last_accessed_at)');
+
   logger.info('✅ Database migrated successfully');
 }
