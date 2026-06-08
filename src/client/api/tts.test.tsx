@@ -51,18 +51,23 @@ describe('useTtsAudioUrl', () => {
 
 describe('useTtsConfig', () => {
   it('returns server config from /api/tts/config', async () => {
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({ enabled: true, defaultVoice: 'nova', maxInputChars: 20000, model: 'gpt-4o-mini-tts' }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ) as typeof fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          enabled: true,
+          defaultVoice: 'nova',
+          voices: ['nova', 'alloy', 'echo'],
+          maxInputChars: 20000,
+          model: 'gpt-4o-mini-tts',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
     const { result } = renderHook(() => useTtsConfig(), { wrapper: wrap() });
     await waitFor(() => expect(result.current.data).toBeDefined());
     expect(result.current.data?.enabled).toBe(true);
     expect(result.current.data?.defaultVoice).toBe('nova');
+    expect(result.current.data?.voices).toEqual(['nova', 'alloy', 'echo']);
   });
 });
 

@@ -4,11 +4,13 @@ import { createStyles } from 'antd-style';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTtsConfig } from '../../api/tts';
+import { useUIStore } from '../../store/uiStore';
 import { AiPlayer } from './AiPlayer';
 import { NativePlayer } from './NativePlayer';
 import { sanitizeForTts } from './sanitizeForTts';
 import { splitSentences } from './splitSentences';
 import { isNativeTtsSupported } from './useNativeTts';
+import { VoicePicker } from './VoicePicker';
 
 const { Text } = Typography;
 
@@ -57,7 +59,14 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
   const ttsConfig = useTtsConfig();
   const aiEnabled = ttsConfig.data?.enabled === true;
   const aiDefaultVoice = ttsConfig.data?.defaultVoice ?? 'nova';
+  const aiVoices = ttsConfig.data?.voices ?? [];
   const aiMaxChars = ttsConfig.data?.maxInputChars ?? 20_000;
+
+  // Persisted last-used voice; falls back to server default. If the persisted value is
+  // no longer in the server's voices list (e.g. model changed), we drop back to default.
+  const persistedVoice = useUIStore((s) => s.ttsVoice);
+  const setPersistedVoice = useUIStore((s) => s.setTtsVoice);
+  const selectedVoice = persistedVoice && aiVoices.includes(persistedVoice) ? persistedVoice : aiDefaultVoice;
 
   const nativeSupported = isNativeTtsSupported();
   // Strip URLs/markdown links once at the modal level — both Native and AI players use the
@@ -111,11 +120,19 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
               </Button>
             </Tooltip>
           </div>
+          {aiEnabled && aiVoices.length > 0 && (
+            <VoicePicker
+              voices={aiVoices}
+              value={selectedVoice}
+              onChange={setPersistedVoice}
+              disabled={!hasContent || aiTooLong}
+            />
+          )}
         </>
       )}
 
       {mode === 'native' && <NativePlayer text={sanitized} onStop={handleStop} />}
-      {mode === 'ai' && <AiPlayer text={sanitized} defaultVoice={aiDefaultVoice} onStop={handleStop} />}
+      {mode === 'ai' && <AiPlayer text={sanitized} defaultVoice={selectedVoice} onStop={handleStop} />}
     </Modal>
   );
 }
