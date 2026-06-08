@@ -144,8 +144,9 @@ export const filterStats = sqliteTable(
 /**
  * Cache for AI-generated TTS audio (Read Aloud feature).
  * Keyed by SHA-256 hash of `text + voice + model` so identical re-reads are instant.
- * Files live at `data/tts/{contentHash}.mp3`. Rows + files expire via periodic cleanup
- * once `lastAccessedAt` is older than TTS_CACHE_TTL_SEC.
+ * Files live at `data/tts/{contentHash}/{idx}.mp3` (one MP3 per chunk).
+ * Rows + files expire via periodic cleanup once `lastAccessedAt` is older
+ * than TTS_CACHE_TTL_SEC.
  */
 export const ttsCache = sqliteTable('tts_cache', {
   contentHash: text('content_hash').primaryKey(), // SHA-256 of `${text}|${voice}|${model}`

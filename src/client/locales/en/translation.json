@@ -341,7 +341,8 @@
     "prev_tooltip": "Previous sentence",
     "next_tooltip": "Next sentence",
     "stop": "Stop",
-    "position": "Sentence {{current}} / {{total}}"
+    "position": "Sentence {{current}} / {{total}}",
+    "ai_chunk_position": "Part {{current}} / {{total}}"
   },
   "tags": {
     "title": "Tags",

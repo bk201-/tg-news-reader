@@ -1,5 +1,5 @@
-import { existsSync, statSync } from 'fs';
-import { mkdir, rename, unlink, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { mkdir, readdir, rename, rm, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { and, eq, lt } from 'drizzle-orm';
 import { OPENAI_TTS_MODEL, OPENAI_TTS_VOICE_DEFAULT, TTS_CACHE_TTL_SEC, TTS_CHUNK_SIZE_CHARS } from '../config.js';
@@ -27,15 +27,20 @@ export interface TtsStartResult extends TtsJobStatus {
   cached: boolean;
 }
 
-/** Absolute path to the cached MP3 for a given hash (used by the route to stream the file). */
-export function ttsFilePath(hash: string): string {
-  return join(TTS_DIR, `${hash}.mp3`);
+/** Per-hash directory containing one MP3 file per chunk (`0.mp3`, `1.mp3`, …). */
+export function ttsChunkDir(hash: string): string {
+  return join(TTS_DIR, hash);
+}
+
+/** Absolute path to a single chunk MP3 (used by the streaming route). */
+export function ttsChunkPath(hash: string, idx: number): string {
+  return join(ttsChunkDir(hash), `${idx}.mp3`);
 }
 
 /**
  * Look up or kick off a TTS generation for the given input.
  *
- * - If a `done` row + file already exist → returns `cached: true`, bumps lastAccessedAt.
+ * - If a `done` row + chunk dir already exist → returns `cached: true`, bumps lastAccessedAt.
  * - If a row exists with status `pending`/`processing` → returns current status (no new job).
  * - If a row exists with status `failed` → resets to `pending` and re-runs.
  * - Otherwise → inserts a `pending` row and kicks off generation in the background.
@@ -53,8 +58,7 @@ export async function startOrGetTts(text: string, voice?: string): Promise<TtsSt
   const existing = await db.select().from(ttsCache).where(eq(ttsCache.contentHash, hash)).limit(1);
   const row = existing[0];
 
-  if (row && row.status === 'done' && existsSync(ttsFilePath(hash))) {
-    // Cache hit — bump access time so cleanup keeps the file warm
+  if (row && row.status === 'done' && existsSync(ttsChunkPath(hash, 0))) {
     await db.update(ttsCache).set({ lastAccessedAt: now }).where(eq(ttsCache.contentHash, hash));
     return {
       hash,
@@ -77,7 +81,7 @@ export async function startOrGetTts(text: string, voice?: string): Promise<TtsSt
     };
   }
 
-  // Fresh row, or previous attempt failed / file vanished → (re)start generation
+  // Fresh row, or previous attempt failed / files vanished → (re)start generation
   const chunks = chunkTextForTts(text, TTS_CHUNK_SIZE_CHARS);
 
   if (row) {
@@ -104,8 +108,7 @@ export async function startOrGetTts(text: string, voice?: string): Promise<TtsSt
     });
   }
 
-  // Kick off the background job, with single-flight dedup
-  void scheduleGeneration(hash, text, v, model, chunks);
+  void scheduleGeneration(hash, v, model, chunks);
 
   return {
     hash,
@@ -142,8 +145,8 @@ export async function touchTts(hash: string): Promise<void> {
 }
 
 /**
- * Periodic cleanup — deletes rows + files where lastAccessedAt is older than TTL.
- * Called on server startup and on an interval.
+ * Periodic cleanup — deletes rows + chunk dirs where lastAccessedAt is older than TTL.
+ * Also sweeps legacy single-file MP3s left over from the Phase 2 initial layout.
  */
 export async function cleanupExpiredTts(): Promise<number> {
   const cutoff = Math.floor(Date.now() / 1000) - TTS_CACHE_TTL_SEC;
@@ -154,18 +157,34 @@ export async function cleanupExpiredTts(): Promise<number> {
 
   let deleted = 0;
   for (const { contentHash } of expired) {
-    const filepath = ttsFilePath(contentHash);
+    const dir = ttsChunkDir(contentHash);
     try {
-      if (existsSync(filepath)) await unlink(filepath);
+      if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
     } catch (err) {
-      logger.warn({ module: 'tts', hash: contentHash, err }, 'failed to delete expired tts file');
+      logger.warn({ module: 'tts', hash: contentHash, err }, 'failed to delete expired tts chunk dir');
     }
     await db.delete(ttsCache).where(eq(ttsCache.contentHash, contentHash));
     deleted += 1;
   }
 
-  // Also clean up orphaned tmp files left behind by crashed jobs (older than 1h)
-  // — deferred to keep the function simple; the rename(.tmp → .mp3) is atomic so leftovers are rare.
+  // One-shot cleanup of legacy `{hash}.mp3` single-file cache.
+  try {
+    if (existsSync(TTS_DIR)) {
+      const entries = await readdir(TTS_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && /^[0-9a-f]{64}\.mp3$/.test(entry.name)) {
+          try {
+            await unlink(join(TTS_DIR, entry.name));
+            logger.info({ module: 'tts', file: entry.name }, 'removed legacy single-file tts cache');
+          } catch {
+            /* best-effort */
+          }
+        }
+      }
+    }
+  } catch {
+    /* best-effort */
+  }
 
   if (deleted > 0) {
     logger.info({ module: 'tts', deleted }, `cleaned up ${deleted} expired tts entries`);
@@ -187,26 +206,29 @@ export async function resetStuckTtsJobs(): Promise<void> {
 
 // ─── Internal: background generation ──────────────────────────────────────────
 
-function scheduleGeneration(hash: string, text: string, voice: string, model: string, chunks: string[]): Promise<void> {
+function scheduleGeneration(hash: string, voice: string, model: string, chunks: string[]): Promise<void> {
   const existing = inFlight.get(hash);
   if (existing) return existing;
 
-  const promise = generate(hash, text, voice, model, chunks).finally(() => {
+  const promise = generate(hash, voice, model, chunks).finally(() => {
     inFlight.delete(hash);
   });
   inFlight.set(hash, promise);
   return promise;
 }
 
-async function generate(hash: string, _text: string, voice: string, model: string, chunks: string[]): Promise<void> {
-  const tmpPath = `${ttsFilePath(hash)}.tmp`;
-  const finalPath = ttsFilePath(hash);
+async function generate(hash: string, voice: string, model: string, chunks: string[]): Promise<void> {
+  const dir = ttsChunkDir(hash);
 
   try {
     await db.update(ttsCache).set({ status: 'processing', chunksDone: 0 }).where(eq(ttsCache.contentHash, hash));
 
+    // Clean slate — a previous failed attempt may have left partial files behind.
+    if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+
     const client = createTtsClient();
-    const buffers: Buffer[] = [];
+    let totalBytes = 0;
 
     for (let i = 0; i < chunks.length; i++) {
       const response = await client.audio.speech.create({
@@ -216,7 +238,15 @@ async function generate(hash: string, _text: string, voice: string, model: strin
         response_format: 'mp3',
       });
       const arrayBuf = await response.arrayBuffer();
-      buffers.push(Buffer.from(arrayBuf));
+      const buf = Buffer.from(arrayBuf);
+      totalBytes += buf.length;
+
+      // Atomic per-chunk write — readers that arrive mid-write never see a partial file.
+      const finalPath = ttsChunkPath(hash, i);
+      const tmpPath = `${finalPath}.tmp`;
+      await writeFile(tmpPath, buf);
+      await rename(tmpPath, finalPath);
+
       await db
         .update(ttsCache)
         .set({ chunksDone: i + 1, lastAccessedAt: Math.floor(Date.now() / 1000) })
@@ -224,17 +254,12 @@ async function generate(hash: string, _text: string, voice: string, model: strin
       logger.debug({ module: 'tts', hash, chunk: i + 1, total: chunks.length }, 'tts chunk done');
     }
 
-    // Concatenate raw MP3 bytes — players tolerate the extra ID3 frames between chunks.
-    await writeFile(tmpPath, Buffer.concat(buffers));
-    await rename(tmpPath, finalPath);
-
-    const sizeBytes = statSync(finalPath).size;
     await db
       .update(ttsCache)
       .set({ status: 'done', lastAccessedAt: Math.floor(Date.now() / 1000) })
       .where(eq(ttsCache.contentHash, hash));
 
-    logger.info({ module: 'tts', hash, chunks: chunks.length, sizeBytes }, 'tts generation complete');
+    logger.info({ module: 'tts', hash, chunks: chunks.length, sizeBytes: totalBytes }, 'tts generation complete');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ module: 'tts', hash, err }, 'tts generation failed');
@@ -242,9 +267,8 @@ async function generate(hash: string, _text: string, voice: string, model: strin
       .update(ttsCache)
       .set({ status: 'failed', error: message.slice(0, 500) })
       .where(eq(ttsCache.contentHash, hash));
-    // Best-effort cleanup of partial tmp file
     try {
-      if (existsSync(tmpPath)) await unlink(tmpPath);
+      if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
     } catch {
       // ignore
     }

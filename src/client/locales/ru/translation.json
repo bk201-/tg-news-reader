@@ -341,7 +341,8 @@
     "prev_tooltip": "Предыдущее предложение",
     "next_tooltip": "Следующее предложение",
     "stop": "Остановить",
-    "position": "Предложение {{current}} / {{total}}"
+    "position": "Предложение {{current}} / {{total}}",
+    "ai_chunk_position": "Часть {{current}} / {{total}}"
   },
   "tags": {
     "title": "Теги",

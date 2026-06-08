@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { OPENAI_TTS_MODEL, OPENAI_TTS_VOICE_DEFAULT, TTS_MAX_INPUT_CHARS } from '../config.js';
 import { logger } from '../logger.js';
 import { isTtsConfigured } from '../services/openaiClient.js';
-import { getTtsStatus, startOrGetTts, touchTts, ttsFilePath } from '../services/ttsService.js';
+import { getTtsStatus, startOrGetTts, touchTts, ttsChunkPath } from '../services/ttsService.js';
 import { createTtsSchema } from './schemas.js';
 
 const router = new Hono();
@@ -13,7 +13,6 @@ const router = new Hono();
 /**
  * GET /api/tts/config
  * Returns current TTS configuration so the client can enable/disable the AI button.
- * Public-ish: requires auth via the parent middleware, but does not reveal secrets.
  */
 router.get('/config', (c) => {
   return c.json({
@@ -31,7 +30,7 @@ router.get('/config', (c) => {
  * - Returns 503 if TTS provider not configured.
  * - Returns 413 if `text.length > TTS_MAX_INPUT_CHARS`.
  * - Returns `{ hash, status, chunksTotal, chunksDone, cached }`:
- *     * `cached: true` → audio is ready, fetch `GET /api/tts/:hash.mp3`
+ *     * `cached: true` → audio is ready, fetch `GET /api/tts/:hash/0.mp3` etc.
  *     * `cached: false` → poll `GET /api/tts/:hash/status` until `status === 'done'`
  */
 router.post('/', zValidator('json', createTtsSchema), async (c) => {
@@ -67,25 +66,36 @@ router.get('/:hash/status', async (c) => {
 });
 
 /**
- * GET /api/tts/:hash.mp3
- * Streams the cached MP3 with HTTP Range support so the browser can seek.
+ * GET /api/tts/:hash/:idx.mp3
+ * Streams a single chunk MP3 with HTTP Range support so the browser can seek inside the chunk.
+ * The client plays chunks sequentially by swapping `<audio src>` on the `ended` event —
+ * this avoids the byte-level MP3 concatenation problem (stray ID3 headers reset the
+ * player timeline at chunk boundaries).
+ *
  * Auth via `?token=` query param (handled by the global auth middleware).
  */
-router.get('/:filename{.+\\.mp3$}', (c) => {
+router.get('/:hash/:filename{[0-9]+\\.mp3$}', (c) => {
+  const hash = c.req.param('hash');
   const filename = c.req.param('filename');
-  const hash = filename.replace(/\.mp3$/, '');
 
   if (!/^[0-9a-f]{64}$/.test(hash)) {
     return c.json({ error: 'Invalid hash' }, 400);
   }
+  const idx = parseInt(filename.replace(/\.mp3$/, ''), 10);
+  if (!Number.isFinite(idx) || idx < 0) {
+    return c.json({ error: 'Invalid chunk index' }, 400);
+  }
 
-  const filepath = ttsFilePath(hash);
+  const filepath = ttsChunkPath(hash, idx);
   if (!existsSync(filepath)) return c.json({ error: 'Not found' }, 404);
 
-  // Bump lastAccessedAt asynchronously — don't block the stream on the DB write
-  void touchTts(hash).catch((err) => {
-    logger.warn({ module: 'tts', hash, err }, 'failed to bump lastAccessedAt');
-  });
+  // Bump lastAccessedAt asynchronously — don't block the stream on the DB write.
+  // Only touch on the first chunk to avoid 4× the writes when the player walks the playlist.
+  if (idx === 0) {
+    void touchTts(hash).catch((err) => {
+      logger.warn({ module: 'tts', hash, err }, 'failed to bump lastAccessedAt');
+    });
+  }
 
   const totalSize = statSync(filepath).size;
   const rangeHeader = c.req.header('range');

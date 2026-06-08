@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useTtsConfig } from '../../api/tts';
 import { AiPlayer } from './AiPlayer';
 import { NativePlayer } from './NativePlayer';
+import { sanitizeForTts } from './sanitizeForTts';
 import { splitSentences } from './splitSentences';
 import { isNativeTtsSupported } from './useNativeTts';
 
@@ -59,11 +60,15 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
   const aiMaxChars = ttsConfig.data?.maxInputChars ?? 20_000;
 
   const nativeSupported = isNativeTtsSupported();
-  const hasContent = !!text.trim();
+  // Strip URLs/markdown links once at the modal level — both Native and AI players use the
+  // sanitized copy. The char count shown to the user reflects the sanitized length too
+  // (so the displayed number matches what actually gets billed by the AI provider).
+  const sanitized = useMemo(() => sanitizeForTts(text), [text]);
+  const hasContent = !!sanitized.trim();
   // Cheap O(n) check to decide whether to enable the Native button — actual sentence
   // playback happens inside <NativePlayer> only after the user picks Native.
-  const sentencesNonEmpty = useMemo(() => hasContent && splitSentences(text).length > 0, [text, hasContent]);
-  const aiTooLong = text.length > aiMaxChars;
+  const sentencesNonEmpty = useMemo(() => hasContent && splitSentences(sanitized).length > 0, [sanitized, hasContent]);
+  const aiTooLong = sanitized.length > aiMaxChars;
 
   const modalTitle = title ? `${t('tts.modal_title')} — ${title}` : t('tts.modal_title');
 
@@ -76,7 +81,7 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
   return (
     <Modal title={modalTitle} open={open} onCancel={onClose} footer={null} destroyOnHidden width={520}>
       <div className={styles.meta}>
-        <Text type="secondary">{t('tts.char_count', { count: text.length })}</Text>
+        <Text type="secondary">{t('tts.char_count', { count: sanitized.length })}</Text>
       </div>
 
       {mode === 'choice' && (
@@ -109,8 +114,8 @@ export function ReadAloudModal({ open, onClose, text, title }: ReadAloudModalPro
         </>
       )}
 
-      {mode === 'native' && <NativePlayer text={text} onStop={handleStop} />}
-      {mode === 'ai' && <AiPlayer text={text} defaultVoice={aiDefaultVoice} onStop={handleStop} />}
+      {mode === 'native' && <NativePlayer text={sanitized} onStop={handleStop} />}
+      {mode === 'ai' && <AiPlayer text={sanitized} defaultVoice={aiDefaultVoice} onStop={handleStop} />}
     </Modal>
   );
 }
