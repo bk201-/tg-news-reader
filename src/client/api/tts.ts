@@ -64,18 +64,20 @@ export function useTtsStatus(hash: string | null) {
 }
 
 /**
- * Returns an authenticated URL for the cached MP3.
+ * Returns an authenticated URL for a single TTS chunk MP3.
  * The query-param token pattern is required because <audio> cannot send Authorization headers.
  *
  * Reactive: re-reads the token from the auth store via a subscription so the URL refreshes
  * after a token rotation. (Useful for long-lived <audio> elements.)
+ *
+ * Pass `null` for hash to disable. `idx` defaults to 0 for the first chunk.
  */
-export function useTtsAudioUrl(hash: string | null): string | null {
+export function useTtsAudioUrl(hash: string | null, idx = 0): string | null {
   const [token, setToken] = useState(() => useAuthStore.getState().accessToken);
   useEffect(() => {
     return useAuthStore.subscribe((s) => setToken(s.accessToken));
   }, []);
   if (!hash) return null;
-  const base = `/api/tts/${hash}.mp3`;
+  const base = `/api/tts/${hash}/${idx}.mp3`;
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }

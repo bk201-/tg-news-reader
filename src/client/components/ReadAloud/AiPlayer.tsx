@@ -40,6 +40,11 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 11px;
     color: ${token.colorTextSecondary};
   `,
+  position: css`
+    font-size: 12px;
+    color: ${token.colorTextSecondary};
+    text-align: center;
+  `,
   actions: css`
     display: flex;
     gap: 8px;
@@ -57,25 +62,35 @@ export interface AiPlayerProps {
 }
 
 /**
- * AI player — kicks off OpenAI TTS generation and plays the resulting MP3 with
+ * AI player — kicks off OpenAI TTS generation and plays the resulting MP3 chunks with
  * a native `<audio>` element so the user gets full seek/scrubbing/playback-rate controls.
+ *
+ * Chunk playlist: chunks are stored as separate MP3 files on the server
+ * (`/api/tts/:hash/:idx.mp3`). When one chunk ends, we advance to the next by swapping
+ * `src` and calling `play()`. We deliberately avoid byte-level MP3 concatenation server-side
+ * because each chunk has its own ID3v2 header, which confuses browser players' timelines
+ * (audio appears to "restart" at every chunk boundary).
  *
  * Flow:
  *   1. mount → POST /api/tts → server returns hash (cached=true on hit, false otherwise)
  *   2. when cached=false → poll /status until status=done
- *   3. swap loading spinner for <audio src=ttsAudioUrl(hash) controls autoPlay>
- *   4. on error → show alert + retry button
+ *   3. swap loading spinner for <audio src=ttsAudioUrl(hash, 0) controls autoPlay>
+ *   4. on `ended` → if more chunks remain, advance idx, swap src, play
+ *   5. on error → show alert + retry button
  */
 export function AiPlayer({ text, defaultVoice, onStop }: AiPlayerProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
 
   const [hash, setHash] = useState<string | null>(null);
+  const [chunkIdx, setChunkIdx] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const generateMutation = useGenerateTts();
   const statusQuery = useTtsStatus(hash);
-  const audioUrl = useTtsAudioUrl(hash);
+  const audioUrl = useTtsAudioUrl(hash, chunkIdx);
+
+  const chunksTotal = statusQuery.data?.chunksTotal ?? 0;
 
   // Kick off generation exactly once on mount
   const kickedOffRef = useRef(false);
@@ -95,6 +110,23 @@ export function AiPlayer({ text, defaultVoice, onStop }: AiPlayerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When chunk index changes (advance to next chunk), load the new src and play it.
+  // We `load()` explicitly so the browser drops any buffered data from the previous chunk.
+  useEffect(() => {
+    if (!audioUrl) return;
+    const el = audioRef.current;
+    if (!el) return;
+    // Reload + autoplay for chunks after the first; chunk 0 uses the element's `autoPlay`
+    // attribute on initial mount.
+    if (chunkIdx > 0) {
+      el.load();
+      el.play().catch(() => {
+        // Autoplay may be blocked if the tab lost focus — leave the controls visible
+        // so the user can press play manually.
+      });
+    }
+  }, [audioUrl, chunkIdx]);
+
   // Pause audio on unmount so it doesn't outlive the modal
   useEffect(() => {
     return () => {
@@ -112,12 +144,21 @@ export function AiPlayer({ text, defaultVoice, onStop }: AiPlayerProps) {
 
   const handleRetry = useCallback(() => {
     setHash(null);
+    setChunkIdx(0);
     kickedOffRef.current = false;
     generateMutation.reset();
     statusQuery.refetch().catch(() => {});
     triggerGeneration();
     kickedOffRef.current = true;
   }, [generateMutation, statusQuery, triggerGeneration]);
+
+  const handleEnded = useCallback(() => {
+    // Advance to the next chunk in the playlist; do nothing on the last chunk.
+    setChunkIdx((idx) => (idx + 1 < chunksTotal ? idx + 1 : idx));
+  }, [chunksTotal]);
+
+  // Only render the chunk-position indicator when there's more than one chunk.
+  const showPosition = chunksTotal > 1;
 
   // ── Render branches ──
   const generateError = generateMutation.error;
@@ -167,6 +208,7 @@ export function AiPlayer({ text, defaultVoice, onStop }: AiPlayerProps) {
     );
   }
 
+  // (`showPosition` was hoisted above the early returns to keep hook order stable)
   return (
     <div className={styles.wrap}>
       {isGenerating && (
@@ -191,7 +233,22 @@ export function AiPlayer({ text, defaultVoice, onStop }: AiPlayerProps) {
         </div>
       )}
 
-      {isReady && <audio ref={audioRef} className={styles.audio} src={audioUrl ?? undefined} controls autoPlay />}
+      {isReady && (
+        <audio
+          ref={audioRef}
+          className={styles.audio}
+          src={audioUrl ?? undefined}
+          controls
+          autoPlay
+          onEnded={handleEnded}
+        />
+      )}
+
+      {isReady && showPosition && (
+        <div className={styles.position}>
+          {t('tts.ai_chunk_position', { current: chunkIdx + 1, total: chunksTotal })}
+        </div>
+      )}
 
       <div className={styles.footerRow}>
         <span className={styles.poweredBy}>{t('tts.ai_powered_by')}</span>

@@ -32,15 +32,20 @@ describe('useTtsAudioUrl', () => {
     expect(result.current).toBeNull();
   });
 
-  it('appends the auth token as a query param', () => {
+  it('appends the auth token as a query param and defaults to chunk 0', () => {
     const { result } = renderHook(() => useTtsAudioUrl('abc'));
-    expect(result.current).toBe('/api/tts/abc.mp3?token=test-token');
+    expect(result.current).toBe('/api/tts/abc/0.mp3?token=test-token');
   });
 
   it('returns the bare URL when no token is set', () => {
     useAuthStore.setState({ accessToken: null, user: null, unlockedGroupIds: [], isCheckingAuth: false });
     const { result } = renderHook(() => useTtsAudioUrl('abc'));
-    expect(result.current).toBe('/api/tts/abc.mp3');
+    expect(result.current).toBe('/api/tts/abc/0.mp3');
+  });
+
+  it('builds a URL for a specific chunk index', () => {
+    const { result } = renderHook(() => useTtsAudioUrl('abc', 3));
+    expect(result.current).toBe('/api/tts/abc/3.mp3?token=test-token');
   });
 });
 
