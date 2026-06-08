@@ -23,6 +23,7 @@ export {
   batchFiltersSchema,
   createDownloadSchema,
   createDigestSchema,
+  createTtsSchema,
   clientLogSchema,
   loginSchema,
   totpConfirmSchema,

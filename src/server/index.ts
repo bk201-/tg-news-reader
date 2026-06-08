@@ -4,7 +4,7 @@ import 'dotenv/config';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { DOWNLOAD_WORKER_CONCURRENCY } from './config.js';
+import { DOWNLOAD_WORKER_CONCURRENCY, TTS_CLEANUP_INTERVAL_MS } from './config.js';
 import { client } from './db/index.js';
 import { runMigration } from './db/migrate.js';
 import { logger } from './logger.js';
@@ -22,12 +22,14 @@ import groupsRouter from './routes/groups.js';
 import logsRouter from './routes/logs.js';
 import mediaRouter from './routes/media.js';
 import newsRouter from './routes/news.js';
+import ttsRouter from './routes/tts.js';
 import versionRouter from './routes/version.js';
 import { sendAlert } from './services/alertBot.js';
 import { isWorkerPoolStopped, startWorkerPool } from './services/downloadManager.js';
 import { renderErrorHtml } from './services/errorHtml.js';
 import { disconnectTelegramClient, isTelegramDelayed } from './services/telegram.js';
 import { getTelegramCircuitState, getTelegramSessionExpired } from './services/telegramCircuitBreaker.js';
+import { cleanupExpiredTts, resetStuckTtsJobs } from './services/ttsService.js';
 
 // All imports loaded — log how long module initialisation took
 // (gramjs TL schema + crypto is the dominant cost, typically 5–8 s)
@@ -158,6 +160,7 @@ app.route('/api/log/client', clientLogRouter);
 app.route('/api/logs', logsRouter);
 app.route('/api/digest', digestRouter);
 app.route('/api/version', versionRouter);
+app.route('/api/tts', ttsRouter);
 
 // Health check — liveness/startup probe: "process is alive, HTTP works"
 // Always 200 as long as the process is running (used by smoke test + startup probe).
@@ -270,6 +273,15 @@ logger.info(
   { module: 'server', workers: DOWNLOAD_WORKER_CONCURRENCY, ms: Math.round(performance.now() - t2) },
   `Worker pool started (${DOWNLOAD_WORKER_CONCURRENCY} workers) in ${Math.round(performance.now() - t2)}ms`,
 );
+
+// ── TTS cache maintenance ────────────────────────────────────────────────────
+// Reset any rows stuck in 'processing' from a previous crash, then schedule periodic cleanup.
+void resetStuckTtsJobs().catch((err) => logger.warn({ module: 'tts', err }, 'resetStuckTtsJobs failed'));
+void cleanupExpiredTts().catch((err) => logger.warn({ module: 'tts', err }, 'cleanupExpiredTts failed (startup)'));
+const ttsCleanupInterval = setInterval(() => {
+  void cleanupExpiredTts().catch((err) => logger.warn({ module: 'tts', err }, 'cleanupExpiredTts failed (interval)'));
+}, TTS_CLEANUP_INTERVAL_MS);
+ttsCleanupInterval.unref();
 
 logger.info(
   { module: 'server', totalMs: Math.round(performance.now()) },

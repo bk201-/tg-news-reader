@@ -140,3 +140,28 @@ export const filterStats = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.filterId, table.date] })],
 );
+
+/**
+ * Cache for AI-generated TTS audio (Read Aloud feature).
+ * Keyed by SHA-256 hash of `text + voice + model` so identical re-reads are instant.
+ * Files live at `data/tts/{contentHash}.mp3`. Rows + files expire via periodic cleanup
+ * once `lastAccessedAt` is older than TTS_CACHE_TTL_SEC.
+ */
+export const ttsCache = sqliteTable('tts_cache', {
+  contentHash: text('content_hash').primaryKey(), // SHA-256 of `${text}|${voice}|${model}`
+  voice: text('voice').notNull(),
+  model: text('model').notNull(),
+  charCount: integer('char_count').notNull(),
+  status: text('status', { enum: ['pending', 'processing', 'done', 'failed'] })
+    .notNull()
+    .default('pending'),
+  chunksTotal: integer('chunks_total').notNull().default(0),
+  chunksDone: integer('chunks_done').notNull().default(0),
+  error: text('error'),
+  createdAt: integer('created_at')
+    .notNull()
+    .default(sql`(unixepoch())`),
+  lastAccessedAt: integer('last_accessed_at')
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
