@@ -228,7 +228,10 @@ describe('useNewsFeedActions', () => {
       result.current.handleMarkAllReadAndAdvance();
     });
 
-    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+      { channelId: 1 },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
     expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
   });
 
@@ -257,7 +260,10 @@ describe('useNewsFeedActions', () => {
       result.current.handleMarkAllReadAndAdvance();
     });
 
-    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ newsIds: [11, 12] });
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+      { newsIds: [11, 12] },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
     expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
   });
 
@@ -282,6 +288,145 @@ describe('useNewsFeedActions', () => {
       result.current.handleMarkAllReadAndAdvance();
     });
 
-    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+      { channelId: 1 },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  // ── Undo-toggle: second click reverts the previous bulk mark ───────────────
+
+  describe('mark-all undo toggle', () => {
+    function firstClickThen(callbackArg: (cb: (data: { success: true; affectedIds: number[] }) => void) => void) {
+      // Helper: trigger the onSuccess callback from the most recent mutate call
+      // with a controlled `affectedIds` payload so we can drive the snapshot state.
+      const lastCall = mockMarkAllReadMutate.mock.calls.at(-1);
+      const onSuccess = lastCall?.[1]?.onSuccess as (data: { success: true; affectedIds: number[] }) => void;
+      expect(onSuccess).toBeTypeOf('function');
+      callbackArg(onSuccess);
+    }
+
+    it('second click sends isRead=0 with the affectedIds from the first click', () => {
+      useUIStore.setState({ autoAdvance: false, newsFilterMode: 'filtered' });
+      const { result } = renderActions([]);
+
+      // First click: full-channel mark
+      act(() => {
+        result.current.handleMarkAllReadAndAdvance();
+      });
+      // Simulate the server returning the IDs it just flipped
+      act(() => {
+        firstClickThen((cb) => cb({ success: true, affectedIds: [101, 102, 103] }));
+      });
+
+      mockMarkAllReadMutate.mockClear();
+
+      // Second click: should undo using the captured IDs
+      act(() => {
+        result.current.handleMarkAllReadAndAdvance();
+      });
+
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ newsIds: [101, 102, 103], isRead: 0 });
+    });
+
+    it('third click after undo behaves like a fresh first click (no infinite toggle)', () => {
+      useUIStore.setState({ autoAdvance: false, newsFilterMode: 'filtered' });
+      const { result } = renderActions([]);
+
+      // 1st click + capture
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      act(() => firstClickThen((cb) => cb({ success: true, affectedIds: [50, 51] })));
+
+      // 2nd click (undo)
+      act(() => result.current.handleMarkAllReadAndAdvance());
+
+      mockMarkAllReadMutate.mockClear();
+
+      // 3rd click: should be a normal mark again, NOT another undo
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { channelId: 1 },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it('does not capture a snapshot when nothing was actually flipped', () => {
+      useUIStore.setState({ autoAdvance: false });
+      const { result } = renderActions([]);
+
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      act(() => firstClickThen((cb) => cb({ success: true, affectedIds: [] })));
+
+      mockMarkAllReadMutate.mockClear();
+
+      // Next click: still a normal mark (no leftover empty snapshot triggering undo)
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { channelId: 1 },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it('snapshot is cleared when the user changes channel', () => {
+      const setSelectedChannelId = vi.fn();
+      useUIStore.setState({ autoAdvance: false, setSelectedChannelId });
+
+      const otherChannel = makeChannel(2);
+      const { result, rerender } = renderHookWithProviders(
+        ({ ch }: { ch: Channel }) => useNewsFeedActions(ch, [], 5, 0, setMediaProgressKey),
+        { initialProps: { ch: channel } },
+      );
+
+      // 1st click on channel 1 + capture
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      {
+        const onSuccess = mockMarkAllReadMutate.mock.calls.at(-1)?.[1]?.onSuccess as (d: {
+          success: true;
+          affectedIds: number[];
+        }) => void;
+        act(() => onSuccess({ success: true, affectedIds: [9, 10] }));
+      }
+
+      // Switch to channel 2 → the snapshot for channel 1 must NOT survive
+      rerender({ ch: otherChannel });
+
+      mockMarkAllReadMutate.mockClear();
+
+      // Click on channel 2: should be a normal mark, NOT an undo for channel 1
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { channelId: 2 },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it('snapshot is cleared when the user changes the hashtag filter', () => {
+      useUIStore.setState({ autoAdvance: false, hashTagFilter: null });
+
+      const items = [makeItem(30), makeItem(31)];
+      const { result } = renderActions(items);
+
+      // 1st click + capture (no hashtag → full channel sweep)
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      {
+        const onSuccess = mockMarkAllReadMutate.mock.calls.at(-1)?.[1]?.onSuccess as (d: {
+          success: true;
+          affectedIds: number[];
+        }) => void;
+        act(() => onSuccess({ success: true, affectedIds: [30, 31] }));
+      }
+
+      // Activate hashtag filter — should invalidate the snapshot
+      act(() => useUIStore.setState({ hashTagFilter: '#tech' }));
+
+      mockMarkAllReadMutate.mockClear();
+
+      // Click now should be a fresh mark (newsIds path because hashTagFilter is active)
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { newsIds: [30, 31] },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
   });
 });

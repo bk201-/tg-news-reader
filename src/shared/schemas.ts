@@ -39,6 +39,11 @@ export const fetchChannelSchema = z.object({
 export const readAllNewsSchema = z.object({
   channelId: z.number().optional(),
   newsIds: z.array(z.number()).optional(),
+  /**
+   * Target read state: 1 = mark as read (default, backwards-compatible),
+   * 0 = mark as unread (used by the toolbar's undo-toggle).
+   */
+  isRead: z.union([z.literal(0), z.literal(1)]).optional(),
 });
 
 export const markReadSchema = z.object({
