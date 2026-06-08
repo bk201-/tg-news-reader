@@ -319,6 +319,23 @@
     "cleared_count": "Очищено дайджестов: {{count}}",
     "auto_cleared_all_read": "Все батчи помечены прочитанными — кэш дайджеста очищен"
   },
+  "tts": {
+    "button": "Озвучить",
+    "button_tooltip": "Прочитать вслух",
+    "modal_title": "Озвучить",
+    "char_count": "{{count}} символов",
+    "choice_native": "Браузер (нативно)",
+    "choice_ai": "ИИ (высокое качество)",
+    "ai_coming_soon": "Появится в следующем релизе",
+    "native_unsupported": "Ваш браузер не поддерживает синтез речи.",
+    "empty_text": "Нечего озвучивать — текст пуст.",
+    "play_tooltip": "Воспроизвести",
+    "pause_tooltip": "Пауза",
+    "prev_tooltip": "Предыдущее предложение",
+    "next_tooltip": "Следующее предложение",
+    "stop": "Остановить",
+    "position": "Предложение {{current}} / {{total}}"
+  },
   "tags": {
     "title": "Теги",
     "subtitle": "{{count}} тегов",

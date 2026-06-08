@@ -14,8 +14,9 @@ import dayjs from 'dayjs';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
+import { ReadAloudButton } from '../../../ReadAloud/ReadAloudButton';
 import { NewsHashtags } from '../../Feed/NewsHashtags';
-import { isYouTubeUrl } from '../../newsUtils';
+import { getNewsTitle, isYouTubeUrl } from '../../newsUtils';
 import type { NewsDetailToolbarProps } from '../newsDetailToolbarTypes';
 
 const ICON_RELOAD = <ReloadOutlined />;
@@ -148,6 +149,11 @@ export function NewsDetailToolbarPanel({
             <span className={styles.ndBtnText}>{t('news.detail.share')}</span>
           </Button>
         </Tooltip>
+        <ReadAloudButton
+          text={item.fullContent || item.text || ''}
+          title={getNewsTitle(item).slice(0, 60)}
+          labelClassName={styles.ndBtnText}
+        />
         <Button
           icon={ICON_CHECK}
           size="small"
