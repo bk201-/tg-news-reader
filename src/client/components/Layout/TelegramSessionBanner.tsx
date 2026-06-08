@@ -1,6 +1,6 @@
-import React from 'react';
 import { Alert } from 'antd';
 import { createStyles } from 'antd-style';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealthStatus } from '../../api/health';
 

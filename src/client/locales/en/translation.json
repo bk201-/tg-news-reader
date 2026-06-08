@@ -27,6 +27,7 @@
   },
   "channels": {
     "updated": "Updated: {{date}}",
+    "update_success": "Channel updated",
     "unavailable_tooltip": "Channel unavailable in Telegram (deleted or closed)",
     "fetch_tooltip": "Fetch news",
     "edit_tooltip": "Edit",
@@ -97,6 +98,13 @@
       "show_all": "Show all",
       "show_all_tooltip": "Toggle filtered / show all · [A]",
       "hide_filtered": "Filtered only",
+      "mode_label": {
+        "filtered": "Filtered",
+        "all": "All",
+        "hidden": "Hidden only"
+      },
+      "mode_tooltip": "View mode (click to cycle): Filtered → All → Hidden · [A]",
+      "mode_cycle_label": "View: {{current}} (tap to cycle)",
       "mark_all_read": "Mark all read",
       "mark_all_read_tooltip": "Mark all as read and clear list · [M]",
       "filter": "Filter",
@@ -140,6 +148,9 @@
       "next": "Next",
       "retry_download": "Retry download",
       "redownload_media": "Re-download media",
+      "font_size_increase": "Increase text size",
+      "font_size_decrease": "Decrease text size",
+      "forwarded_from": "Forwarded from {{name}}",
       "media_missing": "Media file not found on server",
       "download_media": "Download media",
       "download_media_size": "Download media ({{size}})",
@@ -246,6 +257,7 @@
       "clear_cache_confirm_content": "All cached photos and videos will be removed from the browser. They will reload on next view.",
       "clear_cache_success": "Media cache cleared",
       "language": "Language",
+      "font_size": "Text size",
       "version": "v{{version}}",
       "logout": "Sign out"
     }
@@ -306,6 +318,23 @@
     "clear_confirm_content": "All cached digest results for this feed will be removed and batches restarted.",
     "cleared_count": "Cleared {{count}} cached digest(s)",
     "auto_cleared_all_read": "All batches marked as read — digest cache cleared"
+  },
+  "tts": {
+    "button": "Read",
+    "button_tooltip": "Read aloud",
+    "modal_title": "Read aloud",
+    "char_count": "{{count}} characters",
+    "choice_native": "Native (browser)",
+    "choice_ai": "AI (high quality)",
+    "ai_coming_soon": "Available in the next release",
+    "native_unsupported": "Your browser does not support speech synthesis.",
+    "empty_text": "Nothing to read — the text is empty.",
+    "play_tooltip": "Play",
+    "pause_tooltip": "Pause",
+    "prev_tooltip": "Previous sentence",
+    "next_tooltip": "Next sentence",
+    "stop": "Stop",
+    "position": "Sentence {{current}} / {{total}}"
   },
   "tags": {
     "title": "Tags",

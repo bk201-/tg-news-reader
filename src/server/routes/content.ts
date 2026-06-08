@@ -1,8 +1,8 @@
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db/index.js';
 import { news } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { extractContentFromUrl, buildFullContent } from '../services/readability.js';
+import { buildFullContent, extractContentFromUrl } from '../services/readability.js';
 
 const router = new Hono();
 

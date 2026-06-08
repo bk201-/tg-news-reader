@@ -2,14 +2,15 @@
  * Telegram API — public functions: fetch messages, channel info, read history, download media.
  */
 
-import type { Api } from 'telegram';
-import { mkdirSync, existsSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import type { Api } from 'telegram';
+import { MAX_IMG_DOC_SIZE_BYTES, MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '../config.js';
 import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
-import { MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES, MAX_IMG_DOC_SIZE_BYTES } from '../config.js';
-import { getTelegramClient, ensureAndGetApi } from './telegramClient.js';
-import { parseMessageFields, extractInstantViewText, type TelegramMessage } from './telegramParser.js';
+import { ensureAndGetApi, getTelegramClient } from './telegramClient.js';
+import { extractInstantViewText, parseMessageFields } from './telegramParser.js';
+import type { TelegramMessage } from './telegramParser.js';
 
 const BATCH_SIZE = 100;
 
@@ -51,7 +52,10 @@ async function _fetchChannelMessages(
 ): Promise<TelegramMessage[]> {
   const _Api = await ensureAndGetApi();
   const tg = await getTelegramClient();
-  const { sinceDate, limit = 500 } = options;
+  // `limit === undefined` means "no cap" — keep paging until sinceDate / empty result.
+  // This is used when the user explicitly asks for a date range via the Fetch-period UI:
+  // they want EVERYTHING since that date, not just the first N messages.
+  const { sinceDate, limit } = options;
   const allMessages: TelegramMessage[] = [];
   let offsetId = options.offsetId ?? 0;
 
@@ -78,7 +82,7 @@ async function _fetchChannelMessages(
 
       if (reachedSinceDate) break;
       if (result.length < BATCH_SIZE) break;
-      if (allMessages.length >= limit) break;
+      if (limit !== undefined && allMessages.length >= limit) break;
 
       const lastMsg = result[result.length - 1];
       if (lastMsg instanceof _Api.Message) {
@@ -101,6 +105,35 @@ async function _fetchChannelMessages(
     );
     for (const msg of partialIVMessages) {
       await resolvePartialInstantView(msg);
+    }
+  }
+
+  // ── Resolve forward source channel names (entity cache lookup) ───────────
+  // After getHistory, gramjs caches all entities from the response,
+  // so PeerChannel lookups here are cache hits — no extra network calls.
+  // Build a deduped map from stringified channelId → PeerChannel peer
+  const channelForwardPeers = [
+    ...new Map(
+      allMessages
+        .filter((m) => !m.forwardFromName && m.forwardFromPeer instanceof _Api.PeerChannel)
+        .map((m) => [String((m.forwardFromPeer as Api.PeerChannel).channelId), m.forwardFromPeer as Api.TypePeer]),
+    ).values(),
+  ];
+
+  if (channelForwardPeers.length > 0) {
+    const entityResults = await Promise.all(channelForwardPeers.map((peer) => tg.getEntity(peer).catch(() => null)));
+    const nameMap = new Map<string, string>();
+    channelForwardPeers.forEach((peer, i) => {
+      const entity = entityResults[i];
+      if (entity && 'title' in entity && typeof (entity as { title?: unknown }).title === 'string') {
+        nameMap.set(String((peer as Api.PeerChannel).channelId), (entity as { title: string }).title);
+      }
+    });
+    for (const msg of allMessages) {
+      if (!msg.forwardFromName && msg.forwardFromPeer instanceof _Api.PeerChannel) {
+        const name = nameMap.get(String(msg.forwardFromPeer.channelId));
+        if (name) msg.forwardFromName = name;
+      }
     }
   }
 
@@ -253,8 +286,7 @@ export async function downloadMessageMedia(
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
     try {
-      // oxlint-disable-next-line typescript/no-explicit-any, typescript/no-unsafe-argument
-      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath } as any);
+      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath });
       if (!result) return null;
       return `${channelTelegramId}/${filename}`;
     } catch (err) {

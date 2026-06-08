@@ -1,5 +1,5 @@
-import React from 'react';
 import { createStyles } from 'antd-style';
+import React from 'react';
 import type { ServerLogEntry } from '../../api/logs';
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -105,8 +105,11 @@ export function LogEntryList({ entries, emptyText }: Props) {
 
   return (
     <div className={styles.list}>
-      {entries.map((e, i) => (
-        <div key={i} className={styles.row}>
+      {entries.map((e) => (
+        <div
+          key={`${e.time}-${e.level}-${String(e.module ?? '')}-${String(e.msg).slice(0, 40)}`}
+          className={styles.row}
+        >
           <span className={styles.time}>{formatTime(e.time)}</span>
           <span className={cx(levelClass(styles, e.level))}>{LEVEL_LABEL[e.level] ?? '???'}</span>
           <span className={styles.module}>{e.module ?? ''}</span>

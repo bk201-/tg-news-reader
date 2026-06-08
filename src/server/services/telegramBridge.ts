@@ -17,8 +17,8 @@
  */
 
 import type { Worker } from 'worker_threads';
-import { fetchMessageById, downloadMessageMedia } from './telegram.js';
 import { logger } from '../logger.js';
+import { downloadMessageMedia, fetchMessageById } from './telegram.js';
 
 // ─── Message types ────────────────────────────────────────────────────────────
 

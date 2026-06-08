@@ -1,10 +1,12 @@
+import type { NewsItem } from '@shared/types.ts';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 import { useAuthStore } from '../store/authStore';
 import { tryRefresh } from './client';
-import type { NewsItem } from '@shared/types.ts';
-import { type NewsResponse, updatePaginatedItems } from './news';
-import { createReconnectingEventSource } from '../services/reconnectingEventSource';
+import { updatePaginatedItems } from './news';
+import type { NewsResponse } from './news';
 
 interface MediaProgressEvent {
   type: 'item' | 'complete';

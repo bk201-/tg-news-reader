@@ -1,6 +1,6 @@
-import { db, client } from '../db/index.js';
-import { news, filters } from '../db/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
+import { client, db } from '../db/index.js';
+import { filters, news } from '../db/schema.js';
 import { logger } from '../logger.js';
 
 type FilterRow = { id: number; type: string; value: string };

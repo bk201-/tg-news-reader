@@ -1,11 +1,13 @@
-import { useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { api, tryRefresh } from './client';
-import { useAuthStore } from '../store/authStore';
-import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
 import type { CreateDownloadInput } from '@shared/schemas.ts';
-import { type NewsResponse, updatePaginatedItems } from './news';
+import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { createReconnectingEventSource } from '../services/reconnectingEventSource';
+import { useAuthStore } from '../store/authStore';
+import { api, tryRefresh } from './client';
+import { updatePaginatedItems } from './news';
+import type { NewsResponse } from './news';
 
 export const downloadsKeys = {
   all: ['downloads'] as const,

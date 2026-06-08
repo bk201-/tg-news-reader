@@ -27,6 +27,7 @@
   },
   "channels": {
     "updated": "Обновлено: {{date}}",
+    "update_success": "Канал обновлён",
     "unavailable_tooltip": "Канал недоступен в Telegram (удалён или закрыт)",
     "fetch_tooltip": "Загрузить новости",
     "edit_tooltip": "Редактировать",
@@ -97,6 +98,13 @@
       "show_all": "Показать все",
       "show_all_tooltip": "Переключить фильтр / все · [A]",
       "hide_filtered": "Только отфильтрованные",
+      "mode_label": {
+        "filtered": "Отфильтрованные",
+        "all": "Все",
+        "hidden": "Только скрытые"
+      },
+      "mode_tooltip": "Режим показа (клик переключает по кругу): Отфильтрованные → Все → Скрытые · [A]",
+      "mode_cycle_label": "Режим: {{current}} (тап — следующий)",
       "mark_all_read": "Прочитать все",
       "mark_all_read_tooltip": "Отметить все прочитанными и очистить список · [M]",
       "filter": "Фильтр",
@@ -140,6 +148,9 @@
       "next": "Следующее",
       "retry_download": "Повторить загрузку",
       "redownload_media": "Скачать медиа заново",
+      "font_size_increase": "Увеличить размер текста",
+      "font_size_decrease": "Уменьшить размер текста",
+      "forwarded_from": "Переслано из {{name}}",
       "media_missing": "Файл не найден на сервере",
       "download_media": "Скачать медиа",
       "download_media_size": "Скачать медиа ({{size}})",
@@ -246,6 +257,7 @@
       "clear_cache_confirm_content": "Все закэшированные фото и видео будут удалены из браузера. При следующем просмотре они загрузятся снова.",
       "clear_cache_success": "Кэш медиа очищен",
       "language": "Язык",
+      "font_size": "Размер текста",
       "version": "v{{version}}",
       "logout": "Выйти"
     }
@@ -306,6 +318,23 @@
     "clear_confirm_content": "Все кэшированные результаты дайджеста для этой ленты будут удалены, батчи перезапустятся.",
     "cleared_count": "Очищено дайджестов: {{count}}",
     "auto_cleared_all_read": "Все батчи помечены прочитанными — кэш дайджеста очищен"
+  },
+  "tts": {
+    "button": "Озвучить",
+    "button_tooltip": "Прочитать вслух",
+    "modal_title": "Озвучить",
+    "char_count": "{{count}} символов",
+    "choice_native": "Браузер (нативно)",
+    "choice_ai": "ИИ (высокое качество)",
+    "ai_coming_soon": "Появится в следующем релизе",
+    "native_unsupported": "Ваш браузер не поддерживает синтез речи.",
+    "empty_text": "Нечего озвучивать — текст пуст.",
+    "play_tooltip": "Воспроизвести",
+    "pause_tooltip": "Пауза",
+    "prev_tooltip": "Предыдущее предложение",
+    "next_tooltip": "Следующее предложение",
+    "stop": "Остановить",
+    "position": "Предложение {{current}} / {{total}}"
   },
   "tags": {
     "title": "Теги",

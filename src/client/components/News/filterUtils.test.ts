@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import type { Filter, NewsItem } from '@shared/types.ts';
+import { describe, expect, it } from 'vitest';
 import { applyFilters } from './filterUtils';
-import type { NewsItem, Filter } from '@shared/types.ts';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {

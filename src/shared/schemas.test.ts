@@ -1,18 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  clientLogSchema,
   createChannelSchema,
-  updateChannelSchema,
-  fetchChannelSchema,
-  createGroupSchema,
-  updateGroupSchema,
-  verifyPinSchema,
-  createFilterSchema,
-  updateFilterSchema,
-  createDownloadSchema,
   createDigestSchema,
+  createDownloadSchema,
+  createFilterSchema,
+  createGroupSchema,
+  fetchChannelSchema,
   loginSchema,
   totpConfirmSchema,
-  clientLogSchema,
+  updateChannelSchema,
+  updateFilterSchema,
+  updateGroupSchema,
+  verifyPinSchema,
 } from './schemas.js';
 
 describe('createChannelSchema', () => {

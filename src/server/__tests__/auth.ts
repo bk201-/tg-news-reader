@@ -2,12 +2,12 @@
  * Auth helpers for integration tests — create users, sessions, and JWT tokens.
  */
 
-import { sign } from 'hono/jwt';
-import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import bcrypt from 'bcryptjs';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { sign } from 'hono/jwt';
 import type * as schema from '../db/schema.js';
-import { users, sessions } from '../db/schema.js';
+import { sessions, users } from '../db/schema.js';
 
 const TEST_JWT_SECRET = 'test-secret-key';
 

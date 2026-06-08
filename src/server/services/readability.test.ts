@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { buildFullContent, parseHtml, type ExtractedContent } from './readability.js';
+import { describe, expect, it } from 'vitest';
+import { buildFullContent, parseHtml } from './readability.js';
+import type { ExtractedContent } from './readability.js';
 
 function makeExtracted(partial: Partial<ExtractedContent> = {}): ExtractedContent {
   return {

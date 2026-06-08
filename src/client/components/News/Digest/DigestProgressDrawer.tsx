@@ -1,15 +1,21 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Drawer, Modal, Progress, Typography, message } from 'antd';
 import { CloseOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Button, Drawer, message, Modal, Progress, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DigestBatchPanel } from './DigestBatchPanel';
-import { useBatchDigest, type BatchDigestStatus } from './useBatchDigest';
-import { useBatchQueue } from './useBatchQueue';
-import { saveBatchResult, loadBatchResult, clearScope, type BatchScope } from './batchPersistence';
-import { DigestDrawer } from './DigestDrawer';
 import type { DigestParams } from '../../../api/digest';
 import { useMarkAllRead } from '../../../api/news';
+import { clearScope, loadBatchResult, saveBatchResult } from './batchPersistence';
+import type { BatchScope } from './batchPersistence';
+import { DigestBatchPanel } from './DigestBatchPanel';
+import { DigestDrawer } from './DigestDrawer';
+import { useBatchDigest } from './useBatchDigest';
+import type { BatchDigestStatus } from './useBatchDigest';
+import { useBatchQueue } from './useBatchQueue';
+
+const ICON_CLOSE = <CloseOutlined />;
+const ICON_DELETE = <DeleteOutlined />;
+const DRAWER_BODY_STYLES = { body: { padding: 0 } };
 
 const { Text } = Typography;
 
@@ -88,6 +94,10 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
   }, [newsIds]);
 
   const queue = useBatchQueue(batches.length, DIGEST_MAX_PARALLEL);
+  const queueEnabled = queue.enabled;
+  const queueRelease = queue.release;
+  const queueActivate = queue.activate;
+  const queueReset = queue.reset;
 
   const [doneCount, setDoneCount] = useState(0);
   const [digestOpenedSet, setDigestOpenedSet] = useState<Set<number>>(new Set());
@@ -130,7 +140,7 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
     // Reset the queue so releasedCount starts from 0 for this fresh open.
     // Without this, re-opening the drawer would double-count releases and
     // skip indices when re-playing cached batches.
-    queue.reset();
+    queueReset();
     // Pre-fill results from localStorage
     const restored: Record<number, { result: string; refMap: Record<number, number> }> = {};
     const restoredIndices: number[] = [];
@@ -149,10 +159,9 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
     // cached batches would sit in "done (cached)" state and the queue's
     // initial window would stay stuck on slots 0..maxParallel-1 forever.
     for (const i of restoredIndices) {
-      queue.release(i);
+      queueRelease(i);
     }
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [open, newsIds]);
+  }, [open, newsIds, batches, scope, queueReset, queueRelease]);
 
   // ── Memoized handlers: accept `index` as an arg so the reference stays stable ──
   // across renders. This lets BatchRow be React.memo-wrapped and avoid re-rendering
@@ -167,16 +176,16 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
       setDoneCount((n) => n + 1);
       const ids = batchesRef.current[index];
       if (ids) saveBatchResult(scopeRef.current, index, { ...data, newsIds: [...ids] });
-      queue.release(index);
+      queueRelease(index);
     },
-    [queue],
+    [queueRelease],
   );
 
   const handleBatchError = useCallback(
     (index: number) => {
-      queue.release(index);
+      queueRelease(index);
     },
-    [queue],
+    [queueRelease],
   );
 
   const handleShow = useCallback((index: number) => {
@@ -221,13 +230,13 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
     setDigestOpenedSet(new Set());
     setMarkedReadSet(new Set());
     setDrawerBatchIndex(null);
-    queue.reset();
+    queueReset();
     setClearEpoch((n) => n + 1);
     // Invalidate the "feed signature" guard so the open-effect can re-run
     // reset/restore logic on the next relevant change.
     lastSigRef.current = '';
     return removed;
-  }, [queue]);
+  }, [queueReset]);
 
   const handleClearAll = useCallback(() => {
     Modal.confirm({
@@ -265,9 +274,9 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
 
   const handleRetry = useCallback(
     (index: number) => {
-      queue.activate(index);
+      queueActivate(index);
     },
-    [queue],
+    [queueActivate],
   );
 
   const total = batches.length;
@@ -289,10 +298,9 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
         size="large"
         open={open}
         onClose={onClose}
-        closeIcon={<CloseOutlined />}
+        closeIcon={ICON_CLOSE}
         mask={false}
-        maskClosable={false}
-        styles={{ body: { padding: 0 } }}
+        styles={DRAWER_BODY_STYLES}
       >
         <div className={styles.body}>
           <div className={styles.header}>
@@ -304,18 +312,18 @@ export function DigestProgressDrawer({ open, newsIds, baseParams, scope, onClose
                 className={styles.overallProgress}
               />
             </div>
-            <Button size="small" icon={<DeleteOutlined />} onClick={handleClearAll} disabled={total === 0} danger>
+            <Button size="small" icon={ICON_DELETE} onClick={handleClearAll} disabled={total === 0} danger>
               {t('digest.clear_all')}
             </Button>
           </div>
           <div className={styles.list}>
             {batches.map((batchIds, i) => (
               <BatchRow
-                key={`${clearEpoch}-${i}-${batchIds[0]}-${batchIds[batchIds.length - 1]}`}
+                key={`${clearEpoch}-${batchIds[0]}-${batchIds[batchIds.length - 1]}`}
                 index={i}
                 newsIds={batchIds}
                 baseParams={baseParams}
-                enabled={queue.enabled.has(i)}
+                enabled={queueEnabled.has(i)}
                 cached={batchResults[i]}
                 fromItem={i * DIGEST_BATCH_SIZE + 1}
                 toItem={i * DIGEST_BATCH_SIZE + batchIds.length}
@@ -403,8 +411,7 @@ const BatchRow = memo(function BatchRow({
     } else if (batch.status !== 'done' && batch.status !== 'error') {
       lastStatusRef.current = batch.status;
     }
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [batch.status, hasCached, index]);
+  }, [batch.status, batch.result, batch.refMap, hasCached, index]);
 
   // Stable per-row handlers bound to `index`. useCallback keeps refs stable so
   // DigestBatchPanel (also memo) does not re-render unless state actually changes.

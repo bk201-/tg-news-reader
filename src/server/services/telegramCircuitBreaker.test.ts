@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies before importing the module
 vi.mock('../logger.js', () => ({
@@ -13,8 +13,8 @@ vi.mock('../utils/retry.js', () => ({
   TELEGRAM_POLICY: {},
 }));
 
-import { TelegramCircuitBreaker, setReconnectCallback } from './telegramCircuitBreaker.js';
 import { sendAlert } from './alertBot.js';
+import { TelegramCircuitBreaker, setReconnectCallback } from './telegramCircuitBreaker.js';
 
 describe('TelegramCircuitBreaker', () => {
   let cb: TelegramCircuitBreaker;

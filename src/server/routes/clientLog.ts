@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { logger } from '../logger.js';
 import { clientLogSchema, parseOptionalBody } from './schemas.js';
 

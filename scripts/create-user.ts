@@ -3,11 +3,11 @@
  * Usage: npm run auth:create-user -- <email> <password>
  * Example: npm run auth:create-user -- admin@example.com MySecurePassword123!
  */
+import bcrypt from 'bcryptjs';
 import 'dotenv/config';
+import { eq } from 'drizzle-orm';
 import { db } from '../src/server/db/index.js';
 import { users } from '../src/server/db/schema.js';
-import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
 
 const [, , email, password] = process.argv;
 

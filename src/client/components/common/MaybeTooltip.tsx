@@ -1,6 +1,6 @@
-import React from 'react';
 import { Tooltip } from 'antd';
 import type { TooltipProps } from 'antd';
+import React from 'react';
 
 /**
  * On coarse-pointer (touch) devices tooltips fire on every tap and block the UI.

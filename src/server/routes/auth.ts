@@ -1,17 +1,17 @@
-import { Hono } from 'hono';
+import { randomUUID } from 'crypto';
 import { zValidator } from '@hono/zod-validator';
-import { sign } from 'hono/jwt';
-import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
-import { db } from '../db/index.js';
-import { users, sessions } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { sign } from 'hono/jwt';
 import * as OTPAuth from 'otpauth';
 import QRCode from 'qrcode';
-import { randomUUID } from 'crypto';
-import { authMiddleware } from '../middleware/auth.js';
-import { JWT_SECRET, JWT_ACCESS_EXPIRES_SEC, REFRESH_EXPIRES_DAYS } from '../config.js';
+import { JWT_ACCESS_EXPIRES_SEC, JWT_SECRET, REFRESH_EXPIRES_DAYS } from '../config.js';
+import { db } from '../db/index.js';
+import { sessions, users } from '../db/schema.js';
 import { logger } from '../logger.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { loginSchema, totpConfirmSchema } from './schemas.js';
 
 const router = new Hono();

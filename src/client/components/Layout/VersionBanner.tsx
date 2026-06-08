@@ -1,11 +1,13 @@
-import React from 'react';
-import { Button, Typography } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
+import { Button, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
 
 const { Text } = Typography;
+
+const ICON_CLOSE = <CloseOutlined />;
 
 const useStyles = createStyles(({ css, token }) => ({
   banner: css`
@@ -48,7 +50,7 @@ export function VersionBanner() {
         <Button type="primary" size="small" onClick={reload} className={styles.actionBtn}>
           {t('common.newVersionReload')}
         </Button>
-        <Button type="text" size="small" icon={<CloseOutlined />} aria-label={t('common.close')} onClick={dismiss} />
+        <Button type="text" size="small" icon={ICON_CLOSE} aria-label={t('common.close')} onClick={dismiss} />
       </div>
     </div>
   );

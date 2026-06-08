@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { toNewsItem } from './mappers.js';
 
 /** Minimal valid row — all required fields set, optional fields null */
@@ -22,6 +22,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     textInPanel: 0,
     canLoadArticle: 0,
     fullContentFormat: 'text' as const,
+    forwardFromName: null,
     ...overrides,
   };
 }

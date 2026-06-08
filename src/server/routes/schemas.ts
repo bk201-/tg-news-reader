@@ -3,8 +3,9 @@
  * the server-only parseOptionalBody helper (depends on Hono Context).
  */
 
-import { z } from 'zod';
 import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { z } from 'zod';
 
 // Re-export every schema so existing server route imports stay unchanged
 export {
@@ -29,11 +30,18 @@ export {
 
 /**
  * Safely parse a JSON body and validate with Zod.
- * Returns the default value if the body is empty or malformed.
- * Throws a Zod error if the body is present but fails validation.
+ * Returns the default value if the body is empty or malformed JSON.
+ * Throws HTTPException(400) if the body is present but fails schema validation.
  */
 export async function parseOptionalBody<T>(c: Context, schema: z.ZodType<T>, fallback: T): Promise<T> {
   const raw: unknown = await c.req.json().catch(() => null);
   if (raw === null || raw === undefined) return fallback;
-  return schema.parse(raw);
+  try {
+    return schema.parse(raw);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      throw new HTTPException(400, { message: 'Invalid request body', cause: err });
+    }
+    throw err;
+  }
 }

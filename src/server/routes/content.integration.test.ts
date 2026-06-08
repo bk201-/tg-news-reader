@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -18,9 +18,10 @@ vi.mock('../services/readability.js', () => ({
 }));
 
 import { Hono } from 'hono';
-import { createTestDb, type TestDb } from '../__tests__/testDb.js';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
 import { seedChannel, seedNews } from '../__tests__/seed.js';
+import { createTestDb } from '../__tests__/testDb.js';
+import type { TestDb } from '../__tests__/testDb.js';
 
 let testDb: TestDb;
 
@@ -33,9 +34,9 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-import contentRouter from './content.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { extractContentFromUrl, buildFullContent } from '../services/readability.js';
+import contentRouter from './content.js';
 
 function createApp() {
   const app = new Hono();

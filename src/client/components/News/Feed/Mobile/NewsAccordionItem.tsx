@@ -1,8 +1,9 @@
-import React, { memo } from 'react';
-import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsListItem } from '../NewsListItem';
+import { createStyles } from 'antd-style';
+import React, { memo, useCallback } from 'react';
+import type { NewsFilterMode } from '../../../../store/uiStore';
 import { NewsDetail } from '../../Detail/NewsDetail';
+import { NewsListItem } from '../NewsListItem';
 
 const useStyles = createStyles(({ css, token }) => ({
   item: css`
@@ -26,7 +27,7 @@ interface NewsAccordionItemProps {
   item: NewsItem;
   isSelected: boolean;
   isFiltered: boolean;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   channelTelegramId: string;
   onSelect: (id: number | null) => void;
   onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
@@ -38,7 +39,7 @@ export const NewsAccordionItem = memo(
     item,
     isSelected,
     isFiltered,
-    showAll,
+    newsFilterMode,
     channelTelegramId,
     onSelect,
     onTagClick,
@@ -46,9 +47,11 @@ export const NewsAccordionItem = memo(
   }: NewsAccordionItemProps) {
     const { styles, cx } = useStyles();
 
-    if (!isFiltered && !showAll) return null;
+    const handleHeaderClick = useCallback(() => onSelect(null), [onSelect]);
 
-    const dimmed = !isFiltered && showAll;
+    if (newsFilterMode === 'filtered' && !isFiltered) return null;
+
+    const dimmed = newsFilterMode === 'all' && !isFiltered;
 
     return (
       <div
@@ -63,7 +66,7 @@ export const NewsAccordionItem = memo(
             channelTelegramId={channelTelegramId}
             onMarkedRead={onMarkedRead}
             variant="inline"
-            onHeaderClick={() => onSelect(null)}
+            onHeaderClick={handleHeaderClick}
             onTagClick={onTagClick}
           />
         ) : (
@@ -71,8 +74,8 @@ export const NewsAccordionItem = memo(
             item={item}
             isSelected={false}
             isFiltered={isFiltered}
-            showAll={showAll}
-            onClick={() => onSelect(item.id)}
+            newsFilterMode={newsFilterMode}
+            onClick={onSelect}
             onTagClick={onTagClick}
           />
         )}
@@ -83,6 +86,6 @@ export const NewsAccordionItem = memo(
     prev.item === next.item &&
     prev.isSelected === next.isSelected &&
     prev.isFiltered === next.isFiltered &&
-    prev.showAll === next.showAll &&
+    prev.newsFilterMode === next.newsFilterMode &&
     prev.channelTelegramId === next.channelTelegramId,
 );

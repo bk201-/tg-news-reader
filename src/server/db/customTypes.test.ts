@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  stringArrayToDriver,
-  stringArrayFromDriver,
-  numberArrayToDriver,
   numberArrayFromDriver,
+  numberArrayToDriver,
+  stringArrayFromDriver,
+  stringArrayToDriver,
 } from './customTypes.js';
 
 describe('jsonStringArray', () => {

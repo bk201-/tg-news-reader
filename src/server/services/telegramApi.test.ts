@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TelegramMessage } from './telegramParser.js';
 
 // ─── Hoisted mocks (available before vi.mock factories) ──────────────────────
@@ -51,10 +51,18 @@ const {
   const _mockParseMessageFields = vi.fn();
   const _mockExtractInstantViewText = vi.fn();
 
+  class _MockPeerChannel {
+    channelId: bigint;
+    constructor(channelId: bigint) {
+      this.channelId = channelId;
+    }
+  }
+
   const _mockApi = {
     Message: _MockMessage,
     WebPage: _MockWebPage,
     Page: _MockPage,
+    PeerChannel: _MockPeerChannel,
     messages: {
       GetWebPage: class {
         url: string;
@@ -110,8 +118,8 @@ vi.mock('./telegramParser.js', () => ({
   extractInstantViewText: (...args: unknown[]) => mockExtractInstantViewText(...args),
 }));
 
-import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 import { logger } from '../logger.js';
+import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -315,6 +323,101 @@ describe('telegramApi — resolvePartialInstantView', () => {
       expect(result).not.toBeNull();
       expect(result!.instantViewContent).toBe('Full content');
       expect(mockInvoke).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Regression: fetch-loop pagination respect for limit / sinceDate ─────────
+  describe('fetchChannelMessages pagination cap', () => {
+    // `vi.clearAllMocks()` in the outer beforeEach does NOT drain the
+    // `mockResolvedValueOnce` queue — any unconsumed entries from previous
+    // tests leak into the next test's getMessages calls. Reset explicitly.
+    beforeEach(() => {
+      mockGetMessages.mockReset();
+      mockParseMessageFields.mockReset();
+    });
+
+    // Build a batch of N MockMessage objects, all dated NOW (well after any sinceDate).
+    function buildBatch(startId: number, count: number, date = 1700000000): InstanceType<typeof MockMessage>[] {
+      return Array.from({ length: count }, (_, i) => new MockMessage({ id: startId + i, message: 't', date }));
+    }
+
+    it('stops at `limit` when limit is provided', async () => {
+      // 3 full batches of 100 = 300 messages available, limit = 150 → should stop after batch 2.
+      mockGetMessages
+        .mockResolvedValueOnce(buildBatch(300, 100))
+        .mockResolvedValueOnce(buildBatch(200, 100))
+        .mockResolvedValueOnce(buildBatch(100, 100));
+
+      mockParseMessageFields.mockImplementation((m: { id: number; date: number }) => ({
+        id: m.id,
+        message: 't',
+        date: m.date,
+        links: [],
+        hashtags: [],
+      }));
+
+      const results = await fetchChannelMessages('test_channel', { limit: 150 });
+
+      expect(results).toHaveLength(200); // two full batches accumulated, loop exits AFTER second
+      expect(mockGetMessages).toHaveBeenCalledTimes(2);
+    });
+
+    // Regression for issue 2: when the user explicitly requests a sinceDate and passes
+    // no `limit`, the loop must keep paging until sinceDate is reached, NOT stop at
+    // the old hard-coded 500-message default.
+    it('does not stop at the old 500-default when limit is undefined', async () => {
+      // 6 batches of 100 = 600 messages, all newer than sinceDate. Without the fix,
+      // the loop would stop after batch 5 (500 messages). With the fix, it keeps going
+      // until getMessages returns < BATCH_SIZE (the 7th call returns empty).
+      mockGetMessages
+        .mockResolvedValueOnce(buildBatch(600, 100))
+        .mockResolvedValueOnce(buildBatch(500, 100))
+        .mockResolvedValueOnce(buildBatch(400, 100))
+        .mockResolvedValueOnce(buildBatch(300, 100))
+        .mockResolvedValueOnce(buildBatch(200, 100))
+        .mockResolvedValueOnce(buildBatch(100, 100))
+        .mockResolvedValueOnce([]); // end of channel
+
+      mockParseMessageFields.mockImplementation((m: { id: number; date: number }) => ({
+        id: m.id,
+        message: 't',
+        date: m.date,
+        links: [],
+        hashtags: [],
+      }));
+
+      const sinceDate = new Date(1600000000 * 1000); // far in the past — never reached
+      const results = await fetchChannelMessages('test_channel', { sinceDate });
+
+      expect(results).toHaveLength(600);
+      expect(mockGetMessages).toHaveBeenCalledTimes(7);
+    });
+
+    it('stops at sinceDate boundary regardless of limit', async () => {
+      // First batch: 50 newer + 50 older than sinceDate. Should stop mid-batch.
+      const sinceTs = 1700000500;
+      const newerMsgs = Array.from(
+        { length: 50 },
+        (_, i) => new MockMessage({ id: 200 - i, message: 't', date: sinceTs + 10 }),
+      );
+      const olderMsgs = Array.from(
+        { length: 50 },
+        (_, i) => new MockMessage({ id: 150 - i, message: 't', date: sinceTs - 10 }),
+      );
+      mockGetMessages.mockResolvedValueOnce([...newerMsgs, ...olderMsgs]);
+
+      mockParseMessageFields.mockImplementation((m: { id: number; date: number }) => ({
+        id: m.id,
+        message: 't',
+        date: m.date,
+        links: [],
+        hashtags: [],
+      }));
+
+      const results = await fetchChannelMessages('test_channel', { sinceDate: new Date(sinceTs * 1000) });
+
+      expect(results).toHaveLength(50); // only the newer half
+      expect(mockGetMessages).toHaveBeenCalledTimes(1);
     });
   });
 });

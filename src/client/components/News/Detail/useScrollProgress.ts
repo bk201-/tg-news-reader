@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 
 /**
  * Tracks scroll progress of an element relative to the viewport.

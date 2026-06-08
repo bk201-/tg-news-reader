@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock downloadManager before importing strategies
 vi.mock('./downloadManager.js', () => ({ enqueueTask: vi.fn() }));
 
+import type { ChannelType } from '../../shared/types.js';
 import { getChannelStrategy } from './channelStrategies.js';
 import { enqueueTask } from './downloadManager.js';
 import type { TelegramMessage } from './telegramParser.js';
-import type { ChannelType } from '../../shared/types.js';
 
 function makeTgMsg(partial: Partial<TelegramMessage> = {}): TelegramMessage {
   return {

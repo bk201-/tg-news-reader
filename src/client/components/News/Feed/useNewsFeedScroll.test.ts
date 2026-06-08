@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
 import type { NewsItem } from '@shared/types';
+import { renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUIStore } from '../../../store/uiStore';
 import { useNewsFeedScroll } from './useNewsFeedScroll';
 
@@ -23,7 +23,7 @@ describe('useNewsFeedScroll', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useUIStore.setState({ selectedNewsId: null, showAll: false });
+    useUIStore.setState({ selectedNewsId: null, newsFilterMode: 'filtered' });
   });
 
   it('auto-advances to next unread when selected item is filtered out', () => {
@@ -32,7 +32,7 @@ describe('useNewsFeedScroll', () => {
     const displayItems = [makeItem(2, { isRead: 0 }), makeItem(3, { isRead: 0 })];
 
     const setSelectedNewsId = vi.fn();
-    useUIStore.setState({ selectedNewsId: 1, showAll: false, setSelectedNewsId });
+    useUIStore.setState({ selectedNewsId: 1, newsFilterMode: 'filtered', setSelectedNewsId });
 
     renderHook(() => useNewsFeedScroll(displayItems, allItems, 'list', false, markReadFn));
 
@@ -42,12 +42,12 @@ describe('useNewsFeedScroll', () => {
     expect(setSelectedNewsId).toHaveBeenCalledWith(2);
   });
 
-  it('does not auto-advance when showAll is true', () => {
+  it('does not auto-advance when newsFilterMode is "all"', () => {
     const allItems = [makeItem(1), makeItem(2)];
     const displayItems = [makeItem(2)]; // item 1 not in display
 
     const setSelectedNewsId = vi.fn();
-    useUIStore.setState({ selectedNewsId: 1, showAll: true, setSelectedNewsId });
+    useUIStore.setState({ selectedNewsId: 1, newsFilterMode: 'all', setSelectedNewsId });
 
     renderHook(() => useNewsFeedScroll(displayItems, allItems, 'list', false, markReadFn));
 
@@ -60,7 +60,7 @@ describe('useNewsFeedScroll', () => {
     const displayItems = [makeItem(1), makeItem(2)];
 
     const setSelectedNewsId = vi.fn();
-    useUIStore.setState({ selectedNewsId: 1, showAll: false, setSelectedNewsId });
+    useUIStore.setState({ selectedNewsId: 1, newsFilterMode: 'filtered', setSelectedNewsId });
 
     renderHook(() => useNewsFeedScroll(displayItems, allItems, 'list', false, markReadFn));
 
@@ -73,7 +73,7 @@ describe('useNewsFeedScroll', () => {
     const displayItems: NewsItem[] = []; // all filtered out
 
     const setSelectedNewsId = vi.fn();
-    useUIStore.setState({ selectedNewsId: 1, showAll: false, setSelectedNewsId });
+    useUIStore.setState({ selectedNewsId: 1, newsFilterMode: 'filtered', setSelectedNewsId });
 
     renderHook(() => useNewsFeedScroll(displayItems, allItems, 'list', false, markReadFn));
 

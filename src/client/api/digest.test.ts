@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/authStore';
 
 vi.mock('../store/authStore', async () => {
@@ -84,7 +84,7 @@ describe('streamDigest', () => {
 
     const { streamDigest } = await import('./digest');
     await expect(async () => {
-      for await (const _ of streamDigest({}, new AbortController().signal)) {
+      for await (const _event of streamDigest({}, new AbortController().signal)) {
         // consume
       }
     }).rejects.toThrow('Something failed');
@@ -99,7 +99,7 @@ describe('streamDigest', () => {
 
     const { streamDigest } = await import('./digest');
     await expect(async () => {
-      for await (const _ of streamDigest({}, new AbortController().signal)) {
+      for await (const _event of streamDigest({}, new AbortController().signal)) {
         // consume
       }
     }).rejects.toThrow('Internal error');
@@ -113,7 +113,7 @@ describe('streamDigest', () => {
 
     const { streamDigest } = await import('./digest');
     await expect(async () => {
-      for await (const _ of streamDigest({}, new AbortController().signal)) {
+      for await (const _event of streamDigest({}, new AbortController().signal)) {
         // consume
       }
     }).rejects.toThrow('No response body');

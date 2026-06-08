@@ -1,13 +1,14 @@
-import { ConfigProvider, App as AntApp, theme } from 'antd';
+import { App as AntApp, ConfigProvider, theme } from 'antd';
 import { StyleProvider } from 'antd-style';
-import ruRU from 'antd/locale/ru_RU';
 import enUS from 'antd/locale/en_US';
-import { useTranslation } from 'react-i18next';
+import ruRU from 'antd/locale/ru_RU';
 import dayjs from 'dayjs';
-import { AppLayout } from './components/Layout/AppLayout';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AuthGate } from './components/Auth/AuthGate';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary';
 import { RateLimitBanner } from './components/common/RateLimitBanner';
+import { AppLayout } from './components/Layout/AppLayout';
 import { useUIStore } from './store/uiStore';
 
 export function App() {
@@ -19,15 +20,17 @@ export function App() {
   // Keep dayjs locale in sync with UI language
   dayjs.locale(isRu ? 'ru' : 'en');
 
+  const antdTheme = useMemo(
+    () => ({
+      algorithm: isDarkTheme ? theme.darkAlgorithm : theme.defaultAlgorithm,
+      cssVar: { prefix: 'tgr' },
+      hashed: false,
+    }),
+    [isDarkTheme],
+  );
+
   return (
-    <ConfigProvider
-      locale={antdLocale}
-      theme={{
-        algorithm: isDarkTheme ? theme.darkAlgorithm : theme.defaultAlgorithm,
-        cssVar: { prefix: 'tgr' },
-        hashed: false,
-      }}
-    >
+    <ConfigProvider locale={antdLocale} theme={antdTheme}>
       <StyleProvider>
         <AntApp>
           <AppErrorBoundary>

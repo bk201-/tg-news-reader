@@ -1,22 +1,32 @@
-import React from 'react';
-import { Button, Space } from 'antd';
-import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
 import {
-  ReloadOutlined,
-  LinkOutlined,
-  FileTextOutlined,
-  DownloadOutlined,
-  LoadingOutlined,
-  ExportOutlined,
   CheckOutlined,
+  DownloadOutlined,
+  ExportOutlined,
+  FileTextOutlined,
+  LinkOutlined,
+  LoadingOutlined,
+  ReloadOutlined,
   ShareAltOutlined,
 } from '@ant-design/icons';
+import { Button, Space } from 'antd';
 import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
-import { isYouTubeUrl } from '../../newsUtils';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MaybeTooltip as Tooltip } from '../../../common/MaybeTooltip';
+import { ReadAloudButton } from '../../../ReadAloud/ReadAloudButton';
 import { NewsHashtags } from '../../Feed/NewsHashtags';
+import { getNewsTitle, isYouTubeUrl } from '../../newsUtils';
 import type { NewsDetailToolbarProps } from '../newsDetailToolbarTypes';
+
+const ICON_RELOAD = <ReloadOutlined />;
+const ICON_LINK = <LinkOutlined />;
+const ICON_FILE_TEXT = <FileTextOutlined />;
+const ICON_LOADING = <LoadingOutlined />;
+const ICON_DOWNLOAD = <DownloadOutlined />;
+const ICON_EXPORT = <ExportOutlined />;
+const ICON_SHARE = <ShareAltOutlined />;
+const ICON_CHECK = <CheckOutlined />;
 
 const useStyles = createStyles(({ css, token }) => ({
   headerTop: css`
@@ -62,8 +72,11 @@ export function NewsDetailToolbarPanel({
 }: NewsDetailToolbarProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-  const hashtags = item.hashtags || [];
+  const hashtags = useMemo(() => item.hashtags || [], [item.hashtags]);
   const nonYtLinks = links.filter((l) => !isYouTubeUrl(l));
+
+  const handleToggleLinks = useCallback(() => onTogglePanel('links'), [onTogglePanel]);
+  const handleToggleText = useCallback(() => onTogglePanel('text'), [onTogglePanel]);
 
   const metaContent = (
     <>
@@ -78,7 +91,7 @@ export function NewsDetailToolbarPanel({
 
       <Space wrap size={4}>
         <Tooltip title={t('news.detail.refresh_tooltip')}>
-          <Button icon={<ReloadOutlined />} size="small" onClick={onRefresh} loading={refreshPending}>
+          <Button icon={ICON_RELOAD} size="small" onClick={onRefresh} loading={refreshPending}>
             <span className={styles.ndBtnText}>{t('news.detail.refresh')}</span>
           </Button>
         </Tooltip>
@@ -86,10 +99,10 @@ export function NewsDetailToolbarPanel({
         {links.length > 0 && (
           <Tooltip title={t('news.detail.links_tooltip')}>
             <Button
-              icon={<LinkOutlined />}
+              icon={ICON_LINK}
               size="small"
               type={topPanel === 'links' ? 'primary' : 'default'}
-              onClick={() => onTogglePanel('links')}
+              onClick={handleToggleLinks}
             >
               <span className={styles.ndBtnText}>
                 {links.length > 1 ? t('news.detail.links_count', { count: links.length }) : t('news.detail.links')}
@@ -100,10 +113,10 @@ export function NewsDetailToolbarPanel({
         {item.text && (
           <Tooltip title={t('news.detail.text_tooltip')}>
             <Button
-              icon={<FileTextOutlined />}
+              icon={ICON_FILE_TEXT}
               size="small"
               type={topPanel === 'text' ? 'primary' : 'default'}
-              onClick={() => onTogglePanel('text')}
+              onClick={handleToggleText}
             >
               <span className={styles.ndBtnText}>{t('news.detail.text')}</span>
             </Button>
@@ -113,7 +126,7 @@ export function NewsDetailToolbarPanel({
         {item.canLoadArticle === 1 && !item.fullContent && nonYtLinks.length > 0 && (
           <Tooltip title={t('news.detail.load_article_tooltip')}>
             <Button
-              icon={articleLoading ? <LoadingOutlined /> : <DownloadOutlined />}
+              icon={articleLoading ? ICON_LOADING : ICON_DOWNLOAD}
               size="small"
               onClick={onExtractClick}
               loading={articleLoading}
@@ -127,17 +140,22 @@ export function NewsDetailToolbarPanel({
         )}
 
         <Tooltip title={isExternalLink ? t('news.detail.open_tooltip') : t('news.detail.open_tg_tooltip')}>
-          <Button icon={<ExportOutlined />} size="small" href={openUrl} target="_blank" rel="noreferrer">
+          <Button icon={ICON_EXPORT} size="small" href={openUrl} target="_blank" rel="noreferrer">
             <span className={styles.ndBtnText}>{t('news.detail.open')}</span>
           </Button>
         </Tooltip>
         <Tooltip title={t('news.detail.share_tooltip')}>
-          <Button icon={<ShareAltOutlined />} size="small" onClick={onShare}>
+          <Button icon={ICON_SHARE} size="small" onClick={onShare}>
             <span className={styles.ndBtnText}>{t('news.detail.share')}</span>
           </Button>
         </Tooltip>
+        <ReadAloudButton
+          text={item.fullContent || item.text || ''}
+          title={getNewsTitle(item).slice(0, 60)}
+          labelClassName={styles.ndBtnText}
+        />
         <Button
-          icon={<CheckOutlined />}
+          icon={ICON_CHECK}
           size="small"
           type={isRead ? 'default' : 'primary'}
           onClick={onMarkRead}

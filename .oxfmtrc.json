@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "insertFinalNewline": true,
+  "endOfLine": "lf",
+  "embeddedLanguageFormatting": "off",
+  "sortPackageJson": false,
+  "sortImports": {
+    "newlinesBetween": false,
+    "partitionByNewline": false,
+    "sortSideEffects": true
+  },
+  "overrides": [
+    {
+      "files": ["*.md", "*.json", "*.jsonc", "*.yml", "*.yaml"],
+      "options": {
+        "tabWidth": 2,
+        "trailingComma": "none"
+      }
+    }
+  ],
+  "ignorePatterns": [".idea", "coverage", "data", "dist", "node_modules", "plans", "package-lock.json", "*.sqlite"]
+}

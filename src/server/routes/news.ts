@@ -1,15 +1,15 @@
+import { and, asc, eq, gt, inArray, max, notInArray, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { ChannelType, NewsItem } from '../../shared/types.js';
 import { db } from '../db/index.js';
-import { news, channels, downloads } from '../db/schema.js';
-import { eq, and, asc, max, sql, gt, notInArray, inArray, type SQL } from 'drizzle-orm';
-import type { NewsItem } from '../../shared/types.js';
-import { readChannelHistory, fetchMessageById } from '../services/telegram.js';
-import { getChannelStrategy } from '../services/channelStrategies.js';
-import type { ChannelType } from '../../shared/types.js';
-import { logger } from '../logger.js';
 import { toNewsItem } from '../db/mappers.js';
-import { readAllNewsSchema, markReadSchema, parseOptionalBody } from './schemas.js';
+import { channels, downloads, news } from '../db/schema.js';
+import { logger } from '../logger.js';
+import { getChannelStrategy } from '../services/channelStrategies.js';
+import { fetchMessageById, readChannelHistory } from '../services/telegram.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
+import { markReadSchema, parseOptionalBody, readAllNewsSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -42,6 +42,7 @@ router.post('/read-all', async (c) => {
           .select({ count: sql<number>`count(*)` })
           .from(news)
           .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+
         await db
           .update(channels)
           .set({ unreadCount: result?.count ?? 0 })
@@ -135,12 +136,23 @@ router.delete('/read', async (c) => {
   return c.json({ deleted: deleted.length });
 });
 
-// GET /api/news?channelId=&isRead=&filtered=1&limit=&cursor=
+// GET /api/news?channelId=&isRead=&view=filtered|all|hidden&limit=&cursor=
+//   - view=filtered (or legacy filtered=1): excludes items flagged as hidden by filters
+//   - view=hidden: returns ONLY items flagged as hidden by filters
+//   - view=all (default): no filter applied
 // Response: { items: NewsItem[], filteredOut: number, nextCursor: number | null, hasMore: boolean }
 router.get('/', async (c) => {
   const channelId = c.req.query('channelId') ? parseInt(c.req.query('channelId')!, 10) : undefined;
   const isReadParam = c.req.query('isRead');
-  const applyServerFilters = c.req.query('filtered') === '1';
+  // ── View mode (with back-compat: filtered=1 → view=filtered) ─────────────
+  const rawView = c.req.query('view');
+  const legacyFilteredParam = c.req.query('filtered') === '1';
+  let view: 'filtered' | 'all' | 'hidden' = 'all';
+  if (rawView === 'filtered' || rawView === 'hidden' || rawView === 'all') {
+    view = rawView;
+  } else if (legacyFilteredParam) {
+    view = 'filtered';
+  }
   const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!, 10) : 50;
   const cursor = c.req.query('cursor') ? parseInt(c.req.query('cursor')!, 10) : undefined;
 
@@ -149,22 +161,31 @@ router.get('/', async (c) => {
   if (channelId !== undefined) baseConditions.push(eq(news.channelId, channelId));
   if (isReadParam !== undefined) baseConditions.push(eq(news.isRead, parseInt(isReadParam, 10)));
 
-  // Full conditions = base + filter exclusions
+  // Full conditions = base + view-specific exclusions
   const conditions: SQL[] = [...baseConditions];
-  let filtersApplied = false;
 
-  // Server-side filter application: use pre-computed is_filtered flag
-  if (applyServerFilters && channelId !== undefined) {
-    conditions.push(eq(news.isFiltered, 0));
-    filtersApplied = true;
-
-    // For media_content channels: auto-filter posts without real media attachment
+  // For media_content channels, "hidden" auto-includes non-media items too,
+  // and "filtered" auto-excludes them. Resolve channel type once.
+  let isMediaChannel = false;
+  if (channelId !== undefined && view !== 'all') {
     const [channelRow] = await db
       .select({ channelType: channels.channelType })
       .from(channels)
       .where(eq(channels.id, channelId));
-    if (channelRow?.channelType === 'media') {
+    isMediaChannel = channelRow?.channelType === 'media';
+  }
+
+  if (view === 'filtered' && channelId !== undefined) {
+    conditions.push(eq(news.isFiltered, 0));
+    if (isMediaChannel) {
       conditions.push(sql`${news.mediaType} IN ('photo', 'document', 'audio')`);
+    }
+  } else if (view === 'hidden' && channelId !== undefined) {
+    // Inverse of 'filtered': anything that would be excluded from the filtered view.
+    if (isMediaChannel) {
+      conditions.push(sql`(${news.isFiltered} = 1 OR ${news.mediaType} NOT IN ('photo', 'document', 'audio'))`);
+    } else {
+      conditions.push(eq(news.isFiltered, 1));
     }
   }
 
@@ -184,14 +205,19 @@ router.get('/', async (c) => {
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-  // Count queries only on the first page (no cursor) — subsequent pages reuse page[0] values on the client
+  // filteredOut = count of items that WOULD be excluded from the 'filtered' view.
+  // Always computed on the first page when channelId is provided, regardless of
+  // the current view, so the toolbar can show "Hidden: N" in any mode.
   let filteredOut = 0;
-  if (!cursor && filtersApplied && channelId !== undefined) {
-    const filteredConditions = [...baseConditions, eq(news.isFiltered, 1)];
+  if (!cursor && channelId !== undefined) {
+    const isMedia = isMediaChannel || (await isChannelMedia(channelId));
+    const hiddenCondition = isMedia
+      ? sql`(${news.isFiltered} = 1 OR ${news.mediaType} NOT IN ('photo', 'document', 'audio'))`
+      : eq(news.isFiltered, 1);
     const [result] = await db
       .select({ count: sql<number>`count(*)` })
       .from(news)
-      .where(and(...filteredConditions));
+      .where(and(...baseConditions, hiddenCondition));
     filteredOut = result?.count ?? 0;
   }
 
@@ -200,13 +226,18 @@ router.get('/', async (c) => {
 
   // ETag: must capture ALL dimensions of response state — including fields
   // that change asynchronously after insertion (localMediaPath via download worker,
-  // fullContent via article extractor). Without these, the browser HTTP cache
-  // serves stale 304 responses when TanStack Query refetches, wiping SSE-patched
-  // media paths from the client cache and making images vanish.
+  // fullContent via article extractor) AND the per-item isRead flag. Without
+  // isRead in the ETag, marking items as read (e.g. when opening the lightbox)
+  // does not invalidate the previously cached 200 response: a subsequent
+  // refetch sees identical count/maxPostedAt/mediaCount/contentCount, the
+  // server returns 304, and the browser HTTP cache replays the OLD body with
+  // isRead=0, reverting the just-flipped checkboxes in the news list.
   const maxPostedAt = pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : 0;
   const mediaCount = pageRows.filter((r) => r.localMediaPath).length;
   const contentCount = pageRows.filter((r) => r.fullContent).length;
-  const etag = `"${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}"`;
+  const readCount = pageRows.filter((r) => r.isRead === 1).length;
+  // Include view in ETag so different modes don't collide in the HTTP cache.
+  const etag = `"${view}-${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}-${readCount}"`;
 
   const ifNoneMatch = c.req.header('If-None-Match');
   if (ifNoneMatch === etag) {
@@ -223,6 +254,13 @@ router.get('/', async (c) => {
   c.header('ETag', etag);
   return c.json({ items, filteredOut, nextCursor, hasMore });
 });
+
+// Helper for the filteredOut count path that needs channel type when not
+// already resolved above (view=all branch).
+async function isChannelMedia(channelId: number): Promise<boolean> {
+  const [row] = await db.select({ channelType: channels.channelType }).from(channels).where(eq(channels.id, channelId));
+  return row?.channelType === 'media';
+}
 
 // GET /api/news/:id
 router.get('/:id', async (c) => {

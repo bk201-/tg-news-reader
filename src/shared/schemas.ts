@@ -118,7 +118,7 @@ export const clientLogSchema = z.object({
         time: z.number().optional(),
         url: z.string().optional(),
       })
-      .passthrough(),
+      .loose(),
   ),
 });
 

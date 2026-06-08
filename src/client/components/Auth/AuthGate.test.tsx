@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../__tests__/renderWithProviders';
-import { AuthGate } from './AuthGate';
 import { useAuthStore } from '../../store/authStore';
+import { AuthGate } from './AuthGate';
 
 describe('AuthGate', () => {
   beforeEach(() => {

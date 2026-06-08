@@ -1,9 +1,11 @@
-import React, { useCallback } from 'react';
-import { Spin, Empty } from 'antd';
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
+import { Empty, Spin } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Virtuoso } from 'react-virtuoso';
+import type { VirtuosoHandle } from 'react-virtuoso';
+import type { NewsFilterMode } from '../../../../store/uiStore';
 import { NewsListItem } from '../NewsListItem';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -43,7 +45,7 @@ interface NewsFeedListProps {
   isLoading: boolean;
   items: NewsItem[];
   filteredIds: Set<number>;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
@@ -59,7 +61,7 @@ export function NewsFeedList({
   isLoading,
   items,
   filteredIds,
-  showAll,
+  newsFilterMode,
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
@@ -79,12 +81,12 @@ export function NewsFeedList({
         item={item}
         isSelected={selectedNewsId === item.id}
         isFiltered={filteredIds.has(item.id)}
-        showAll={showAll}
-        onClick={() => onSelect(item.id)}
+        newsFilterMode={newsFilterMode}
+        onClick={onSelect}
         onTagClick={onTagClick}
       />
     ),
-    [selectedNewsId, filteredIds, showAll, onSelect, onTagClick],
+    [selectedNewsId, filteredIds, newsFilterMode, onSelect, onTagClick],
   );
 
   const emptyDescription = hashTagFilter
@@ -103,6 +105,8 @@ export function NewsFeedList({
     [isFetchingNextPage, styles.loadingMore],
   );
 
+  const virtuosoComponents = useMemo(() => ({ Footer: footer }), [footer]);
+
   return (
     <div role="listbox" aria-label={t('news.list.list_label')} className={styles.list}>
       {isLoading && (
@@ -119,7 +123,7 @@ export function NewsFeedList({
           overscan={400}
           itemContent={renderItem}
           endReached={hasNextPage ? onEndReached : undefined}
-          components={{ Footer: footer }}
+          components={virtuosoComponents}
         />
       )}
     </div>

@@ -1,16 +1,19 @@
-import React, { memo } from 'react';
-import { Typography, Checkbox } from 'antd';
 import { PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import dayjs from 'dayjs';
 import type { NewsItem } from '@shared/types.ts';
-import { useMarkRead } from '../../../api/news';
+import { Checkbox, Typography } from 'antd';
+import { createStyles } from 'antd-style';
+import dayjs from 'dayjs';
+import React, { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
-import { NewsHashtags } from './NewsHashtags';
+import { useMarkRead } from '../../../api/news';
+import type { NewsFilterMode } from '../../../store/uiStore';
 import { useUIStore } from '../../../store/uiStore';
+import { NewsHashtags } from './NewsHashtags';
 
 const { Text } = Typography;
+
+const EMPTY_HASHTAGS: string[] = [];
 
 const useStyles = createStyles(({ css, token }) => ({
   item: css`
@@ -153,8 +156,8 @@ interface NewsListItemProps {
   item: NewsItem;
   isSelected: boolean;
   isFiltered: boolean; // true = passed filter, false = filtered out
-  showAll: boolean;
-  onClick: () => void;
+  newsFilterMode: NewsFilterMode;
+  onClick: (id: number) => void;
   onTagClick?: (tag: string, action: 'show' | 'addFilter') => void;
 }
 
@@ -165,14 +168,14 @@ function getTitle(item: NewsItem, fallback: string): string {
 }
 
 export const NewsListItem = memo(
-  function NewsListItem({ item, isSelected, isFiltered, showAll, onClick, onTagClick }: NewsListItemProps) {
+  function NewsListItem({ item, isSelected, isFiltered, newsFilterMode, onClick, onTagClick }: NewsListItemProps) {
     const markRead = useMarkRead();
     const { styles, cx } = useStyles();
     const { t } = useTranslation();
     const openLightbox = useUIStore((s) => s.openLightbox);
 
     const title = getTitle(item, t('news.list.message_fallback', { id: item.telegramMsgId }));
-    const hashtags = item.hashtags || [];
+    const hashtags = item.hashtags ?? EMPTY_HASHTAGS;
     const isRead = item.isRead === 1;
     const isAudio = item.mediaType === 'audio';
     const firstMediaPath = item.localMediaPaths?.[0] ?? item.localMediaPath;
@@ -181,15 +184,45 @@ export const NewsListItem = memo(
     // Show thumbnail for downloaded media, or always for audio (even without a file)
     const showThumb = !!firstMediaPath || isAudio;
 
-    // If filtered out and not showAll, don't render
-    if (!isFiltered && !showAll) return null;
+    const handleMarkRead = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId });
+      },
+      [markRead, item.id, item.channelId, isRead],
+    );
 
-    const dimmed = !isFiltered && showAll;
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onClick(item.id);
+        }
+      },
+      [onClick, item.id],
+    );
 
-    const handleMarkRead = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      markRead.mutate({ id: item.id, isRead: isRead ? 0 : 1, channelId: item.channelId });
-    };
+    const handleClick = useCallback(() => onClick(item.id), [onClick, item.id]);
+
+    const ellipsisConfig = useMemo(() => ({ tooltip: title }), [title]);
+
+    const handleThumbClick = useCallback(
+      (e: React.MouseEvent) => {
+        if (!isAudio && (item.mediaType === 'photo' || item.mediaType === 'document')) {
+          e.stopPropagation();
+          openLightbox(item.id, 0, item.channelId);
+        }
+      },
+      [isAudio, item.mediaType, item.id, item.channelId, openLightbox],
+    );
+
+    // Render rules per mode:
+    //   'filtered' — hide items rejected by filters (isFiltered=false)
+    //   'all'      — render everything; dim rejected ones
+    //   'hidden'   — render everything (server returned only rejected items); no dimming
+    if (newsFilterMode === 'filtered' && !isFiltered) return null;
+
+    const dimmed = newsFilterMode === 'all' && !isFiltered;
 
     return (
       <div
@@ -203,33 +236,20 @@ export const NewsListItem = memo(
           isRead && styles.itemRead,
           dimmed && styles.itemDimmed,
         )}
-        onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onClick();
-          }
-        }}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
         <div className={styles.header}>
           <Checkbox checked={isRead} onClick={handleMarkRead} className={styles.checkbox} />
           <Text
             className={cx(styles.title, styles.titleWrap, isRead && styles.titleRead, dimmed && styles.titleDimmed)}
             strong={!isRead}
-            ellipsis={{ tooltip: title }}
+            ellipsis={ellipsisConfig}
           >
             {title}
           </Text>
           {showThumb && (
-            <div
-              className={cx(styles.thumb, dimmed && styles.thumbDimmed)}
-              onClick={(e) => {
-                if (!isAudio && (item.mediaType === 'photo' || item.mediaType === 'document')) {
-                  e.stopPropagation();
-                  openLightbox(item.id, 0, item.channelId);
-                }
-              }}
-            >
+            <div className={cx(styles.thumb, dimmed && styles.thumbDimmed)} onClick={handleThumbClick}>
               {isAudio ? (
                 <div className={styles.thumbAudio}>
                   <SoundOutlined className={styles.audioIcon} />

@@ -24,6 +24,10 @@ export interface TelegramMessage {
   // store the URL so telegramApi can call messages.getWebPage for the full page
   instantViewUrl?: string;
   instantViewPartial?: boolean;
+  // Forward info — set if this message was forwarded from another channel/user
+  forwardFromName?: string;
+  /** Raw peer reference for entity resolution in telegramApi.ts — not stored in DB */
+  forwardFromPeer?: Api.TypePeer;
 }
 
 export function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
@@ -211,9 +215,16 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
     mediaType,
     mediaSizeBytes,
     rawMedia: msg.media ?? undefined,
-    groupedId: msg.groupedId != null ? String(msg.groupedId) : undefined,
+    groupedId: msg.groupedId !== null && msg.groupedId !== undefined ? String(msg.groupedId) : undefined,
     instantViewContent,
     instantViewUrl,
     instantViewPartial,
+    // Forward header: fromName is set for hidden-user forwards; fromId for channel/user forwards
+    ...(msg.fwdFrom
+      ? {
+          forwardFromName: msg.fwdFrom.fromName ?? undefined,
+          forwardFromPeer: msg.fwdFrom.fromId ?? undefined,
+        }
+      : {}),
   };
 }

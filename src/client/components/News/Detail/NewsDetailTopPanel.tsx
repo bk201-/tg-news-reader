@@ -1,9 +1,11 @@
-import React from 'react';
-import { Button } from 'antd';
 import { CloseOutlined, LinkOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 import { createStyles, keyframes } from 'antd-style';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { getLinkLabel } from '../newsUtils';
+
+const ICON_CLOSE = <CloseOutlined />;
 
 const panelIn = keyframes`
   from { opacity: 0; transform: translateY(-6px); }
@@ -117,13 +119,13 @@ export function NewsDetailTopPanel({ panel, links, text, onClose }: NewsDetailTo
               ? t('news.detail.links_count', { count: links.length })
               : t('news.detail.text_panel_title')}
           </span>
-          <Button type="text" size="small" icon={<CloseOutlined />} onClick={onClose} className={styles.closeBtn} />
+          <Button type="text" size="small" icon={ICON_CLOSE} onClick={onClose} className={styles.closeBtn} />
         </div>
         <div className={styles.panelBody}>
           {panel === 'links' ? (
             <div className={styles.linkList}>
               {links.map((link, i) => (
-                <a key={i} href={link} target="_blank" rel="noopener noreferrer" className={styles.linkRow}>
+                <a key={link} href={link} target="_blank" rel="noopener noreferrer" className={styles.linkRow}>
                   <span className={styles.linkLabel}>
                     <LinkOutlined className={styles.linkIcon} />
                     {getLinkLabel(link, i, t('news.detail.link_fallback', { n: i + 1 }))}

@@ -2,10 +2,10 @@
  * useNewsFeedScroll — FAB visibility, scroll-to-top, sentinel, refs, auto-advance on filter.
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { VirtuosoHandle } from 'react-virtuoso';
 import type { NewsItem } from '../../../../shared/types';
 import { useUIStore } from '../../../store/uiStore';
-import type { VirtuosoHandle } from 'react-virtuoso';
 
 export function useNewsFeedScroll(
   displayItems: NewsItem[],
@@ -14,12 +14,12 @@ export function useNewsFeedScroll(
   forceAccordion: boolean,
   markReadFn: (args: { id: number; isRead: number; channelId: number }) => void,
 ) {
-  const { selectedNewsId, setSelectedNewsId, showAll } = useUIStore();
+  const { selectedNewsId, setSelectedNewsId, newsFilterMode } = useUIStore();
 
   // Stable refs for deps that should NOT re-trigger the auto-advance effect
-  const advanceRef = useRef({ newsItems, selectedNewsId, showAll, markReadFn, setSelectedNewsId });
+  const advanceRef = useRef({ newsItems, selectedNewsId, newsFilterMode, markReadFn, setSelectedNewsId });
   useEffect(() => {
-    advanceRef.current = { newsItems, selectedNewsId, showAll, markReadFn, setSelectedNewsId };
+    advanceRef.current = { newsItems, selectedNewsId, newsFilterMode, markReadFn, setSelectedNewsId };
   });
 
   // ── Refs ──────────────────────────────────────────────────────────────
@@ -57,13 +57,14 @@ export function useNewsFeedScroll(
   // ── Auto-advance selected news when filtered out ───────────────────────
   useEffect(() => {
     const {
-      showAll: sa,
+      newsFilterMode: mode,
       selectedNewsId: snId,
       newsItems: ni,
       markReadFn: mrf,
       setSelectedNewsId: ssn,
     } = advanceRef.current;
-    if (sa || !snId) return;
+    // In 'all' mode items never disappear from view → nothing to advance.
+    if (mode === 'all' || !snId) return;
     if (displayItems.some((n) => n.id === snId)) return;
     const item = ni.find((n) => n.id === snId);
     if (item && item.isRead === 0) mrf({ id: item.id, isRead: 1, channelId: item.channelId });

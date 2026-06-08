@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getLogEntries, getBufferSize, LEVEL_MAP } from '../services/logBuffer.js';
+import { getBufferSize, getLogEntries, LEVEL_MAP } from '../services/logBuffer.js';
 
 const router = new Hono();
 

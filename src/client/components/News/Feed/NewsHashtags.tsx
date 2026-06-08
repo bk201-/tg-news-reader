@@ -1,8 +1,15 @@
-import React from 'react';
-import { Tag, Dropdown } from 'antd';
 import { FilterOutlined, PlusOutlined } from '@ant-design/icons';
+import { Dropdown, Tag } from 'antd';
+import type { MenuProps } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CURSOR_POINTER_STYLE = { cursor: 'pointer' };
+const STOP_PROPAGATION = (e: React.MouseEvent) => e.stopPropagation();
+const DROPDOWN_TRIGGER: ['click'] = ['click'];
+const ICON_FILTER = <FilterOutlined />;
+const ICON_PLUS = <PlusOutlined />;
 
 const useStyles = createStyles(({ css }) => ({
   tags: css`
@@ -25,6 +32,41 @@ interface NewsHashtagsProps {
   maxVisible?: number;
 }
 
+/** Single hashtag with its own dropdown menu — keeps the menu prop stable per tag. */
+function HashtagDropdown({
+  tag,
+  onTagClick,
+  className,
+}: {
+  tag: string;
+  onTagClick: (tag: string, action: 'show' | 'addFilter') => void;
+  className: string;
+}) {
+  const { t } = useTranslation();
+
+  const menu = useMemo<MenuProps>(
+    () => ({
+      items: [
+        { key: 'show', label: t('news.list.tag_show'), icon: ICON_FILTER },
+        { key: 'addFilter', label: t('news.list.tag_add_filter'), icon: ICON_PLUS },
+      ],
+      onClick: ({ key, domEvent }) => {
+        domEvent.stopPropagation();
+        onTagClick(tag, key as 'show' | 'addFilter');
+      },
+    }),
+    [t, onTagClick, tag],
+  );
+
+  return (
+    <Dropdown trigger={DROPDOWN_TRIGGER} menu={menu}>
+      <Tag color="blue" className={className} style={CURSOR_POINTER_STYLE} onClick={STOP_PROPAGATION}>
+        {tag}
+      </Tag>
+    </Dropdown>
+  );
+}
+
 /**
  * Shared hashtag component used in NewsListItem (collapsed) and NewsDetailToolbar (expanded).
  * When `onTagClick` is provided each tag shows a dropdown instead of plain text.
@@ -32,7 +74,6 @@ interface NewsHashtagsProps {
  */
 export function NewsHashtags({ hashtags, onTagClick, className, maxVisible }: NewsHashtagsProps) {
   const { styles, cx } = useStyles();
-  const { t } = useTranslation();
 
   if (hashtags.length === 0) return null;
 
@@ -43,26 +84,9 @@ export function NewsHashtags({ hashtags, onTagClick, className, maxVisible }: Ne
     <div className={cx(styles.tags, className)}>
       {visible.map((tag) =>
         onTagClick ? (
-          <Dropdown
-            key={tag}
-            trigger={['click']}
-            menu={{
-              items: [
-                { key: 'show', label: t('news.list.tag_show'), icon: <FilterOutlined /> },
-                { key: 'addFilter', label: t('news.list.tag_add_filter'), icon: <PlusOutlined /> },
-              ],
-              onClick: ({ key, domEvent }) => {
-                domEvent.stopPropagation();
-                onTagClick(tag, key as 'show' | 'addFilter');
-              },
-            }}
-          >
-            <Tag color="blue" className={styles.tag} style={{ cursor: 'pointer' }} onClick={(e) => e.stopPropagation()}>
-              {tag}
-            </Tag>
-          </Dropdown>
+          <HashtagDropdown key={tag} tag={tag} onTagClick={onTagClick} className={styles.tag} />
         ) : (
-          <Tag key={tag} color="blue" className={styles.tag} onClick={(e) => e.stopPropagation()}>
+          <Tag key={tag} color="blue" className={styles.tag} onClick={STOP_PROPAGATION}>
             {tag}
           </Tag>
         ),

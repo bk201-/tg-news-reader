@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Alert } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
+import { Alert } from 'antd';
 import { createStyles } from 'antd-style';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRateLimitStore } from '../../store/rateLimitStore';
+
+const ICON_THUNDERBOLT = <ThunderboltOutlined />;
 
 const useStyles = createStyles(({ css }) => ({
   banner: css`
@@ -60,7 +62,7 @@ export function RateLimitBanner() {
     <Alert
       className={styles.banner}
       type="warning"
-      icon={<ThunderboltOutlined />}
+      icon={ICON_THUNDERBOLT}
       showIcon
       banner
       title={t('rateLimit.message', { secs })}

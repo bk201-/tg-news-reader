@@ -1,8 +1,10 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
-import { LoadingOutlined, DownloadOutlined } from '@ant-design/icons';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaUrl } from '../../../api/mediaUrl';
+
+const ICON_DOWNLOAD = <DownloadOutlined />;
 
 /** Max number of silent auto-retries before showing error UI */
 const MAX_AUTO_RETRIES = 2;
@@ -113,7 +115,7 @@ export function LightboxMedia({
   // a useEffect, which runs after paint and races with the browser's own autoplay.
   const videoRefCallback = useCallback(
     (el: HTMLVideoElement | null) => {
-      (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+      videoRef.current = el;
       if (el) {
         el.volume = 0.5;
         void el.play().catch(() => {
@@ -121,10 +123,8 @@ export function LightboxMedia({
         });
       }
     },
-    // Re-create the callback when path changes so React replaces the video element
-    // and the callback fires again for the new element.
-    // oxlint-disable-next-line react/exhaustive-deps
-    [path, videoRef],
+    // Keep callback stable; it still fires on each mount/remount of the video node.
+    [videoRef],
   );
 
   const displayPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? path) : path;
@@ -178,6 +178,12 @@ export function LightboxMedia({
     }
   }, [retryCount, onRetry]);
 
+  const handleImgLoad = useCallback(() => {
+    setImgLoading(false);
+    setImgError(false);
+    setRetryCount(0);
+  }, []);
+
   /** Image URL with cache-buster to bypass browser/SW cache on retries */
   const imgSrc = displayPath
     ? retryCount > 0
@@ -192,7 +198,7 @@ export function LightboxMedia({
         {onDownload ? (
           <div className={styles.errorOverlay}>
             <LoadingOutlined className={styles.spinner} />
-            <Button icon={<DownloadOutlined />} onClick={onDownload} className={styles.lightboxBtn}>
+            <Button icon={ICON_DOWNLOAD} onClick={onDownload} className={styles.lightboxBtn}>
               Download
             </Button>
           </div>
@@ -227,11 +233,7 @@ export function LightboxMedia({
             alt=""
             className={styles.img}
             draggable={false}
-            onLoad={() => {
-              setImgLoading(false);
-              setImgError(false);
-              setRetryCount(0);
-            }}
+            onLoad={handleImgLoad}
             onError={handleImgError}
           />
           {/* Spinner overlay while loading — previous image stays visible beneath */}
@@ -245,7 +247,7 @@ export function LightboxMedia({
             <div className={styles.errorOverlay}>
               <span>Failed to load</span>
               {onDownload && (
-                <Button icon={<DownloadOutlined />} onClick={onDownload} className={styles.lightboxBtn} size="small">
+                <Button icon={ICON_DOWNLOAD} onClick={onDownload} className={styles.lightboxBtn} size="small">
                   Re-download
                 </Button>
               )}

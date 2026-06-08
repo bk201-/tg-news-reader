@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  withRetry,
-  isTransientTelegramError,
+  getFloodWaitOverrideMs,
   isTransientDbError,
   isTransientDownloadError,
   isTransientHttpFetchError,
-  getFloodWaitOverrideMs,
-  type RetryPolicy,
+  isTransientTelegramError,
+  withRetry,
 } from './retry.js';
+import type { RetryPolicy } from './retry.js';
 
 // ─── Helper: minimal policy with zero delays ─────────────────────────────────
 

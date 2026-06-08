@@ -1,7 +1,7 @@
-import React, { memo } from 'react';
 import { createStyles } from 'antd-style';
+import React, { memo } from 'react';
 
-const useStyles = createStyles(({ css, token }) => ({
+const useStyles = createStyles(({ css, token }, pct: number) => ({
   track: css`
     position: absolute;
     bottom: 0;
@@ -13,6 +13,7 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
   bar: css`
     height: 100%;
+    width: ${pct}%;
     background: ${token.colorPrimary};
     transition: width 0.1s linear;
     border-radius: 0 1px 1px 0;
@@ -24,14 +25,14 @@ interface ScrollProgressBarProps {
 }
 
 export const ScrollProgressBar = memo(function ScrollProgressBar({ progress }: ScrollProgressBarProps) {
-  const { styles } = useStyles();
   const pct = Math.round(progress * 100);
+  const { styles } = useStyles(pct);
 
   if (pct <= 0) return null;
 
   return (
     <div className={styles.track}>
-      <div className={styles.bar} style={{ width: `${pct}%` }} />
+      <div className={styles.bar} />
     </div>
   );
 });

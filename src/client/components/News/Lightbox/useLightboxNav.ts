@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
-import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { NewsItem } from '@shared/types.ts';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
 import type { NewsResponse } from '../../../api/news';
 
 /** Media types that appear in the lightbox (photo + document covers images and videos) */

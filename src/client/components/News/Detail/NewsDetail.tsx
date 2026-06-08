@@ -1,13 +1,13 @@
-import React, { useRef } from 'react';
-import { createStyles } from 'antd-style';
 import type { NewsItem } from '@shared/types.ts';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useRef } from 'react';
+import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../hooks/breakpoints';
+import { NewsDetailBody } from './NewsDetailBody';
 import { NewsDetailToolbar } from './NewsDetailToolbar';
 import { NewsDetailTopPanel } from './NewsDetailTopPanel';
-import { NewsDetailBody } from './NewsDetailBody';
+import { ScrollProgressBar } from './ScrollProgressBar';
 import { useNewsDetailState } from './useNewsDetailState';
 import { useScrollProgress } from './useScrollProgress';
-import { ScrollProgressBar } from './ScrollProgressBar';
-import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../hooks/breakpoints';
 
 const useStyles = createStyles(({ css, token }) => ({
   detail: css`
@@ -61,6 +61,30 @@ export function NewsDetail({
   const { styles, cx } = useStyles();
   const s = useNewsDetailState({ item, channelTelegramId, onMarkedRead, variant });
   const detailRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const handleTogglePanel = useCallback(
+    (p: typeof s.topPanel) => s.setTopPanel((prev) => (prev === p ? null : p)),
+    [s],
+  );
+  const handleShare = useCallback(() => void s.handleShare(), [s]);
+  const handleCloseTopPanel = useCallback(() => s.setTopPanel(null), [s]);
+  const handleAlbumNav = useCallback(
+    (delta: number) => s.setAlbumIndex((i) => Math.max(0, Math.min(s.albumLength - 1, i + delta))),
+    [s],
+  );
+  const handleDownload = useCallback(
+    () =>
+      s.downloadMedia.mutate(item.id, {
+        onSuccess: () => void s.message.success(s.t('news.detail.media_queued_toast')),
+      }),
+    [s, item.id],
+  );
+  const handleModalConfirm = useCallback(() => {
+    s.setLinkModalOpen(false);
+    s.handleExtract(s.selectedUrl);
+  }, [s]);
+  const handleModalCancel = useCallback(() => s.setLinkModalOpen(false), [s]);
 
   // Sticky offset = feed toolbar (on mobile) + approximate header height
   // On mobile (< BP_XL): MOBILE_TOOLBAR_HEIGHT is the feed toolbar above;
@@ -75,7 +99,9 @@ export function NewsDetail({
           item={item}
           links={s.links}
           topPanel={s.topPanel}
-          onTogglePanel={(p) => s.setTopPanel((prev) => (prev === p ? null : p))}
+          onTogglePanel={handleTogglePanel}
+          variant={variant}
+          title={s.title}
           articleLoading={s.articleLoading}
           articleQueued={s.articleQueued}
           onExtractClick={s.handleExtractClick}
@@ -86,17 +112,15 @@ export function NewsDetail({
           refreshPending={s.refreshPending}
           openUrl={s.openUrl}
           isExternalLink={s.isExternalLink}
-          variant={variant}
-          title={s.title}
           onHeaderClick={onHeaderClick}
           onTagClick={onTagClick}
-          onShare={() => void s.handleShare()}
+          onShare={handleShare}
         />
         {variant === 'inline' && <ScrollProgressBar progress={scrollProgress} />}
       </div>
 
       {s.topPanel && (
-        <NewsDetailTopPanel panel={s.topPanel} links={s.links} text={item.text} onClose={() => s.setTopPanel(null)} />
+        <NewsDetailTopPanel panel={s.topPanel} links={s.links} text={item.text} onClose={handleCloseTopPanel} />
       )}
 
       <NewsDetailBody
@@ -109,16 +133,12 @@ export function NewsDetail({
         albumIndex={s.albumIndex}
         albumLength={s.albumLength}
         albumExpectedLength={s.albumExpectedLength}
-        onAlbumNav={(delta) => s.setAlbumIndex((i) => Math.max(0, Math.min(s.albumLength - 1, i + delta)))}
+        onAlbumNav={handleAlbumNav}
         mediaLoading={s.mediaLoading}
         mediaQueued={s.mediaQueued}
         mediaTaskStatus={s.mediaTask?.status}
         mediaTaskError={s.mediaTask?.error ?? undefined}
-        onDownload={() =>
-          s.downloadMedia.mutate(item.id, {
-            onSuccess: () => void s.message.success(s.t('news.detail.media_queued_toast')),
-          })
-        }
+        onDownload={handleDownload}
         articleLoading={s.articleLoading}
         articleQueued={s.articleQueued}
         articleTaskStatus={s.articleTask?.status}
@@ -127,12 +147,10 @@ export function NewsDetail({
         linkModalOpen={s.linkModalOpen}
         selectedUrl={s.selectedUrl}
         onSelectedUrlChange={s.setSelectedUrl}
-        onModalConfirm={() => {
-          s.setLinkModalOpen(false);
-          s.handleExtract(s.selectedUrl);
-        }}
-        onModalCancel={() => s.setLinkModalOpen(false)}
+        onModalConfirm={handleModalConfirm}
+        onModalCancel={handleModalCancel}
         onDoubleTap={variant === 'inline' ? s.handleMarkRead : undefined}
+        videoRef={videoRef}
       />
     </div>
   );

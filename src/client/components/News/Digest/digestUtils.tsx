@@ -1,5 +1,7 @@
-import React from 'react';
 import { Tag } from 'antd';
+import React, { useCallback } from 'react';
+
+const CURSOR_POINTER = { cursor: 'pointer' as const };
 
 // Explicit type guard — avoids IDE false-positive "ReactNode can't be string"
 const isString = (v: unknown): v is string => typeof v === 'string';
@@ -7,6 +9,26 @@ const isString = (v: unknown): v is string => typeof v === 'string';
 // Matches both [N] and [N,M,P] (model sometimes groups refs despite instructions)
 const REF_SPLIT = /(\[\d[\d,\s]*])/g;
 const REF_PARSE = /^\[(\d[\d,\s]*)]$/;
+
+/** Single clickable citation chip — stable click handler bound to its newsId. */
+function RefChip({
+  label,
+  newsId,
+  onRefClick,
+  className,
+}: {
+  label: number;
+  newsId: number;
+  onRefClick: (newsId: number) => void;
+  className: string;
+}) {
+  const handleClick = useCallback(() => onRefClick(newsId), [onRefClick, newsId]);
+  return (
+    <Tag color="blue" className={className} style={CURSOR_POINTER} onClick={handleClick}>
+      {label}
+    </Tag>
+  );
+}
 
 /**
  * Recursively walks React children, replacing [N] citation markers with
@@ -43,17 +65,9 @@ export function inlineRefs(
 
         for (const n of nums) {
           const newsId = refMap[n];
-          if (newsId != null) {
+          if (newsId !== null && newsId !== undefined) {
             result.push(
-              <Tag
-                key={key++}
-                color="blue"
-                className={chipClass}
-                style={{ cursor: 'pointer' }}
-                onClick={() => onRefClick(newsId)}
-              >
-                {n}
-              </Tag>,
+              <RefChip key={key++} label={n} newsId={newsId} onRefClick={onRefClick} className={chipClass} />,
             );
           } else {
             result.push(<React.Fragment key={key++}>[{n}]</React.Fragment>);
@@ -68,7 +82,10 @@ export function inlineRefs(
   }
 
   if (Array.isArray(children)) {
+    // Parsed React tree nodes have no stable identity — index key is the correct choice here
+    // oxlint-disable-next-line react/no-array-index-key
     return (children as React.ReactNode[]).map((child, i) => (
+      // oxlint-disable-next-line react/no-array-index-key
       <React.Fragment key={i}>{inlineRefs(child, refMap, onRefClick, chipClass)}</React.Fragment>
     ));
   }

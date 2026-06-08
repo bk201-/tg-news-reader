@@ -1,18 +1,20 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
-import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useUIStore } from '../../../store/uiStore';
-import { useChannels } from '../../../api/channels';
-import { useMarkRead, useDownloadMedia, useNews, type NewsResponse, updatePaginatedItems } from '../../../api/news';
-import { api } from '../../../api/client';
 import type { NewsItem } from '@shared/types.ts';
-import { useLightboxNav } from './useLightboxNav';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+import { useChannels } from '../../../api/channels';
+import { api } from '../../../api/client';
+import { mediaUrl } from '../../../api/mediaUrl';
+import { updatePaginatedItems, useDownloadMedia, useMarkRead } from '../../../api/news';
+import type { NewsResponse } from '../../../api/news';
+import { useUIStore } from '../../../store/uiStore';
 import { LightboxMedia } from './LightboxMedia';
 import { LightboxToolbar } from './LightboxToolbar';
-import { mediaUrl } from '../../../api/mediaUrl';
+import { useLightboxNav } from './useLightboxNav';
 
 /** History state key pushed when the lightbox opens */
 const HISTORY_KEY = '_lightboxOpen';
@@ -99,12 +101,20 @@ const useStyles = createStyles(({ css }) => ({
   `,
 }));
 
-export function LightboxOverlay() {
+interface LightboxOverlayProps {
+  /** fetchNextPage / hasNextPage forwarded from the parent news feed query.
+   *  Avoids mounting a second observer on the same query key, which would
+   *  trigger a background refetch and overwrite optimistic isRead updates. */
+  fetchNextPage: () => void;
+  hasNextPage: boolean;
+}
+
+export function LightboxOverlay({ fetchNextPage, hasNextPage }: LightboxOverlayProps) {
   const { styles, cx } = useStyles();
   const { t } = useTranslation();
   const qc = useQueryClient();
 
-  const { lightbox, closeLightbox, openLightbox, showAll } = useUIStore();
+  const { lightbox, closeLightbox, openLightbox } = useUIStore();
   const { data: channels = [] } = useChannels();
   const markRead = useMarkRead();
   const downloadMedia = useDownloadMedia();
@@ -114,14 +124,13 @@ export function LightboxOverlay() {
   const channelId = lightbox?.channelId ?? 0;
   const newsId = lightbox?.newsId ?? 0;
   const albumIndex = lightbox?.albumIndex ?? 0;
-
-  // Reuse the active infinite query so we can fetch more pages from the lightbox
-  const { fetchNextPage, hasNextPage } = useNews(channelId, !showAll);
+  const isLightboxOpen = lightbox !== null;
+  const markReadMutate = markRead.mutate;
 
   // ── History API ───────────────────────────────────────────────────────
   const closedByBackRef = useRef(false);
   useEffect(() => {
-    if (!lightbox) return;
+    if (!isLightboxOpen) return;
     closedByBackRef.current = false;
     history.pushState({ [HISTORY_KEY]: true }, '');
 
@@ -136,12 +145,11 @@ export function LightboxOverlay() {
         history.replaceState(null, '', window.location.href);
       }
     };
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [!!lightbox]);
+  }, [isLightboxOpen, closeLightbox]);
 
   // ── Lock body scroll while lightbox is open ──────────────────────────
   useEffect(() => {
-    if (!lightbox) return;
+    if (!isLightboxOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -157,9 +165,12 @@ export function LightboxOverlay() {
       document.body.style.overflow = prev;
       document.removeEventListener('touchmove', preventScroll);
     };
-  }, [!!lightbox]); // oxlint-disable-line react/exhaustive-deps
+  }, [isLightboxOpen]);
 
   const channel = channels.find((c) => c.id === channelId);
+  const channelType = channel?.channelType;
+  const lightboxNewsId = lightbox?.newsId ?? null;
+  const lightboxChannelId = lightbox?.channelId ?? null;
 
   const navigate = useCallback(
     (nextNewsId: number, nextAlbumIndex: number) => {
@@ -168,34 +179,66 @@ export function LightboxOverlay() {
 
       const ch = channels.find((c) => c.id === channelId);
       if (ch?.channelType === 'media' || ch?.channelType === 'blog') {
-        markRead.mutate({ id: nextNewsId, isRead: 1, channelId });
+        // Find the item in cache to verify media is downloaded before marking as read
+        const allData =
+          qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'all']) ??
+          qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'filtered']);
+        const items = allData?.pages.flatMap((p) => p.items) ?? [];
+        const nextItem = items.find((it) => it.id === nextNewsId);
+        const hasMedia = !!(nextItem?.localMediaPaths?.[0] ?? nextItem?.localMediaPath);
+        if (hasMedia) {
+          markRead.mutate({ id: nextNewsId, isRead: 1, channelId });
+        }
       }
     },
-    [openLightbox, channelId, channels, markRead],
+    [openLightbox, channelId, channels, markRead, qc],
   );
 
-  const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, () => void fetchNextPage(), hasNextPage);
+  const nav = useLightboxNav(
+    channelId,
+    newsId,
+    albumIndex,
+    navigate,
+    () => {
+      fetchNextPage();
+    },
+    hasNextPage,
+  );
 
-  // ── Prefetch adjacent images (Issue 8) ───────────────────────────────
+  // ── Prefetch adjacent images: 1 behind + 2 ahead (full albums) ──────
   useEffect(() => {
     const { entries, cursor } = nav;
-    [entries[cursor - 1], entries[cursor + 1]].forEach((e) => {
-      const p = e?.item.localMediaPaths?.[0] ?? e?.item.localMediaPath;
-      if (p) {
-        const img = new Image();
-        img.src = mediaUrl(p);
-      }
-    });
-  }, [nav]);
 
-  // Auto-mark as read on open (media channels)
+    /** All non-video paths for an entry (full album or single image) */
+    const entryPaths = (e: (typeof entries)[number] | undefined): string[] => {
+      if (!e) return [];
+      const paths = e.item.localMediaPaths ?? (e.item.localMediaPath ? [e.item.localMediaPath] : []);
+      return paths.filter((p) => !/\.(mp4|webm|mov)$/i.test(p));
+    };
+
+    const toPreload: string[] = [
+      // Remaining images in the current album (from current position onwards)
+      ...entryPaths(entries[cursor]).slice(albumIndex + 1),
+      // Full album of 1 item behind + 2 items ahead
+      ...entryPaths(entries[cursor - 1]),
+      ...entryPaths(entries[cursor + 1]),
+      ...entryPaths(entries[cursor + 2]),
+    ];
+
+    toPreload.forEach((p) => {
+      const img = new Image();
+      img.src = mediaUrl(p);
+    });
+  }, [nav, albumIndex]);
+
+  // Auto-mark as read on open (media channels) — only when media is already downloaded
   useEffect(() => {
-    if (!lightbox || !channel) return;
-    if (channel.channelType === 'media' || channel.channelType === 'blog') {
-      markRead.mutate({ id: lightbox.newsId, isRead: 1, channelId: lightbox.channelId });
-    }
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [lightbox?.newsId, lightbox?.channelId]);
+    if (!isLightboxOpen || lightboxNewsId === null || lightboxChannelId === null) return;
+    if (channelType !== 'media' && channelType !== 'blog') return;
+    // Don't mark read if media hasn't been downloaded yet
+    if (!nav.firstMediaPath) return;
+    markReadMutate({ id: lightboxNewsId, isRead: 1, channelId: lightboxChannelId });
+  }, [isLightboxOpen, lightboxNewsId, lightboxChannelId, channelType, markReadMutate, nav.firstMediaPath]);
 
   // Focus overlay so keyboard events are received
   useEffect(() => {
@@ -321,34 +364,56 @@ export function LightboxOverlay() {
     };
   }, [lightbox, nav]);
 
+  // Stable callbacks — must be before any conditional return (rules-of-hooks)
+  // nav.currentEntry is available even before the early return
+  const currentItem = nav.currentEntry?.item ?? null;
+
+  const handleDownload = useCallback(() => {
+    if (currentItem) downloadMedia.mutate(currentItem.id);
+  }, [currentItem, downloadMedia]);
+
+  const handleRetry = useCallback(() => {
+    if (!currentItem) return;
+    void api.get<NewsItem>(`/news/${currentItem.id}`).then((updated) => {
+      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
+        updatePaginatedItems(old, (items) =>
+          items.map((n) => (n.id === updated.id ? { ...n, ...updated, isRead: n.isRead } : n)),
+        ),
+      );
+      const freshPath = updated.localMediaPaths?.[0] ?? updated.localMediaPath;
+      if (!freshPath) downloadMedia.mutate(currentItem.id);
+    });
+  }, [currentItem, qc, channelId, downloadMedia]);
+
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) closeLightbox();
+    },
+    [closeLightbox],
+  );
+
+  const handleNavPrev = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      nav.go(-1);
+    },
+    [nav],
+  );
+
+  const handleNavNext = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      nav.go(1);
+    },
+    [nav],
+  );
+
   if (!lightbox || !channel) return null;
 
   const { currentEntry, isAlbum, firstMediaPath } = nav;
   const item = currentEntry?.item;
   const albumPaths = item?.localMediaPaths;
   const currentMediaPath = isAlbum && albumPaths ? (albumPaths[albumIndex] ?? firstMediaPath) : firstMediaPath;
-
-  const handleDownload = () => {
-    if (item) downloadMedia.mutate(item.id);
-  };
-
-  const handleRetry = () => {
-    if (!item) return;
-    // Fetch fresh news item from API — cache may be stale (SSE missed update)
-    void api.get<NewsItem>(`/news/${item.id}`).then((updated) => {
-      // Patch the updated item into paginated cache
-      qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
-        updatePaginatedItems(old, (items) =>
-          items.map((n) => (n.id === updated.id ? { ...n, ...updated, isRead: n.isRead } : n)),
-        ),
-      );
-      // If the server still has no media path → queue a re-download
-      const freshPath = updated.localMediaPaths?.[0] ?? updated.localMediaPath;
-      if (!freshPath) {
-        downloadMedia.mutate(item.id);
-      }
-    });
-  };
 
   return createPortal(
     <div
@@ -358,9 +423,7 @@ export function LightboxOverlay() {
       role="dialog"
       aria-modal="true"
       aria-label={t('lightbox.title')}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeLightbox();
-      }}
+      onClick={handleOverlayClick}
     >
       <LightboxToolbar
         item={item}
@@ -372,20 +435,8 @@ export function LightboxOverlay() {
       />
 
       {/* Image fills the full area; nav buttons are positioned on top */}
-      <div
-        className={styles.mediaArea}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeLightbox();
-        }}
-      >
-        <button
-          className={cx(styles.navBtn, styles.navPrev)}
-          onClick={(e) => {
-            e.stopPropagation();
-            nav.go(-1);
-          }}
-          title={t('lightbox.prev')}
-        >
+      <div className={styles.mediaArea} onClick={handleOverlayClick}>
+        <button className={cx(styles.navBtn, styles.navPrev)} onClick={handleNavPrev} title={t('lightbox.prev')}>
           <LeftOutlined />
         </button>
 
@@ -399,14 +450,7 @@ export function LightboxOverlay() {
           onRetry={handleRetry}
         />
 
-        <button
-          className={cx(styles.navBtn, styles.navNext)}
-          onClick={(e) => {
-            e.stopPropagation();
-            nav.go(1);
-          }}
-          title={t('lightbox.next')}
-        >
+        <button className={cx(styles.navBtn, styles.navNext)} onClick={handleNavNext} title={t('lightbox.next')}>
           <RightOutlined />
         </button>
       </div>

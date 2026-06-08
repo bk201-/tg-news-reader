@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./client', () => ({
   api: {
@@ -13,7 +13,6 @@ vi.mock('./client', () => ({
   },
 }));
 
-import { api } from './client';
 import {
   channelKeys,
   useChannels,
@@ -25,6 +24,7 @@ import {
   useMarkReadAndFetch,
   useChannelLookup,
 } from './channels';
+import { api } from './client';
 
 const mockedApi = vi.mocked(api);
 

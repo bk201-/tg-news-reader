@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { mediaProgressEmitter, emitMediaProgress, type MediaProgressEvent } from './mediaProgress.js';
+import { describe, expect, it, vi } from 'vitest';
+import { emitMediaProgress, mediaProgressEmitter } from './mediaProgress.js';
+import type { MediaProgressEvent } from './mediaProgress.js';
 
 describe('mediaProgress', () => {
   it('emits on correct channel key', () => {

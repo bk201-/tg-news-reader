@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
 import type { NewsItem } from '@shared/types';
+import { act, renderHook } from '@testing-library/react';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -29,9 +30,9 @@ function fireKeyWithTarget(code: string, target: HTMLElement) {
 }
 
 describe('useNewsDetailHotkeys', () => {
-  let onRefresh: ReturnType<typeof vi.fn>;
-  let onExtractArticle: ReturnType<typeof vi.fn>;
-  let onShare: ReturnType<typeof vi.fn>;
+  let onRefresh: Mock<() => void>;
+  let onExtractArticle: Mock<() => void>;
+  let onShare: Mock<() => void>;
   let windowOpenSpy: ReturnType<typeof vi.spyOn>;
 
   const defaultOpts = () => ({

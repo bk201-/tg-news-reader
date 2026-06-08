@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from './client';
+import type { CreateChannelInput, FetchChannelInput, UpdateChannelInput } from '@shared/schemas.ts';
 import type { Channel } from '@shared/types.ts';
-import type { CreateChannelInput, UpdateChannelInput, FetchChannelInput } from '@shared/schemas.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from './client';
 
 export const channelKeys = { all: ['channels'] as const };
 

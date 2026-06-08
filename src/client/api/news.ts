@@ -1,9 +1,11 @@
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import type { Channel, NewsItem } from '@shared/types.ts';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
+import type { NewsFilterMode } from '../store/uiStore';
 import { api } from './client';
-import type { NewsItem, Channel } from '@shared/types.ts';
 
 export const newsKeys = {
-  byChannel: (channelId: number, filtered = false) => ['news', channelId, filtered ? 'filtered' : 'all'] as const,
+  byChannel: (channelId: number, mode: NewsFilterMode = 'all') => ['news', channelId, mode] as const,
 };
 
 export interface NewsResponse {
@@ -34,12 +36,12 @@ export function flattenPaginatedItems(data: InfiniteData<NewsResponse> | undefin
   return data.pages.flatMap((page) => page.items);
 }
 
-export function useNews(channelId: number, filtered = false) {
+export function useNews(channelId: number, mode: NewsFilterMode = 'all') {
   return useInfiniteQuery({
-    queryKey: newsKeys.byChannel(channelId, filtered),
+    queryKey: newsKeys.byChannel(channelId, mode),
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ channelId: String(channelId) });
-      if (filtered) params.set('filtered', '1');
+      if (mode !== 'all') params.set('view', mode);
       if (pageParam) params.set('cursor', String(pageParam));
       return api.get<NewsResponse>(`/news?${params.toString()}`);
     },

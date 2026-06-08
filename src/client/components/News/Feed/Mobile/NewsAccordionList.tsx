@@ -1,11 +1,15 @@
-import React, { useCallback } from 'react';
-import { Spin, Empty } from 'antd';
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { createStyles } from 'antd-style';
-import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@shared/types.ts';
-import { NewsAccordionItem } from './NewsAccordionItem';
+import { Empty, Spin } from 'antd';
+import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Virtuoso } from 'react-virtuoso';
+import type { VirtuosoHandle } from 'react-virtuoso';
 import { BP_XL, MOBILE_TOOLBAR_HEIGHT } from '../../../../hooks/breakpoints';
+import type { NewsFilterMode } from '../../../../store/uiStore';
+import { NewsAccordionItem } from './NewsAccordionItem';
+
+const VIRTUOSO_HEIGHT_FULL = { height: '100%' };
 
 const useStyles = createStyles(({ css, token }) => ({
   accordion: css`
@@ -47,7 +51,7 @@ interface NewsAccordionListProps {
   isLoading: boolean;
   items: NewsItem[];
   filteredIds: Set<number>;
-  showAll: boolean;
+  newsFilterMode: NewsFilterMode;
   selectedNewsId: number | null;
   hashTagFilter: string | null;
   activeFilterCount: number;
@@ -67,7 +71,7 @@ export function NewsAccordionList({
   isLoading,
   items,
   filteredIds,
-  showAll,
+  newsFilterMode,
   selectedNewsId,
   hashTagFilter,
   activeFilterCount,
@@ -97,7 +101,7 @@ export function NewsAccordionList({
           item={item}
           isSelected={selectedNewsId === item.id}
           isFiltered={filteredIds.has(item.id)}
-          showAll={showAll}
+          newsFilterMode={newsFilterMode}
           channelTelegramId={channelTelegramId}
           onSelect={onSelect}
           onTagClick={onTagClick}
@@ -105,7 +109,7 @@ export function NewsAccordionList({
         />
       </div>
     ),
-    [selectedNewsId, filteredIds, showAll, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
+    [selectedNewsId, filteredIds, newsFilterMode, channelTelegramId, onSelect, onTagClick, onMarkedRead, styles.item],
   );
 
   const footer = useCallback(
@@ -117,6 +121,8 @@ export function NewsAccordionList({
       ) : null,
     [isFetchingNextPage, styles.loadingWrap],
   );
+
+  const virtuosoComponents = useMemo(() => ({ Footer: footer }), [footer]);
 
   return (
     <div role="list" aria-label={t('news.list.list_label')} className={styles.accordion}>
@@ -133,10 +139,10 @@ export function NewsAccordionList({
           data={items}
           overscan={500}
           useWindowScroll={windowScroll}
-          style={windowScroll ? undefined : { height: '100%' }}
+          style={windowScroll ? undefined : VIRTUOSO_HEIGHT_FULL}
           itemContent={renderItem}
           endReached={hasNextPage ? onEndReached : undefined}
-          components={{ Footer: footer }}
+          components={virtuosoComponents}
         />
       )}
     </div>

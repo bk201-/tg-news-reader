@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from '@testing-library/react';
 import type { Channel, NewsItem } from '@shared/types';
+import { act } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
@@ -28,8 +28,8 @@ vi.mock('../../../api/channels', () => ({
   useMarkReadAndFetch: () => ({ mutate: mockMarkReadAndFetchMutate }),
 }));
 
-import { useNewsFeedActions } from './useNewsFeedActions';
 import { useUIStore } from '../../../store/uiStore';
+import { useNewsFeedActions } from './useNewsFeedActions';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -73,8 +73,9 @@ describe('useNewsFeedActions', () => {
     mockAllChannels.push(makeChannel(1), makeChannel(2), makeChannel(3));
     useUIStore.setState({
       selectedNewsId: null,
-      showAll: false,
+      newsFilterMode: 'filtered',
       autoAdvance: false,
+      hashTagFilter: null,
     });
   });
 
@@ -133,6 +134,51 @@ describe('useNewsFeedActions', () => {
     });
 
     expect(setSelectedNewsId).toHaveBeenCalledWith(2);
+  });
+
+  // Regression: previously, finishing the last visible item while a hashtag filter was active
+  // would call markAllRead({ channelId }) and silently mark every other unread news as read,
+  // losing news that didn't match the tag.
+  it('handleMarkedRead does NOT mark whole channel as read when hashTagFilter is active', () => {
+    const items = [makeItem(1, { isRead: 0 })]; // last visible (filtered) unread
+    useUIStore.setState({ newsFilterMode: 'filtered', hashTagFilter: '#tech' });
+    // serverFilteredOut > 0 to simulate user-filter-hidden items present
+    const { result } = renderActions(items, 5, 3);
+
+    act(() => {
+      result.current.handleMarkedRead(1);
+    });
+
+    expect(mockMarkAllReadMutate).not.toHaveBeenCalled();
+  });
+
+  // Original semantics preserved: when there's NO tag filter, finishing the last visible item
+  // while server-filtered items exist still triggers the channel-wide mark-read sweep.
+  it('handleMarkedRead marks whole channel as read when no hashTagFilter and serverFilteredOut>0', () => {
+    const items = [makeItem(1, { isRead: 0 })];
+    useUIStore.setState({ newsFilterMode: 'filtered', hashTagFilter: null });
+    const { result } = renderActions(items, 5, 3);
+
+    act(() => {
+      result.current.handleMarkedRead(1);
+    });
+
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
+  });
+
+  it('handleMarkedRead does NOT sweep channel when newsFilterMode is "hidden"', () => {
+    // In hidden mode, finishing the last visible item must NOT mark the whole
+    // channel as read — that would silently mark the non-hidden items the user
+    // intentionally left out of view.
+    const items = [makeItem(1, { isRead: 0 })];
+    useUIStore.setState({ newsFilterMode: 'hidden', hashTagFilter: null });
+    const { result } = renderActions(items, 5, 3);
+
+    act(() => {
+      result.current.handleMarkedRead(1);
+    });
+
+    expect(mockMarkAllReadMutate).not.toHaveBeenCalled();
   });
 
   it('handleTagClick addFilter creates a filter', async () => {
@@ -198,5 +244,44 @@ describe('useNewsFeedActions', () => {
       1,
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
+  });
+
+  it('handleMarkAllReadAndAdvance in "hidden" mode marks only currently loaded items', () => {
+    // The user is looking at the hidden-only view; mark-all must NOT sweep the
+    // whole channel (that would silently mark all the non-hidden items too).
+    useUIStore.setState({ autoAdvance: false, newsFilterMode: 'hidden' });
+    const items = [makeItem(11), makeItem(12)];
+    const { result } = renderActions(items);
+
+    act(() => {
+      result.current.handleMarkAllReadAndAdvance();
+    });
+
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ newsIds: [11, 12] });
+    expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
+  });
+
+  it('handleMarkAllReadAndAdvance in "hidden" mode with empty list is a no-op', () => {
+    useUIStore.setState({ autoAdvance: false, newsFilterMode: 'hidden' });
+    const { result } = renderActions([]);
+
+    act(() => {
+      result.current.handleMarkAllReadAndAdvance();
+    });
+
+    expect(mockMarkAllReadMutate).not.toHaveBeenCalled();
+    expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
+  });
+
+  it('handleMarkAllReadAndAdvance in "all" mode still marks whole channel', () => {
+    useUIStore.setState({ autoAdvance: false, newsFilterMode: 'all' });
+    const items = [makeItem(20), makeItem(21)];
+    const { result } = renderActions(items);
+
+    act(() => {
+      result.current.handleMarkAllReadAndAdvance();
+    });
+
+    expect(mockMarkAllReadMutate).toHaveBeenCalledWith({ channelId: 1 });
   });
 });

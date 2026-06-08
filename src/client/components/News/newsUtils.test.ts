@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { getNewsTitle, getLinkLabel, isYouTubeUrl, getYouTubeEmbedId, formatBytes } from './newsUtils';
 import type { NewsItem } from '@shared/types';
+import { describe, expect, it } from 'vitest';
+import { formatBytes, getLinkLabel, getNewsTitle, getYouTubeEmbedId, isYouTubeUrl } from './newsUtils';
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -10,17 +10,8 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
     text: '',
     links: [],
     hashtags: [],
-    mediaType: null,
-    mediaSize: null,
-    localMediaPath: null,
-    localMediaPaths: null,
-    albumMsgIds: null,
-    fullContent: null,
-    fullContentFormat: null,
     isRead: 0,
-    isFiltered: 0,
     postedAt: 1700000000,
-    createdAt: 1700000000,
     textInPanel: 0,
     canLoadArticle: 0,
     ...overrides,

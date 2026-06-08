@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { useUIStore } from './uiStore';
 
 describe('uiStore', () => {
@@ -8,7 +8,7 @@ describe('uiStore', () => {
       selectedChannelId: null,
       selectedNewsId: null,
       selectedGroupId: null,
-      showAll: false,
+      newsFilterMode: 'filtered',
       filterPanelOpen: false,
       hashTagFilter: null,
       sidebarDrawerOpen: false,
@@ -92,11 +92,24 @@ describe('uiStore', () => {
     expect(useUIStore.getState().selectedNewsId).toBe(42);
   });
 
-  it('setShowAll sets showAll flag', () => {
-    useUIStore.getState().setShowAll(true);
-    expect(useUIStore.getState().showAll).toBe(true);
-    useUIStore.getState().setShowAll(false);
-    expect(useUIStore.getState().showAll).toBe(false);
+  it('setNewsFilterMode sets the filter mode', () => {
+    useUIStore.getState().setNewsFilterMode('all');
+    expect(useUIStore.getState().newsFilterMode).toBe('all');
+    useUIStore.getState().setNewsFilterMode('hidden');
+    expect(useUIStore.getState().newsFilterMode).toBe('hidden');
+    useUIStore.getState().setNewsFilterMode('filtered');
+    expect(useUIStore.getState().newsFilterMode).toBe('filtered');
+  });
+
+  it('cycleNewsFilterMode cycles filtered → all → hidden → filtered', () => {
+    // Start at default 'filtered'
+    expect(useUIStore.getState().newsFilterMode).toBe('filtered');
+    useUIStore.getState().cycleNewsFilterMode();
+    expect(useUIStore.getState().newsFilterMode).toBe('all');
+    useUIStore.getState().cycleNewsFilterMode();
+    expect(useUIStore.getState().newsFilterMode).toBe('hidden');
+    useUIStore.getState().cycleNewsFilterMode();
+    expect(useUIStore.getState().newsFilterMode).toBe('filtered');
   });
 
   it('setFilterPanelOpen toggles filterPanelOpen', () => {

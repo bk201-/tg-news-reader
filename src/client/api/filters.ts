@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from './client';
+import type { BatchFiltersInput, CreateFilterInput, UpdateFilterInput } from '@shared/schemas.ts';
 import type { Filter, FilterStat } from '@shared/types.ts';
-import type { CreateFilterInput, UpdateFilterInput, BatchFiltersInput } from '@shared/schemas.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from './client';
 
 export const filterKeys = {
   byChannel: (channelId: number) => ['filters', channelId] as const,

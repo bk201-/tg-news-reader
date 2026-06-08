@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../__tests__/renderWithProviders';
-import { LoginPage } from './LoginPage';
 import { useAuthStore } from '../../store/authStore';
+import { LoginPage } from './LoginPage';
 
 describe('LoginPage', () => {
   beforeEach(() => {

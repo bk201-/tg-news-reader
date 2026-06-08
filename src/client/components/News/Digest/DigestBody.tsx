@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
 import { createStyles } from 'antd-style';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { inlineRefs } from './digestUtils';
 

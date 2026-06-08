@@ -1,8 +1,8 @@
-import React from 'react';
-import { Modal, DatePicker } from 'antd';
+import { DatePicker, Modal } from 'antd';
 import { createStyles } from 'antd-style';
+import type dayjs from 'dayjs';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import dayjs from 'dayjs';
 
 const useStyles = createStyles(({ css, token }) => ({
   body: css`

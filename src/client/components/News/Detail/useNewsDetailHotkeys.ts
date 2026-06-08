@@ -1,5 +1,6 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { NewsItem } from '@shared/types.ts';
+import { useEffect, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { isYouTubeUrl } from '../newsUtils';
 
 interface UseNewsDetailHotkeysOptions {

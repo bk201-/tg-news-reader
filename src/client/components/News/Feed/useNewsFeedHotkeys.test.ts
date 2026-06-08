@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNewsFeedHotkeys } from './useNewsFeedHotkeys';
 
 function fireKey(code: string, opts: Partial<KeyboardEvent> = {}) {
@@ -13,20 +14,20 @@ function fireKeyWithTarget(code: string, target: HTMLElement) {
 }
 
 describe('useNewsFeedHotkeys', () => {
-  let onFetch: ReturnType<typeof vi.fn>;
-  let onToggleShowAll: ReturnType<typeof vi.fn>;
-  let onMarkAllRead: ReturnType<typeof vi.fn>;
-  let onOpenFilters: ReturnType<typeof vi.fn>;
+  let onFetch: Mock<() => void>;
+  let onCycleFilterMode: Mock<() => void>;
+  let onMarkAllRead: Mock<() => void>;
+  let onOpenFilters: Mock<() => void>;
 
   beforeEach(() => {
     onFetch = vi.fn();
-    onToggleShowAll = vi.fn();
+    onCycleFilterMode = vi.fn();
     onMarkAllRead = vi.fn();
     onOpenFilters = vi.fn();
   });
 
   const renderIt = () =>
-    renderHook(() => useNewsFeedHotkeys({ onFetch, onToggleShowAll, onMarkAllRead, onOpenFilters }));
+    renderHook(() => useNewsFeedHotkeys({ onFetch, onCycleFilterMode, onMarkAllRead, onOpenFilters }));
 
   it('U key calls onFetch', () => {
     renderIt();
@@ -34,10 +35,10 @@ describe('useNewsFeedHotkeys', () => {
     expect(onFetch).toHaveBeenCalled();
   });
 
-  it('A key calls onToggleShowAll', () => {
+  it('A key calls onCycleFilterMode', () => {
     renderIt();
     fireKey('KeyA');
-    expect(onToggleShowAll).toHaveBeenCalled();
+    expect(onCycleFilterMode).toHaveBeenCalled();
   });
 
   it('M key calls onMarkAllRead', () => {
@@ -56,7 +57,7 @@ describe('useNewsFeedHotkeys', () => {
     renderIt();
     fireKey('KeyX');
     expect(onFetch).not.toHaveBeenCalled();
-    expect(onToggleShowAll).not.toHaveBeenCalled();
+    expect(onCycleFilterMode).not.toHaveBeenCalled();
     expect(onMarkAllRead).not.toHaveBeenCalled();
     expect(onOpenFilters).not.toHaveBeenCalled();
   });

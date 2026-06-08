@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '../../__tests__/renderWithProviders';
-import { FilterPanel } from './FilterPanel';
-import { useUIStore } from '../../store/uiStore';
 import type { Filter, FilterStat } from '@shared/types';
+import { screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithProviders } from '../../__tests__/renderWithProviders';
+import { useUIStore } from '../../store/uiStore';
+import { FilterPanel } from './FilterPanel';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 const mockFilters: Filter[] = [];

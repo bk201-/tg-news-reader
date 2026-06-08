@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Modal, Input, Button, Alert, Flex, Spin, Typography } from 'antd';
+import { Alert, Button, Flex, Input, Modal, Spin, Typography } from 'antd';
 import { createStyles } from 'antd-style';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
@@ -39,7 +39,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchQr = async () => {
+  const fetchQr = useCallback(async () => {
     setStep('scan');
     setCode('');
     setError(null);
@@ -53,13 +53,16 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
     } catch (e: unknown) {
       setFetchError(e instanceof Error ? e.message : t('common.retry'));
     }
-  };
+  }, [t]);
 
-  const handleAfterOpen = (visible: boolean) => {
-    if (visible) void fetchQr();
-  };
+  const handleAfterOpen = useCallback(
+    (visible: boolean) => {
+      if (visible) void fetchQr();
+    },
+    [fetchQr],
+  );
 
-  const handleConfirm = async () => {
+  const handleConfirm = useCallback(async () => {
     if (!secret) return;
     setLoading(true);
     setError(null);
@@ -72,7 +75,20 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [secret, code, updateUser, onClose, t]);
+
+  const handleFetchQr = fetchQr;
+  const handleGoConfirm = useCallback(() => setStep('confirm'), []);
+  const handleGoScan = useCallback(() => setStep('scan'), []);
+
+  const retryAction = useMemo(
+    () => (
+      <Button size="small" onClick={handleFetchQr}>
+        {t('common.retry')}
+      </Button>
+    ),
+    [handleFetchQr, t],
+  );
 
   return (
     <Modal
@@ -87,16 +103,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
         <Flex vertical gap={16}>
           <Text>{t('auth.totp_setup.scan_prompt')}</Text>
           {fetchError ? (
-            <Alert
-              type="error"
-              description={fetchError}
-              showIcon
-              action={
-                <Button size="small" onClick={() => void fetchQr()}>
-                  {t('common.retry')}
-                </Button>
-              }
-            />
+            <Alert type="error" description={fetchError} showIcon action={retryAction} />
           ) : qr ? (
             <div className={styles.qrContainer}>
               <img src={qr} alt="TOTP QR Code" className={styles.qrImg} />
@@ -106,7 +113,7 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
               <Spin />
             </div>
           )}
-          <Button type="primary" block onClick={() => setStep('confirm')} disabled={!qr}>
+          <Button type="primary" block onClick={handleGoConfirm} disabled={!qr}>
             {t('auth.totp_setup.scanned_button')}
           </Button>
         </Flex>
@@ -116,8 +123,8 @@ export function TotpSetupModal({ open, onClose }: TotpSetupModalProps) {
           <Input.OTP length={6} value={code} onChange={setCode} size="large" />
           {error && <Alert type="error" description={error} showIcon />}
           <Flex justify="space-between">
-            <Button onClick={() => setStep('scan')}>{t('auth.totp_setup.back')}</Button>
-            <Button type="primary" onClick={() => void handleConfirm()} loading={loading} disabled={code.length < 6}>
+            <Button onClick={handleGoScan}>{t('auth.totp_setup.back')}</Button>
+            <Button type="primary" onClick={handleConfirm} loading={loading} disabled={code.length < 6}>
               {t('auth.totp_setup.enable_button')}
             </Button>
           </Flex>

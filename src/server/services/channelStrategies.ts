@@ -1,6 +1,6 @@
+import type { ChannelType } from '../../shared/types.js';
 import { enqueueTask } from './downloadManager.js';
 import type { TelegramMessage } from './telegram.js';
-import type { ChannelType } from '../../shared/types.js';
 
 export interface ItemFlags {
   /** When true, post text goes to collapsible top panel instead of inline body */
