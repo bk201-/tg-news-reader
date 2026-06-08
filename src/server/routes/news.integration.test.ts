@@ -197,6 +197,97 @@ describe('News routes (integration)', () => {
       const checkBody = await checkRes.json();
       expect(checkBody.items).toHaveLength(0);
     });
+
+    it('returns affectedIds with the rows that were actually flipped', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 1 });
+      const unread = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 11 });
+      // Already-read items must NOT be re-counted in affectedIds
+      await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 12 });
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id }),
+      });
+
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.affectedIds).toEqual([unread.id]);
+    });
+
+    it('returns empty affectedIds when nothing matches the source state', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 0 });
+      await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 13 });
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id }),
+      });
+
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.affectedIds).toEqual([]);
+    });
+
+    it('isRead=0 flips read items back to unread (toolbar undo-toggle)', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 0 });
+      const a = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 21 });
+      const b = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 22 });
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsIds: [a.id, b.id], isRead: 0 }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect([...body.affectedIds].sort((x: number, y: number) => x - y)).toEqual([a.id, b.id].sort((x, y) => x - y));
+
+      // Both should now be unread
+      const checkRes = await app.request(`/api/news?channelId=${ch.id}&isRead=0`, { headers });
+      const checkBody = await checkRes.json();
+      expect(checkBody.items).toHaveLength(2);
+    });
+
+    it('isRead=0 with channelId flips all read items in the channel to unread', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 0 });
+      await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 31 });
+      await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 32 });
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id, isRead: 0 }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.affectedIds).toHaveLength(2);
+
+      // unreadCount on the channel should be recalculated to 2
+      const checkRes = await app.request(`/api/news?channelId=${ch.id}&isRead=0`, { headers });
+      const checkBody = await checkRes.json();
+      expect(checkBody.items).toHaveLength(2);
+    });
+
+    it('isRead=0 leaves rows already unread untouched (no double flip)', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 1 });
+      await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 41 }); // already unread
+      const wasRead = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 42 });
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id, isRead: 0 }),
+      });
+
+      const body = await res.json();
+      // Only the previously-read row should appear in affectedIds
+      expect(body.affectedIds).toEqual([wasRead.id]);
+    });
   });
 
   // ── DELETE /api/news/read ─────────────────────────────────────────────────

@@ -73,20 +73,34 @@ export function useMarkRead() {
   });
 }
 
-export type MarkAllReadArgs = { channelId?: number; newsIds?: number[] };
+export type MarkAllReadArgs = {
+  channelId?: number;
+  newsIds?: number[];
+  /** Target state: 1 = mark read (default), 0 = mark unread (used by undo-toggle). */
+  isRead?: 0 | 1;
+};
+
+export interface MarkAllReadResult {
+  success: true;
+  /** IDs that were actually flipped (excludes rows already in the target state). */
+  affectedIds: number[];
+}
 
 export function useMarkAllRead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: MarkAllReadArgs = {}) => api.post('/news/read-all', args),
+    mutationFn: (args: MarkAllReadArgs = {}) => api.post<MarkAllReadResult>('/news/read-all', args),
     onSuccess: (_data, args) => {
       const { channelId, newsIds } = args ?? {};
+      const targetIsRead: 0 | 1 = args.isRead ?? 1;
 
       if (newsIds && newsIds.length > 0) {
-        // Scoped mark-read: update only the specified items optimistically
+        // Scoped flip: update only the specified items optimistically
         const newsIdSet = new Set(newsIds);
         qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news'] }, (old) =>
-          updatePaginatedItems(old, (items) => items.map((n) => (newsIdSet.has(n.id) ? { ...n, isRead: 1 } : n))),
+          updatePaginatedItems(old, (items) =>
+            items.map((n) => (newsIdSet.has(n.id) ? { ...n, isRead: targetIsRead } : n)),
+          ),
         );
         // Invalidate channels to get accurate unread counts from server
         void qc.invalidateQueries({ queryKey: ['channels'] });
@@ -95,16 +109,27 @@ export function useMarkAllRead() {
 
       if (channelId !== undefined) {
         qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
-          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: 1 }))),
+          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: targetIsRead }))),
         );
-        qc.setQueryData<Channel[]>(['channels'], (old) =>
-          old ? old.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)) : old,
-        );
+        // For the read direction we know the count drops to 0 outright; for unread
+        // we don't know how many of the channel's items the server flipped (it only
+        // touches rows currently in the opposite state) so we invalidate to refetch.
+        if (targetIsRead === 1) {
+          qc.setQueryData<Channel[]>(['channels'], (old) =>
+            old ? old.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)) : old,
+          );
+        } else {
+          void qc.invalidateQueries({ queryKey: ['channels'] });
+        }
       } else {
         qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news'] }, (old) =>
-          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: 1 }))),
+          updatePaginatedItems(old, (items) => items.map((n) => ({ ...n, isRead: targetIsRead }))),
         );
-        qc.setQueryData<Channel[]>(['channels'], (old) => (old ? old.map((ch) => ({ ...ch, unreadCount: 0 })) : old));
+        if (targetIsRead === 1) {
+          qc.setQueryData<Channel[]>(['channels'], (old) => (old ? old.map((ch) => ({ ...ch, unreadCount: 0 })) : old));
+        } else {
+          void qc.invalidateQueries({ queryKey: ['channels'] });
+        }
       }
     },
   });

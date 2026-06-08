@@ -207,6 +207,38 @@ describe('useMarkAllRead', () => {
     const channels = queryClient.getQueryData<Channel[]>(['channels']);
     expect(channels!.every((ch) => ch.unreadCount === 0)).toBe(true);
   });
+
+  it('forwards isRead=0 to the API and flips items to unread optimistically', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const data = makePaginatedData([[makeItem(7, { isRead: 1 }), makeItem(8, { isRead: 1 })]]);
+    queryClient.setQueryData(newsKeys.byChannel(1), data);
+
+    const { result } = renderHook(() => useMarkAllRead(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ newsIds: [7, 8], isRead: 0 });
+    });
+
+    expect(mockedApi.post).toHaveBeenCalledWith('/news/read-all', { newsIds: [7, 8], isRead: 0 });
+
+    const cached = queryClient.getQueryData<InfiniteData<NewsResponse>>(newsKeys.byChannel(1));
+    expect(cached!.pages[0].items.every((n) => n.isRead === 0)).toBe(true);
+  });
+
+  it('invalidates channels (instead of zeroing the badge) when marking a channel as unread', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData<Channel[]>(['channels'], [{ id: 1, unreadCount: 0 } as Channel]);
+
+    const { result } = renderHook(() => useMarkAllRead(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ channelId: 1, isRead: 0 });
+    });
+
+    // Channels should be invalidated so the server's recount lands
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['channels'] });
+  });
 });
 
 describe('useExtractContent', () => {

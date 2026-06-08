@@ -14,62 +14,110 @@ import { markReadSchema, parseOptionalBody, readAllNewsSchema } from './schemas.
 const router = new Hono();
 
 // POST /api/news/read-all
+//
+// Body (all optional):
+//   - channelId: scope to a single channel (default: all channels)
+//   - newsIds:   scope to specific news IDs (overrides channelId selection)
+//   - isRead:    target state (1 = mark read [default, backwards-compatible],
+//                              0 = mark unread, used by the toolbar undo-toggle)
+//
+// Response: { success: true, affectedIds: number[] }
+//   affectedIds = IDs of rows that were actually flipped (those already in the
+//   target state are NOT included). The client uses this for the toggle:
+//   capture the IDs on the first click, send them back with isRead=0 on the second.
+//
+// `isRead === 0` is local-only — Telegram has no "mark unread" API and `lastReadAt`
+// is left untouched so the next fetch boundary stays where it was.
 router.post('/read-all', async (c) => {
   const body = await parseOptionalBody(c, readAllNewsSchema, {});
+  const targetIsRead: 0 | 1 = body.isRead ?? 1;
+  const sourceIsRead = targetIsRead === 1 ? 0 : 1;
 
-  // ── Scoped mark-read: only specific news IDs (e.g. tag-filtered view) ──────
+  // ── Scoped: only specific news IDs (e.g. tag-filtered view, undo-toggle) ───
   if (body.newsIds && body.newsIds.length > 0) {
-    const toMark = await db
+    const toFlip = await db
       .select({ id: news.id, channelId: news.channelId })
       .from(news)
-      .where(and(inArray(news.id, body.newsIds), eq(news.isRead, 0)));
+      .where(and(inArray(news.id, body.newsIds), eq(news.isRead, sourceIsRead)));
 
-    if (toMark.length > 0) {
-      await db
-        .update(news)
-        .set({ isRead: 1 })
-        .where(
-          inArray(
-            news.id,
-            toMark.map((r) => r.id),
-          ),
-        );
-
-      // Recount unread per affected channel
-      const affectedChannelIds = [...new Set(toMark.map((r) => r.channelId))];
-      for (const chId of affectedChannelIds) {
-        const [result] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(news)
-          .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
-
-        await db
-          .update(channels)
-          .set({ unreadCount: result?.count ?? 0 })
-          .where(eq(channels.id, chId));
-      }
+    if (toFlip.length === 0) {
+      return c.json({ success: true, affectedIds: [] as number[] });
     }
-    return c.json({ success: true });
+
+    const flippedIds = toFlip.map((r) => r.id);
+    await db.update(news).set({ isRead: targetIsRead }).where(inArray(news.id, flippedIds));
+
+    // Recount unread per affected channel
+    const affectedChannelIds = [...new Set(toFlip.map((r) => r.channelId))];
+    for (const chId of affectedChannelIds) {
+      const [result] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(news)
+        .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+
+      await db
+        .update(channels)
+        .set({ unreadCount: result?.count ?? 0 })
+        .where(eq(channels.id, chId));
+    }
+    return c.json({ success: true, affectedIds: flippedIds });
   }
 
-  // ── Full channel / global mark-read ──────────────────────────────────────
-  const conditions = [eq(news.isRead, 0)];
-  if (body.channelId) conditions.push(eq(news.channelId, body.channelId));
+  // ── Full channel / global flip ────────────────────────────────────────────
+  // Capture affected IDs BEFORE the UPDATE so the client can store them for undo.
+  const baseConditions = [eq(news.isRead, sourceIsRead)];
+  if (body.channelId) baseConditions.push(eq(news.channelId, body.channelId));
+
+  const toFlip = await db
+    .select({ id: news.id })
+    .from(news)
+    .where(and(...baseConditions));
+  const flippedIds = toFlip.map((r) => r.id);
+
+  if (flippedIds.length === 0) {
+    return c.json({ success: true, affectedIds: [] as number[] });
+  }
 
   await db
     .update(news)
-    .set({ isRead: 1 })
-    .where(and(...conditions));
+    .set({ isRead: targetIsRead })
+    .where(and(...baseConditions));
 
-  // Update denormalized unread_count
-  if (body.channelId) {
-    await db.update(channels).set({ unreadCount: 0 }).where(eq(channels.id, body.channelId));
+  // Update denormalized unread_count for the affected channel(s).
+  // For the unread→read path we can use the previous fast path (set to 0); for the
+  // read→unread path we recount from the news table to avoid drift.
+  if (targetIsRead === 1) {
+    if (body.channelId) {
+      await db.update(channels).set({ unreadCount: 0 }).where(eq(channels.id, body.channelId));
+    } else {
+      await db.update(channels).set({ unreadCount: 0 });
+    }
   } else {
-    await db.update(channels).set({ unreadCount: 0 });
+    // Read → unread: recount per affected channel.
+    const affectedChannelIds = body.channelId
+      ? [body.channelId]
+      : [
+          ...new Set(
+            (await db.select({ channelId: news.channelId }).from(news).where(inArray(news.id, flippedIds))).map(
+              (r) => r.channelId,
+            ),
+          ),
+        ];
+    for (const chId of affectedChannelIds) {
+      const [result] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(news)
+        .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+
+      await db
+        .update(channels)
+        .set({ unreadCount: result?.count ?? 0 })
+        .where(eq(channels.id, chId));
+    }
   }
 
-  // Sync read state to Telegram if channelId provided
-  if (body.channelId) {
+  // Sync read state to Telegram only on read direction (Telegram has no "mark unread").
+  if (targetIsRead === 1 && body.channelId) {
     try {
       const [channel] = await db.select().from(channels).where(eq(channels.id, body.channelId));
       if (channel) {
@@ -94,7 +142,7 @@ router.post('/read-all', async (c) => {
     }
   }
 
-  return c.json({ success: true });
+  return c.json({ success: true, affectedIds: flippedIds });
 });
 
 // DELETE /api/news/read - delete all read news (excluding items with active downloads)
