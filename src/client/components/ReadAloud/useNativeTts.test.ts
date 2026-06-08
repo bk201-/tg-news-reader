@@ -4,6 +4,7 @@ import { useNativeTts } from './useNativeTts';
 
 interface MockUtterance {
   text: string;
+  lang: string;
   onend: (() => void) | null;
   onerror: (() => void) | null;
 }
@@ -21,6 +22,7 @@ beforeEach(() => {
 
   class MockUtteranceCtor {
     text: string;
+    lang: string = '';
     onend: (() => void) | null = null;
     onerror: (() => void) | null = null;
     constructor(text: string) {
@@ -173,5 +175,30 @@ describe('useNativeTts', () => {
     // start() should be a no-op
     act(() => result.current.start());
     expect(result.current.status).toBe('idle');
+  });
+
+  describe('language detection', () => {
+    it('sets utterance.lang to ru-RU for Cyrillic sentences', () => {
+      const { result } = renderHook(() => useNativeTts(['Привет, как дела?']));
+      act(() => result.current.start());
+      expect(speakCalls[0].lang).toBe('ru-RU');
+    });
+
+    it('sets utterance.lang to en-US for Latin sentences', () => {
+      const { result } = renderHook(() => useNativeTts(['Hello, how are you?']));
+      act(() => result.current.start());
+      expect(speakCalls[0].lang).toBe('en-US');
+    });
+
+    it('detects language per sentence in a mixed-language playlist', () => {
+      const { result } = renderHook(() => useNativeTts(['First in English.', 'А это уже по-русски.']));
+      act(() => result.current.start(0));
+      expect(speakCalls[0].lang).toBe('en-US');
+      // Trigger natural advance
+      act(() => {
+        speakCalls[0].onend?.();
+      });
+      expect(speakCalls[1].lang).toBe('ru-RU');
+    });
   });
 });

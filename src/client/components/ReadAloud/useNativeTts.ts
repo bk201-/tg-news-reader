@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { detectTtsLang } from './detectTtsLang';
 
 /**
  * Detects whether the runtime supports the Web Speech API.
@@ -63,6 +64,9 @@ export function useNativeTts(sentences: string[]): UseNativeTtsResult {
       window.speechSynthesis.cancel();
 
       const utter = new SpeechSynthesisUtterance(list[index]);
+      // Auto-detect language per sentence — without this the browser falls back to its default
+      // voice (usually English) and reads Cyrillic text letter-by-letter as broken phonemes.
+      utter.lang = detectTtsLang(list[index]);
       utter.onend = () => {
         // Guard: ignore late onend from a cancelled utterance
         if (utteranceRef.current !== utter) return;
