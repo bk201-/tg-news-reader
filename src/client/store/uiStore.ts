@@ -69,6 +69,9 @@ interface UIStore {
   // News body font size (100–200, step 10)
   newsFontSize: number;
   setNewsFontSize: (n: number) => void;
+  /** Last-used AI TTS voice (persisted). `null` until the user picks one — UI falls back to server default. */
+  ttsVoice: string | null;
+  setTtsVoice: (v: string) => void;
 }
 
 export const useUIStore = create<UIStore>()((set) => ({
@@ -133,5 +136,10 @@ export const useUIStore = create<UIStore>()((set) => ({
     const clamped = Math.max(100, Math.min(200, n));
     localStorage.setItem('newsFontSize', String(clamped));
     set({ newsFontSize: clamped });
+  },
+  ttsVoice: localStorage.getItem('ttsVoice'),
+  setTtsVoice: (v) => {
+    localStorage.setItem('ttsVoice', v);
+    set({ ttsVoice: v });
   },
 }));

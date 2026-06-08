@@ -7,6 +7,8 @@ import type { ApiError } from './client';
 export interface TtsConfigDto {
   enabled: boolean;
   defaultVoice: string;
+  /** All voices supported by the configured TTS model (e.g. `gpt-4o-mini-tts`). */
+  voices: string[];
   maxInputChars: number;
   model: string;
 }

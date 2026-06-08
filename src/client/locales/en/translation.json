@@ -342,7 +342,20 @@
     "next_tooltip": "Next sentence",
     "stop": "Stop",
     "position": "Sentence {{current}} / {{total}}",
-    "ai_chunk_position": "Part {{current}} / {{total}}"
+    "ai_chunk_position": "Part {{current}} / {{total}}",
+    "voice_label": "Voice:",
+    "voice_desc": {
+      "nova": "warm female",
+      "alloy": "neutral",
+      "echo": "calm male",
+      "fable": "expressive British male",
+      "onyx": "deep male",
+      "shimmer": "soft female",
+      "ash": "warm male",
+      "ballad": "narrative male",
+      "coral": "bright female",
+      "sage": "wise male"
+    }
   },
   "tags": {
     "title": "Tags",

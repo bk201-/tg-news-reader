@@ -2,7 +2,7 @@ import { createReadStream, existsSync, statSync } from 'fs';
 import { Readable } from 'stream';
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import { OPENAI_TTS_MODEL, OPENAI_TTS_VOICE_DEFAULT, TTS_MAX_INPUT_CHARS } from '../config.js';
+import { OPENAI_TTS_MODEL, OPENAI_TTS_VOICE_DEFAULT, OPENAI_TTS_VOICES, TTS_MAX_INPUT_CHARS } from '../config.js';
 import { logger } from '../logger.js';
 import { isTtsConfigured } from '../services/openaiClient.js';
 import { getTtsStatus, startOrGetTts, touchTts, ttsChunkPath } from '../services/ttsService.js';
@@ -12,12 +12,14 @@ const router = new Hono();
 
 /**
  * GET /api/tts/config
- * Returns current TTS configuration so the client can enable/disable the AI button.
+ * Returns current TTS configuration so the client can enable/disable the AI button
+ * and render the voice picker.
  */
 router.get('/config', (c) => {
   return c.json({
     enabled: isTtsConfigured(),
     defaultVoice: OPENAI_TTS_VOICE_DEFAULT,
+    voices: OPENAI_TTS_VOICES,
     maxInputChars: TTS_MAX_INPUT_CHARS,
     model: OPENAI_TTS_MODEL,
   });
@@ -46,6 +48,12 @@ router.post('/', zValidator('json', createTtsSchema), async (c) => {
       },
       413,
     );
+  }
+  // Reject unknown voice names early so a typo doesn't burn a Telegram-API round-trip.
+  // Voice list is part of the public config endpoint — clients should only ever send
+  // one of these. Falsy → server picks OPENAI_TTS_VOICE_DEFAULT in startOrGetTts.
+  if (voice && !(OPENAI_TTS_VOICES as readonly string[]).includes(voice)) {
+    return c.json({ error: `Unknown voice "${voice}"`, voices: OPENAI_TTS_VOICES }, 400);
   }
   const result = await startOrGetTts(text, voice);
   return c.json(result);

@@ -73,6 +73,24 @@ export const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL ?? 'gpt-4o-mini-tts
 /** Default voice. Env: OPENAI_TTS_VOICE_DEFAULT (default "nova") */
 export const OPENAI_TTS_VOICE_DEFAULT = process.env.OPENAI_TTS_VOICE_DEFAULT ?? 'nova';
 /**
+ * Voices supported by `gpt-4o-mini-tts`. OpenAI does NOT expose a "list voices" API —
+ * this is the documented enum (https://platform.openai.com/docs/guides/text-to-speech).
+ * Order is deliberate: defaults first, then the more recent / characterful additions.
+ */
+export const OPENAI_TTS_VOICES = [
+  'nova',
+  'alloy',
+  'echo',
+  'fable',
+  'onyx',
+  'shimmer',
+  'ash',
+  'ballad',
+  'coral',
+  'sage',
+] as const;
+export type OpenAiTtsVoice = (typeof OPENAI_TTS_VOICES)[number];
+/**
  * Azure OpenAI TTS deployment name. When set (along with Azure endpoint+key),
  * Azure provider is used for TTS. Otherwise the service falls back to direct OPENAI_API_KEY.
  * Env: AZURE_OPENAI_TTS_DEPLOYMENT
