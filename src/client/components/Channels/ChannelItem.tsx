@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { formatUnreadBadgeCount } from './formatUnreadBadgeCount';
 
 const { Text } = Typography;
 
@@ -184,7 +185,7 @@ export function ChannelItem({
         )}
       </div>
       <div className={styles.rightSide}>
-        <Badge count={unreadCount} size="small" overflowCount={999} />
+        <Badge count={formatUnreadBadgeCount(unreadCount)} size="small" />
         <Dropdown menu={dropdownMenu} trigger={DROPDOWN_TRIGGER} placement="bottomRight">
           <Button icon={ICON_MORE} size="small" type="text" onClick={stopPropagation} />
         </Dropdown>

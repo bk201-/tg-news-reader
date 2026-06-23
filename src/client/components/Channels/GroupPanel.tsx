@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { formatUnreadBadgeCount } from './formatUnreadBadgeCount';
 import { PRESET_COLORS } from './groupFormConstants';
 import type { GroupFormValues } from './groupFormConstants';
 import { GroupFormModal } from './GroupFormModal';
@@ -231,7 +232,7 @@ export function GroupPanel() {
         >
           <div className={itemStyles.iconWrap}>
             <FolderFilled className={styles.generalIcon} />
-            {generalCount > 0 && <span className={itemStyles.badge}>{generalCount > 999 ? '999+' : generalCount}</span>}
+            {generalCount > 0 && <span className={itemStyles.badge}>{formatUnreadBadgeCount(generalCount)}</span>}
           </div>
           <Text className={cx(itemStyles.label, styles.generalLabel)} ellipsis>
             {t('groups.general')}

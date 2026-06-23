@@ -3,6 +3,7 @@ import type { Group } from '@shared/types.ts';
 import { Dropdown, Typography } from 'antd';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatUnreadBadgeCount } from './formatUnreadBadgeCount';
 import { useGroupItemStyles } from './groupItemStyles';
 
 const { Text } = Typography;
@@ -71,7 +72,7 @@ export function GroupItem({ group, isActive, isLocked, count, onClick, onEdit, o
           ) : (
             <FolderFilled className={styles.icon} style={iconStyle} />
           )}
-          {count > 0 && <span className={styles.badge}>{count > 999 ? '999+' : count}</span>}
+          {count > 0 && <span className={styles.badge}>{formatUnreadBadgeCount(count)}</span>}
         </div>
         <Text className={styles.label} ellipsis>
           {group.name}
