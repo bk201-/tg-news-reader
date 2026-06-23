@@ -183,6 +183,9 @@ export function LightboxMedia({
     setImgError(false);
     setRetryCount(0);
   }, []);
+  const handleVideoContextMenu = useCallback((e: React.MouseEvent<HTMLVideoElement>) => {
+    e.preventDefault();
+  }, []);
 
   /** Image URL with cache-buster to bypass browser/SW cache on retries */
   const imgSrc = displayPath
@@ -221,6 +224,10 @@ export function LightboxMedia({
           loop
           controls
           playsInline
+          controlsList="nodownload noremoteplayback nopictureinpicture"
+          disablePictureInPicture
+          disableRemotePlayback
+          onContextMenu={handleVideoContextMenu}
         />
       ) : (
         <>
