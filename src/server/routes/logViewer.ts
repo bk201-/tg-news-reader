@@ -1,3 +1,12 @@
+/**
+ * Log VIEWER endpoint — `GET /api/logs`.
+ *
+ * Direction: server → admin (READ path). Returns the server-side in-memory log
+ * ring buffer for the in-app log viewer, filtered by time window and level.
+ *
+ * Not to be confused with `logIngest.ts` (`POST /api/log/client`), which is the
+ * WRITE path that accepts browser-forwarded logs.
+ */
 import { Hono } from 'hono';
 import { getBufferSize, getLogEntries, LEVEL_MAP } from '../services/logBuffer.js';
 

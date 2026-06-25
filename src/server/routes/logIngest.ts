@@ -1,3 +1,14 @@
+/**
+ * Log INGEST endpoint — `POST /api/log/client`.
+ *
+ * Direction: browser → server (WRITE path). Receives a batch of `warn`/`error`
+ * log entries forwarded by the client logger and re-emits them through the
+ * server pino instance (`module: client:*`), so browser problems land in the
+ * same stdout/Log Analytics pipeline as server logs.
+ *
+ * Not to be confused with `logViewer.ts` (`GET /api/logs`), which READS the
+ * server-side in-memory log buffer for the in-app log viewer.
+ */
 import { Hono } from 'hono';
 import type { z } from 'zod';
 import { logger } from '../logger.js';
