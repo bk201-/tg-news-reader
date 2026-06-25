@@ -16,13 +16,13 @@
 
 ## Deferred (low priority)
 
-| #   | Task                                       | Description                                                                                                                                                                             | Complexity |
-| --- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1   | Post search                                | Search input in toolbar — client-side filter by `text` + `fullContent`. For large channels consider SQLite FTS5 on the server. Low urgency: hashtag filter covers most use cases.       | ⭐⭐       |
-| 2   | Mobile swipe gestures                      | Swipe-to-mark-read on news list items, swipe between album photos. Needs UX design first: whole row vs header, conflict with scroll. Consider `react-swipeable` or native touch events. | ⭐⭐⭐     |
-| 3   | Client-side video download                 | Videos already render in the browser — save to disk via `<a download>` without storing a copy in Azure. Useful for large videos to watch offline. **Superseded by the [Export channel media to a local folder](#rfc-export-channel-media-to-a-local-folder) RFC below.**                 | ⭐⭐       |
-| 4   | Invites / multi-user                       | Invite another user via an invite link. Requires: user profile card, password change, roles. Not relevant while single-user. See Open Question #2.                                      | ⭐⭐⭐⭐   |
-| 5   | Clarify `logs.ts` vs `clientLog.ts` routes | Two log-related route files are confusing. Document or merge — `clientLog.ts` = browser logs forwarded to server, `logs.ts` = admin log viewer API.                                     | ⭐         |
+| #   | Task                                       | Description                                                                                                                                                                                                                                                              | Complexity |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| 1   | Post search                                | Search input in toolbar — client-side filter by `text` + `fullContent`. For large channels consider SQLite FTS5 on the server. Low urgency: hashtag filter covers most use cases.                                                                                        | ⭐⭐       |
+| 2   | Mobile swipe gestures                      | Swipe-to-mark-read on news list items, swipe between album photos. Needs UX design first: whole row vs header, conflict with scroll. Consider `react-swipeable` or native touch events.                                                                                  | ⭐⭐⭐     |
+| 3   | Client-side video download                 | Videos already render in the browser — save to disk via `<a download>` without storing a copy in Azure. Useful for large videos to watch offline. **Superseded by the [Export channel media to a local folder](#rfc-export-channel-media-to-a-local-folder) RFC below.** | ⭐⭐       |
+| 4   | Invites / multi-user                       | Invite another user via an invite link. Requires: user profile card, password change, roles. Not relevant while single-user. See Open Question #2.                                                                                                                       | ⭐⭐⭐⭐   |
+| 5   | Clarify `logs.ts` vs `clientLog.ts` routes | Two log-related route files are confusing. Document or merge — `clientLog.ts` = browser logs forwarded to server, `logs.ts` = admin log viewer API.                                                                                                                      | ⭐         |
 
 ---
 
@@ -96,7 +96,7 @@ Telegram read semantics already used by the app.
 
 "Export channel to folder" enqueues every news item that has media. Process **sequentially**
 to respect Telegram rate limits / circuit breaker. Could reuse the download-manager pattern,
-but with the *sink* being the client folder instead of `data/`. Surface progress via a
+but with the _sink_ being the client folder instead of `data/`. Surface progress via a
 client-side counter or a dedicated SSE stream. Albums = multiple files per news item.
 
 ### Open sub-questions
@@ -105,6 +105,28 @@ client-side counter or a dedicated SSE stream. Albums = multiple files per news 
 - Should bulk export also push read state to Telegram (`readChannelHistory`) or only mark
   read locally? Match existing behaviour.
 - Progress UX: reuse `DownloadsPanel` or a dedicated export modal with a progress bar.
+
+### Compression & framing — considered & rejected
+
+Should the export stream be compressed (gzip/zstd/brotli), wrapped in protobuf, or bundled
+into a streaming archive? Mostly no — recorded here so we don't revisit it:
+
+- **Compressing the media bytes → counterproductive.** The payload is already-compressed
+  formats (JPEG, MP4/WebM, MP3/OGG, WebP). gzip/zstd/brotli on top yields ~0–2% while burning
+  CPU on both the proxy and the browser, and it breaks HTTP Range / video seeking. If transport
+  compression is ever wanted, that's `Content-Encoding` handled by the platform — not hand-rolled.
+- **Protobuf → not applicable.** Protobuf serializes _structured data_; here the structured
+  part (news metadata: id, text, links) is negligible next to multi-MB media blobs, and is
+  already served as JSON by the existing API. Framing binary blobs in protobuf buys nothing.
+- **Streaming archive (ZIP/tar) → wrong tool for the primary path, right tool for the fallback.**
+  The whole point of the File System Access path is writing **individual real files** into the
+  folder; bundling into one archive would lose per-file resume, skip-existing dedup, per-file
+  mark-as-read, and ready-to-open files. **However**, for the non-Chromium / mobile fallback
+  (only a single `<a download>` is possible), a streaming **ZIP in `store` mode** (no
+  compression — just concatenation + central directory, ~no CPU) is the natural way to grab a
+  whole channel as one `channel.zip` without buffering. Candidates: `client-zip` (client,
+  emits a `ReadableStream`) or `archiver` / `zip-stream` (server). This also collapses
+  "many small files = many requests" (already a non-issue on HTTP/2).
 
 ### Phasing
 
