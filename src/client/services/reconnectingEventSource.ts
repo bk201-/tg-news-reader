@@ -30,6 +30,13 @@ interface ReconnectingESOptions {
    * Use this to refresh the auth token so the next connect uses a fresh URL.
    */
   onBeforeReconnect?: () => Promise<void>;
+  /**
+   * When true, the connection is released while the page is hidden
+   * (tab in background / window minimized) and re-established when the page
+   * becomes visible again. Avoids keeping the server awake and burning the
+   * network on a page nobody is looking at.
+   */
+  pauseWhenHidden?: boolean;
   /** Module name for logging. */
   module?: string;
 }
@@ -38,15 +45,24 @@ export function createReconnectingEventSource({
   getUrl,
   onConnect,
   onBeforeReconnect,
+  pauseWhenHidden = false,
   module = 'sse',
 }: ReconnectingESOptions): ReconnectingES {
   let attempt = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let es: EventSource | null = null;
   let closed = false;
+  let paused = false;
+
+  function clearTimer() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  }
 
   function connect() {
-    if (closed) return;
+    if (closed || paused) return;
 
     es = new EventSource(getUrl());
 
@@ -56,7 +72,7 @@ export function createReconnectingEventSource({
     });
 
     es.onerror = () => {
-      if (closed) return;
+      if (closed || paused) return;
       es?.close();
       es = null;
 
@@ -66,9 +82,10 @@ export function createReconnectingEventSource({
 
       void (async () => {
         // Refresh auth token (e.g. after a JWT expiry 401) before reconnecting.
-        // If rec.close() was called during the async await, skip the reconnect.
+        // If rec.close() was called (or the page was hidden) during the async
+        // await, skip the reconnect.
         await onBeforeReconnect?.();
-        if (closed) return;
+        if (closed || paused) return;
         timer = setTimeout(connect, delay);
       })();
     };
@@ -76,12 +93,42 @@ export function createReconnectingEventSource({
     onConnect(es);
   }
 
+  function handleVisibility() {
+    if (document.hidden) {
+      // Page hidden/minimized — release the connection so we don't keep the
+      // server awake or reconnect in the background.
+      if (paused) return;
+      paused = true;
+      clearTimer();
+      es?.close();
+      es = null;
+      logger.debug({ module }, 'SSE paused — page hidden');
+    } else if (paused) {
+      // Page visible again — reconnect immediately with a fresh backoff.
+      paused = false;
+      attempt = 0;
+      clearTimer();
+      logger.debug({ module }, 'SSE resumed — page visible');
+      connect();
+    }
+  }
+
+  const visibilityEnabled = pauseWhenHidden && typeof document !== 'undefined';
+  if (visibilityEnabled) {
+    document.addEventListener('visibilitychange', handleVisibility);
+    // Honour the current state on creation (e.g. created while tab is backgrounded).
+    if (document.hidden) paused = true;
+  }
+
   connect();
 
   return {
     close() {
       closed = true;
-      if (timer) clearTimeout(timer);
+      clearTimer();
+      if (visibilityEnabled) {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
       es?.close();
       es = null;
     },
