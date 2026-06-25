@@ -201,4 +201,77 @@ describe('createReconnectingEventSource', () => {
     // close() was called during onBeforeReconnect — should NOT create a new EventSource
     expect(MockEventSource.instances).toHaveLength(1);
   });
+
+  describe('pauseWhenHidden', () => {
+    function setHidden(hidden: boolean) {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    afterEach(() => {
+      // Reset visibility to the jsdom default for the next test
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    });
+
+    it('closes the connection while hidden and reconnects when visible again', async () => {
+      const { createReconnectingEventSource } = await importFresh();
+      const handle = createReconnectingEventSource({
+        getUrl: () => 'http://test/stream',
+        onConnect: vi.fn(),
+        pauseWhenHidden: true,
+      });
+
+      expect(MockEventSource.instances).toHaveLength(1);
+      expect(MockEventSource.instances[0].closed).toBe(false);
+
+      // Page hidden → connection released, no new instance
+      setHidden(true);
+      expect(MockEventSource.instances[0].closed).toBe(true);
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      // No background reconnect attempts while hidden
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      // Page visible → reconnect immediately
+      setHidden(false);
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].closed).toBe(false);
+
+      handle.close();
+    });
+
+    it('does not connect when created while the page is already hidden', async () => {
+      const { createReconnectingEventSource } = await importFresh();
+      setHidden(true);
+
+      const handle = createReconnectingEventSource({
+        getUrl: () => 'http://test/stream',
+        onConnect: vi.fn(),
+        pauseWhenHidden: true,
+      });
+
+      expect(MockEventSource.instances).toHaveLength(0);
+
+      setHidden(false);
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      handle.close();
+    });
+
+    it('keeps the connection open when pauseWhenHidden is not set', async () => {
+      const { createReconnectingEventSource } = await importFresh();
+      const handle = createReconnectingEventSource({
+        getUrl: () => 'http://test/stream',
+        onConnect: vi.fn(),
+      });
+
+      expect(MockEventSource.instances).toHaveLength(1);
+      setHidden(true);
+      expect(MockEventSource.instances[0].closed).toBe(false);
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      handle.close();
+    });
+  });
 });

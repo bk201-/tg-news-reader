@@ -122,4 +122,29 @@ describe('useVersionCheck', () => {
 
     expect(result.current.newVersionAvailable).toBe(true);
   });
+
+  it('does not poll while the page is hidden, and catches up when it becomes visible', async () => {
+    vi.useFakeTimers();
+    const hiddenSpy = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
+    fetcher.mockResolvedValue({ ok: true, json: async () => ({ version: '1.19.0' }) });
+
+    renderHook(() => useVersionCheck({ clientVersion: '1.18.0', intervalMs: 1_000, isDev: false, fetcher }));
+
+    // Initial check + interval ticks are all skipped while hidden
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+
+    // Page becomes visible → immediate catch-up check
+    hiddenSpy.mockReturnValue(false);
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    hiddenSpy.mockRestore();
+  });
 });

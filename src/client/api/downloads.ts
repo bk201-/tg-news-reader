@@ -84,6 +84,7 @@ export function useDownloadsSSE() {
       onBeforeReconnect: async () => {
         await tryRefresh();
       },
+      pauseWhenHidden: true,
       module: 'downloads',
       onConnect: (es) => {
         es.addEventListener('init', (e: MessageEvent) => {

@@ -32,6 +32,9 @@ export function useVersionCheck({
     let active = true;
 
     const checkVersion = async () => {
+      // Don't poll while the page is hidden — no point burning the network
+      // (and waking a sleeping server) for a page nobody is looking at.
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const response = await fetcher('/api/version', {
           cache: 'no-store',
@@ -58,9 +61,20 @@ export function useVersionCheck({
     void checkVersion();
     const timer = window.setInterval(() => void checkVersion(), intervalMs);
 
+    // Catch up immediately when the user returns to the tab.
+    const handleVisibility = () => {
+      if (!document.hidden) void checkVersion();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
+
     return () => {
       active = false;
       window.clearInterval(timer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
     };
   }, [clientVersion, fetcher, intervalMs, isDev]);
 
