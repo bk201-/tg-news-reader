@@ -136,6 +136,98 @@ into a streaming archive? Mostly no — recorded here so we don't revisit it:
 
 ---
 
+## RFC: Comment-thread media in the lightbox (media channels)
+
+> Status: **Proposed** · Complexity: ⭐⭐⭐ · Scope: `media` channel type
+
+### Goal
+
+For `media` channels, a post often has a linked **discussion (comments) thread** whose
+replies contain **additional images/videos**. Mirror the Telegram app behaviour: when the
+user opens the lightbox on a post, the image flow should also include the media posted in
+that post's comments — so scrolling through the lightbox walks the post's own album **and**
+the comment images, seamlessly.
+
+### Telegram model (how comments work)
+
+- A channel can have a **linked discussion group**. A channel post's "comments" are replies
+  to that post inside the linked group.
+- On the raw message, `msg.replies` carries the thread info:
+  `replies.comments === true` (it's a comment thread), `replies.replies` (count),
+  `replies.channelId` (the linked discussion group).
+- gramjs entry points:
+  - `messages.GetDiscussionMessage({ peer, msgId })` → resolves the post to its discussion
+    message in the linked group.
+  - `messages.GetReplies({ peer: <discussionGroup>, msgId: <discussionMsgId>, ... })` (or
+    `client.getMessages(group, { replyTo })`) → pages through the comment replies, each of
+    which may carry `media` (photos, videos, albums).
+
+### Detecting comments (cheap, eager)
+
+`msg.replies` is already present on the messages we fetch — no extra Telegram call. At fetch
+time, persist a couple of flags on the news row:
+
+- `hasComments: boolean` (`replies?.comments === true`)
+- `commentCount: number` (`replies?.replies ?? 0`)
+- `discussionPeerId` / `discussionMsgId` — enough to fetch the thread later.
+
+This lets the UI show a "has comments" indicator and gate the (expensive) media fetch.
+
+### Fetching comment media — lazy, on demand
+
+Eagerly pulling every post's comment thread at fetch time would multiply Telegram calls and
+invite FloodWait. Match the app: **fetch on demand** — when the user opens the lightbox (or a
+dedicated "comments media" action) on a post that `hasComments`. All calls go through
+`telegramCircuit`, sequentially, with the existing retry/backoff.
+
+### Storage
+
+Comment media are **not** channel posts, so they should not become `news` rows. Options:
+
+- **New side table** `comment_media (id, news_id → news ON DELETE CASCADE, comment_msg_id,
+media_type, local_media_path, sort_order, created_at)`. Downloaded via the existing
+  `downloadManager` (`enqueueTask`, new `type: 'comment_media'` or reuse `'media'` with a
+  source descriptor). Size limits apply as for any background download.
+- Alternative: transient passthrough (fetch + stream on demand, never persisted) — simpler but
+  no caching and re-fetches every open. Persisting is preferred for the lightbox UX.
+
+### Lightbox integration
+
+`useLightboxNav` currently builds a flat list from news items with media and walks
+album-images-then-items (`go` / `goToAlbumImage`). Extend it so a post's entry expands to:
+
+```
+[ post album image 1 … N ] + [ comment image 1 … M ]
+```
+
+navigable with the same flat logic. The `positionLabel` and album counters
+(`albumExpectedLength`) must account for the appended comment images. Decide whether comment
+images are a distinct visual segment (e.g. a divider / "from comments" badge in
+`LightboxToolbar`) or fully merged.
+
+### Concerns / open sub-questions
+
+- **Cost & rate limits**: comment fetching adds Telegram load → strictly lazy, sequential,
+  through `telegramCircuit`; consider a per-post cache TTL so re-opening doesn't refetch.
+- **Pagination**: large threads can have hundreds of replies → page the `GetReplies` call and
+  cap how many comment images are pulled (config, e.g. `COMMENT_MEDIA_MAX`).
+- **Which media**: images + videos only (`photo` / `document` with image/video mime), skip
+  stickers/voice. Reuse the `LIGHTBOX_MEDIA_TYPES` filter.
+- **Scope**: `media` channels only for now; consider a per-channel toggle.
+- **Ordering**: comment media by reply chronology (oldest → newest) after the post's own album.
+
+### Phasing
+
+1. **Detect** — persist `hasComments` / `commentCount` (+ discussion ids) at fetch time
+   (cheap, no extra TG calls); show a "has comments" indicator.
+2. **Fetch & store** — on-demand comment-media fetch through `telegramCircuit` +
+   `downloadManager`, into a `comment_media` table (lazy, capped, cached).
+3. **Lightbox** — merge comment images into `useLightboxNav` flow with correct counters and an
+   optional "from comments" segment marker.
+4. **Tests, i18n, version bump.**
+
+---
+
 ## Open Questions
 
 1. **gramjs in the browser**: should we share the main session or create a separate one?
