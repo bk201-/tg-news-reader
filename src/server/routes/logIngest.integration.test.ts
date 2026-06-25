@@ -30,16 +30,16 @@ vi.mock('../db/index.js', () => ({
 
 import { logger } from '../logger.js';
 import { authMiddleware } from '../middleware/auth.js';
-import clientLogRouter from './clientLog.js';
+import logIngestRouter from './logIngest.js';
 
 function createApp() {
   const app = new Hono();
   app.use('/api/*', authMiddleware);
-  app.route('/api/log/client', clientLogRouter);
+  app.route('/api/log/client', logIngestRouter);
   return app;
 }
 
-describe('Client Log routes (integration)', () => {
+describe('Log ingest route (integration)', () => {
   let app: ReturnType<typeof createApp>;
   let headers: Record<string, string>;
 

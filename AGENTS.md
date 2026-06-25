@@ -621,7 +621,7 @@ Azure App Service / Container Apps handles: process-level crash recovery (contai
 ```
 Client logger.warn/error
   → POST /api/log/client (batched 2s; errors flush immediately; keepalive: true)
-  → server/routes/clientLog.ts → pino logger (module: 'client:xxx')
+  → server/routes/logIngest.ts → pino logger (module: 'client:xxx')
   → stdout JSON (prod) / pino-pretty (dev)
   → Azure Container Apps captures stdout → Log Analytics Workspace
   → KQL queries

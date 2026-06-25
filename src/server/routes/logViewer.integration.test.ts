@@ -53,16 +53,16 @@ vi.mock('../db/index.js', () => ({
 
 import { authMiddleware } from '../middleware/auth.js';
 import { getLogEntries, getBufferSize } from '../services/logBuffer.js';
-import logsRouter from './logs.js';
+import logViewerRouter from './logViewer.js';
 
 function createApp() {
   const app = new Hono();
   app.use('/api/*', authMiddleware);
-  app.route('/api/logs', logsRouter);
+  app.route('/api/logs', logViewerRouter);
   return app;
 }
 
-describe('Logs routes (integration)', () => {
+describe('Log viewer route (integration)', () => {
   let app: ReturnType<typeof createApp>;
   let headers: Record<string, string>;
 
