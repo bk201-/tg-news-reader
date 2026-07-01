@@ -7,7 +7,7 @@ const {
   mockInvoke,
   mockGetMessages,
   mockParseMessageFields,
-  mockExtractInstantViewText,
+  mockExtractInstantViewPage,
   mockApi,
   MockMessage,
   MockWebPage,
@@ -49,7 +49,7 @@ const {
   const _mockInvoke = vi.fn();
   const _mockGetMessages = vi.fn();
   const _mockParseMessageFields = vi.fn();
-  const _mockExtractInstantViewText = vi.fn();
+  const _mockExtractInstantViewPage = vi.fn();
 
   class _MockPeerChannel {
     channelId: bigint;
@@ -79,7 +79,7 @@ const {
     mockInvoke: _mockInvoke,
     mockGetMessages: _mockGetMessages,
     mockParseMessageFields: _mockParseMessageFields,
-    mockExtractInstantViewText: _mockExtractInstantViewText,
+    mockExtractInstantViewPage: _mockExtractInstantViewPage,
     mockApi: _mockApi,
     MockMessage: _MockMessage,
     MockWebPage: _MockWebPage,
@@ -115,7 +115,7 @@ vi.mock('./telegramCircuitBreaker.js', () => ({
 
 vi.mock('./telegramParser.js', () => ({
   parseMessageFields: (...args: unknown[]) => mockParseMessageFields(...args),
-  extractInstantViewText: (...args: unknown[]) => mockExtractInstantViewText(...args),
+  extractInstantViewPage: (...args: unknown[]) => mockExtractInstantViewPage(...args),
 }));
 
 import { logger } from '../logger.js';
@@ -156,7 +156,10 @@ describe('telegramApi — resolvePartialInstantView', () => {
       const fullPage = new MockPage([{ text: 'full blocks' }], false);
       const fullWp = new MockWebPage(fullPage, 'https://example.com/article');
       mockInvoke.mockResolvedValueOnce({ webpage: fullWp });
-      mockExtractInstantViewText.mockReturnValueOnce('Full article text that is much longer than the partial');
+      mockExtractInstantViewPage.mockReturnValueOnce({
+        text: 'Full article text that is much longer than the partial',
+        images: [],
+      });
 
       const results = await fetchChannelMessages('test_channel', { limit: 10 });
 
@@ -181,7 +184,7 @@ describe('telegramApi — resolvePartialInstantView', () => {
       const fullPage = new MockPage([], false);
       const fullWp = new MockWebPage(fullPage, 'https://example.com/article');
       mockInvoke.mockResolvedValueOnce({ webpage: fullWp });
-      mockExtractInstantViewText.mockReturnValueOnce('Short');
+      mockExtractInstantViewPage.mockReturnValueOnce({ text: 'Short', images: [] });
 
       const results = await fetchChannelMessages('test_channel', { limit: 10 });
 
@@ -251,12 +254,12 @@ describe('telegramApi — resolvePartialInstantView', () => {
       const fullPage1 = new MockPage([], false);
       const fullWp1 = new MockWebPage(fullPage1, 'https://example.com/a1');
       mockInvoke.mockResolvedValueOnce({ webpage: fullWp1 });
-      mockExtractInstantViewText.mockReturnValueOnce('Full article 1 with a lot of text');
+      mockExtractInstantViewPage.mockReturnValueOnce({ text: 'Full article 1 with a lot of text', images: [] });
 
       const fullPage2 = new MockPage([], false);
       const fullWp2 = new MockWebPage(fullPage2, 'https://example.com/a2');
       mockInvoke.mockResolvedValueOnce({ webpage: fullWp2 });
-      mockExtractInstantViewText.mockReturnValueOnce('Full article 2 with a lot of text');
+      mockExtractInstantViewPage.mockReturnValueOnce({ text: 'Full article 2 with a lot of text', images: [] });
 
       const results = await fetchChannelMessages('test_channel', { limit: 10 });
 
@@ -283,7 +286,10 @@ describe('telegramApi — resolvePartialInstantView', () => {
       const fullPage = new MockPage([], false);
       const fullWp = new MockWebPage(fullPage, 'https://example.com/article');
       mockInvoke.mockResolvedValueOnce({ webpage: fullWp });
-      mockExtractInstantViewText.mockReturnValueOnce('Full article content that is longer than partial');
+      mockExtractInstantViewPage.mockReturnValueOnce({
+        text: 'Full article content that is longer than partial',
+        images: [],
+      });
 
       const result = await fetchMessageById('test_channel', 42);
 

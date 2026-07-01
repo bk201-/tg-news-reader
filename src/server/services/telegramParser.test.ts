@@ -64,9 +64,13 @@ class MockWebPage {
 class MockPage {
   blocks: unknown[];
   part: boolean;
-  constructor(blocks: unknown[], part = false) {
+  photos: unknown[];
+  documents: unknown[];
+  constructor(blocks: unknown[], part = false, photos: unknown[] = [], documents: unknown[] = []) {
     this.blocks = blocks;
     this.part = part;
+    this.photos = photos;
+    this.documents = documents;
   }
 }
 class MockTextPlain {
@@ -83,6 +87,30 @@ class MockTextConcat {
   }
 }
 class MockTextImage {}
+class MockTextBold {
+  constructor(public text: unknown) {}
+}
+class MockTextItalic {
+  constructor(public text: unknown) {}
+}
+class MockTextStrike {
+  constructor(public text: unknown) {}
+}
+class MockTextFixed {
+  constructor(public text: unknown) {}
+}
+class MockTextUrl {
+  constructor(
+    public text: unknown,
+    public url: string,
+  ) {}
+}
+class MockTextEmail {
+  constructor(
+    public text: unknown,
+    public email: string,
+  ) {}
+}
 class MockPageBlockParagraph {
   text: unknown;
   constructor(text: unknown) {
@@ -188,6 +216,18 @@ class MockPageBlockDetails {
     this.blocks = blocks;
   }
 }
+class MockPageBlockPhoto {
+  constructor(
+    public photoId: number,
+    public caption?: { text?: unknown },
+  ) {}
+}
+class MockPageBlockTable {
+  constructor(public rows: { cells: { text?: unknown }[] }[]) {}
+}
+class MockPageBlockAuthorDate {
+  constructor(public author: unknown) {}
+}
 
 const mockApi = {
   MessageEntityUrl: MockMessageEntityUrl,
@@ -205,6 +245,12 @@ const mockApi = {
   TextEmpty: MockTextEmpty,
   TextConcat: MockTextConcat,
   TextImage: MockTextImage,
+  TextBold: MockTextBold,
+  TextItalic: MockTextItalic,
+  TextStrike: MockTextStrike,
+  TextFixed: MockTextFixed,
+  TextUrl: MockTextUrl,
+  TextEmail: MockTextEmail,
   PageBlockParagraph: MockPageBlockParagraph,
   PageBlockTitle: MockPageBlockTitle,
   PageBlockHeader: MockPageBlockHeader,
@@ -223,13 +269,22 @@ const mockApi = {
   PageListOrderedItemText: MockPageListOrderedItemText,
   PageListOrderedItemBlocks: MockPageListOrderedItemBlocks,
   PageBlockDetails: MockPageBlockDetails,
+  PageBlockPhoto: MockPageBlockPhoto,
+  PageBlockTable: MockPageBlockTable,
+  PageBlockAuthorDate: MockPageBlockAuthorDate,
 };
 
 vi.mock('./telegramClient.js', () => ({
   getApi: () => mockApi,
 }));
 
-import { extractLinks, extractHashtags, parseMessageFields, extractInstantViewText } from './telegramParser.js';
+import {
+  extractLinks,
+  extractHashtags,
+  parseMessageFields,
+  extractInstantViewText,
+  extractInstantViewPage,
+} from './telegramParser.js';
 
 describe('extractLinks', () => {
   it('extracts URL entities', () => {
@@ -459,12 +514,12 @@ describe('extractInstantViewText', () => {
 
   it('extracts subtitle as italic', () => {
     const blocks = [new MockPageBlockSubtitle(new MockTextPlain('Sub'))];
-    expect(extractInstantViewText(blocks as any)).toBe('*Sub*');
+    expect(extractInstantViewText(blocks as any)).toBe('_Sub_');
   });
 
   it('extracts kicker as italic', () => {
     const blocks = [new MockPageBlockKicker(new MockTextPlain('Kicker'))];
-    expect(extractInstantViewText(blocks as any)).toBe('*Kicker*');
+    expect(extractInstantViewText(blocks as any)).toBe('_Kicker_');
   });
 
   it('extracts header as ## heading', () => {
@@ -576,6 +631,94 @@ describe('extractInstantViewText', () => {
     const wrapped = { someOther: 'field' };
     const blocks = [new MockPageBlockParagraph(wrapped)];
     expect(extractInstantViewText(blocks as any)).toBe('');
+  });
+
+  it('renders bold rich text with ** markers', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextBold(new MockTextPlain('strong')))];
+    expect(extractInstantViewText(blocks as any)).toBe('**strong**');
+  });
+
+  it('renders italic rich text with _ markers', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextItalic(new MockTextPlain('em')))];
+    expect(extractInstantViewText(blocks as any)).toBe('_em_');
+  });
+
+  it('renders strikethrough rich text with ~~ markers', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextStrike(new MockTextPlain('gone')))];
+    expect(extractInstantViewText(blocks as any)).toBe('~~gone~~');
+  });
+
+  it('renders monospace rich text with backticks', () => {
+    const blocks = [new MockPageBlockParagraph(new MockTextFixed(new MockTextPlain('code')))];
+    expect(extractInstantViewText(blocks as any)).toBe('`code`');
+  });
+
+  it('renders hyperlink rich text as a markdown link (preserving the URL)', () => {
+    const link = new MockTextUrl(new MockTextPlain('site'), 'https://example.com');
+    const blocks = [new MockPageBlockParagraph(link)];
+    expect(extractInstantViewText(blocks as any)).toBe('[site](https://example.com)');
+  });
+
+  it('renders email rich text as a mailto link', () => {
+    const email = new MockTextEmail(new MockTextPlain('mail me'), 'a@b.com');
+    const blocks = [new MockPageBlockParagraph(email)];
+    expect(extractInstantViewText(blocks as any)).toBe('[mail me](mailto:a@b.com)');
+  });
+
+  it('combines nested bold + link inside a concat', () => {
+    const concat = new MockTextConcat([
+      new MockTextPlain('See '),
+      new MockTextBold(new MockTextUrl(new MockTextPlain('here'), 'https://x.io')),
+    ]);
+    const blocks = [new MockPageBlockParagraph(concat)];
+    expect(extractInstantViewText(blocks as any)).toBe('See **[here](https://x.io)**');
+  });
+
+  it('renders a table as GitHub-flavoured markdown', () => {
+    const table = new MockPageBlockTable([
+      { cells: [{ text: new MockTextPlain('A') }, { text: new MockTextPlain('B') }] },
+      { cells: [{ text: new MockTextPlain('1') }, { text: new MockTextPlain('2') }] },
+    ]);
+    expect(extractInstantViewText([table] as any)).toBe('| A | B |\n| --- | --- |\n| 1 | 2 |');
+  });
+
+  it('renders author/date as italic', () => {
+    const blocks = [new MockPageBlockAuthorDate(new MockTextPlain('Jane Doe'))];
+    expect(extractInstantViewText(blocks as any)).toBe('_Jane Doe_');
+  });
+});
+
+describe('extractInstantViewPage', () => {
+  it('resolves a PageBlockPhoto to a markdown image placeholder + image ref', () => {
+    const photo = new MockPhoto(555, []);
+    const photoBlock = new MockPageBlockPhoto(555, { text: new MockTextPlain('A caption') });
+    const page = new MockPage([photoBlock], false, [photo]);
+    const { text, images } = extractInstantViewPage(page as any);
+    expect(text).toBe('![A caption](iv://0)');
+    expect(images).toHaveLength(1);
+    expect(images[0].placeholder).toBe('iv://0');
+    expect(images[0].media).toBe(photo);
+  });
+
+  it('falls back to caption-only when the photo is missing from the page', () => {
+    const photoBlock = new MockPageBlockPhoto(999, { text: new MockTextPlain('Just caption') });
+    const page = new MockPage([photoBlock], false, []); // no photos
+    const { text, images } = extractInstantViewPage(page as any);
+    expect(text).toBe('Just caption');
+    expect(images).toHaveLength(0);
+  });
+
+  it('numbers multiple images sequentially', () => {
+    const p1 = new MockPhoto(1, []);
+    const p2 = new MockPhoto(2, []);
+    const page = new MockPage(
+      [new MockPageBlockPhoto(1), new MockPageBlockParagraph(new MockTextPlain('mid')), new MockPageBlockPhoto(2)],
+      false,
+      [p1, p2],
+    );
+    const { text, images } = extractInstantViewPage(page as any);
+    expect(text).toBe('![](iv://0)\n\nmid\n\n![](iv://1)');
+    expect(images.map((i) => i.placeholder)).toEqual(['iv://0', 'iv://1']);
   });
 });
 

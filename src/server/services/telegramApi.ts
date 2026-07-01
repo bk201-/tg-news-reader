@@ -9,7 +9,7 @@ import { MAX_IMG_DOC_SIZE_BYTES, MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } fr
 import { logger } from '../logger.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
 import { ensureAndGetApi, getTelegramClient } from './telegramClient.js';
-import { extractInstantViewText, parseMessageFields } from './telegramParser.js';
+import { extractInstantViewPage, parseMessageFields } from './telegramParser.js';
 import type { TelegramMessage } from './telegramParser.js';
 
 const BATCH_SIZE = 100;
@@ -26,9 +26,11 @@ async function resolvePartialInstantView(msg: TelegramMessage): Promise<void> {
     const result = await tg.invoke(new _Api.messages.GetWebPage({ url: msg.instantViewUrl, hash: 0 }));
     const wp = result.webpage;
     if (wp instanceof _Api.WebPage && wp.cachedPage instanceof _Api.Page) {
-      const fullText = extractInstantViewText(wp.cachedPage.blocks);
+      const { text: fullText, images } = extractInstantViewPage(wp.cachedPage);
       if (fullText && fullText.length > (msg.instantViewContent?.length ?? 0)) {
+        // Replace content and its image placeholders together so `iv://N` tokens stay in sync
         msg.instantViewContent = fullText;
+        msg.instantViewImages = images.length ? images : undefined;
       }
       // Even if the page is still partial, we've done our best
       msg.instantViewPartial = false;
@@ -37,6 +39,58 @@ async function resolvePartialInstantView(msg: TelegramMessage): Promise<void> {
     logger.warn({ module: 'telegram', url: msg.instantViewUrl, err }, 'Failed to fetch full Instant View page');
     // Keep whatever partial content we already have
   }
+}
+
+/**
+ * Download Instant View images referenced by `iv://N` placeholders and rewrite the
+ * markdown to point at local /api/media paths. Failed/leftover placeholders are stripped.
+ * `channelTelegramId` is the numeric channel id used as the media directory name.
+ */
+async function resolveInstantViewImages(msg: TelegramMessage, channelTelegramId: string): Promise<void> {
+  if (!msg.instantViewImages?.length || !msg.instantViewContent) return;
+
+  const dir = join(process.cwd(), 'data', channelTelegramId);
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    // best-effort — a failed mkdir surfaces as a download error below
+  }
+
+  let content = msg.instantViewContent;
+  const _Api = await ensureAndGetApi();
+
+  for (let i = 0; i < msg.instantViewImages.length; i++) {
+    const img = msg.instantViewImages[i];
+    const filename = `iv_${msg.id}_${i}.jpg`;
+    const filepath = join(dir, filename);
+    const rel = `${channelTelegramId}/${filename}`;
+    // downloadMedia needs a MessageMedia wrapper, not a bare Photo/Document.
+    const media =
+      img.media instanceof _Api.Photo
+        ? new _Api.MessageMediaPhoto({ photo: img.media })
+        : new _Api.MessageMediaDocument({ document: img.media as Api.TypeDocument });
+    try {
+      if (!existsSync(filepath)) {
+        await telegramCircuit.execute(async () => {
+          const tg = await getTelegramClient();
+          await tg.downloadMedia(media, { outputFile: filepath });
+        }, 'downloadInstantViewImage');
+      }
+      // Replace the placeholder inside the markdown image target: (iv://N) → (rel)
+      content = content.split(`(${img.placeholder})`).join(`(${rel})`);
+    } catch (err) {
+      logger.warn(
+        { module: 'telegram', channelTelegramId, msgId: msg.id, err },
+        'Failed to download Instant View image',
+      );
+      // Leave the placeholder — the cleanup below strips unresolved images.
+    }
+  }
+
+  // Strip any image whose placeholder was never resolved (download failed / missing).
+  content = content.replace(/!\[[^\]]*\]\(iv:\/\/\d+\)\n*/g, '');
+  msg.instantViewContent = content;
+  msg.instantViewImages = undefined;
 }
 
 export async function fetchChannelMessages(
@@ -105,6 +159,15 @@ async function _fetchChannelMessages(
     );
     for (const msg of partialIVMessages) {
       await resolvePartialInstantView(msg);
+    }
+  }
+
+  // ── Download Instant View images (eager) ────────────────────────────────────
+  // channelUsername is the numeric channel telegramId here (see callers), which
+  // matches the media directory used by downloadMessageMedia.
+  for (const msg of allMessages) {
+    if (msg.instantViewImages?.length) {
+      await resolveInstantViewImages(msg, channelUsername);
     }
   }
 
@@ -312,7 +375,12 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       const msg = result[0];
       if (!(msg instanceof _Api.Message)) return null;
       const parsed = parseMessageFields(msg, channelUsername);
-      if (parsed) await resolvePartialInstantView(parsed);
+      if (parsed) {
+        await resolvePartialInstantView(parsed);
+        if (parsed.instantViewImages?.length) {
+          await resolveInstantViewImages(parsed, channelUsername);
+        }
+      }
       return parsed;
     }, 'fetchMessageById');
   } catch (err) {
