@@ -1,8 +1,9 @@
 import { Typography } from 'antd';
 import { createStyles } from 'antd-style';
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { mediaUrl } from '../../../api/mediaUrl';
 
 const { Paragraph } = Typography;
 
@@ -126,6 +127,13 @@ const useStyles = createStyles(({ css, token }) => ({
     font-size: 14px;
     line-height: 1.8;
   `,
+  image: css`
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 12px 0;
+  `,
 }));
 
 interface NewsArticleBodyProps {
@@ -137,11 +145,26 @@ interface NewsArticleBodyProps {
 export function NewsArticleBody({ content, format }: NewsArticleBodyProps) {
   const { styles } = useStyles();
 
+  // Instant View images are stored as bare local media paths (e.g. "12345/iv_678_0.jpg").
+  // Route them through mediaUrl() so the JWT is attached; leave absolute/data URLs as-is.
+  const components = useMemo(
+    () => ({
+      img: ({ src, alt }: { src?: string; alt?: string }) => {
+        if (!src) return null;
+        const resolved = /^(https?:|data:)/i.test(src) ? src : mediaUrl(src);
+        return <img src={resolved} alt={alt ?? ''} loading="lazy" className={styles.image} />;
+      },
+    }),
+    [styles.image],
+  );
+
   return (
     <div className={styles.wrapper}>
       {format === 'markdown' ? (
         <div className={styles.markdown}>
-          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+            {content}
+          </ReactMarkdown>
         </div>
       ) : (
         <Paragraph className={styles.plainText}>{content}</Paragraph>
