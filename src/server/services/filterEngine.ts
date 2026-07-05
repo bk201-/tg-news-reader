@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { client, db } from '../db/index.js';
-import { filters, news } from '../db/schema.js';
+import { channels, filters, news } from '../db/schema.js';
 import { logger } from '../logger.js';
 
 type FilterRow = { id: number; type: string; value: string };
@@ -13,6 +13,15 @@ export function checkFilterMatch(filter: FilterRow, item: NewsCheck): boolean {
     return item.hashtags.some((h) => h.replace(/^#/, '').toLowerCase() === value);
   }
   return item.text.toLowerCase().includes(value);
+}
+
+/** Reads the channel's "filter forwards/redirects" setting. */
+async function getFilterForwards(channelId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ filterForwards: channels.filterForwards })
+    .from(channels)
+    .where(eq(channels.id, channelId));
+  return row?.filterForwards === 1;
 }
 
 /** Upsert per-day hit counts into filter_stats (increments). */
@@ -35,7 +44,7 @@ async function recordFilterHits(hits: Map<number, number>): Promise<void> {
  */
 export async function applyFiltersToInserted(
   channelId: number,
-  insertedItems: Array<{ newsId: number; text: string; hashtags: string[] }>,
+  insertedItems: Array<{ newsId: number; text: string; hashtags: string[]; forwardFromName?: string | null }>,
 ): Promise<void> {
   if (insertedItems.length === 0) return;
 
@@ -44,7 +53,9 @@ export async function applyFiltersToInserted(
     .from(filters)
     .where(and(eq(filters.channelId, channelId), eq(filters.isActive, 1)));
 
-  if (activeFilters.length === 0) return;
+  const filterForwards = await getFilterForwards(channelId);
+
+  if (activeFilters.length === 0 && !filterForwards) return;
 
   const toFilter = new Set<number>();
   const hits = new Map<number, number>();
@@ -55,6 +66,10 @@ export async function applyFiltersToInserted(
         toFilter.add(item.newsId);
         hits.set(filter.id, (hits.get(filter.id) ?? 0) + 1);
       }
+    }
+    // "Filter forwards" hides reposts/redirects from other channels.
+    if (filterForwards && item.forwardFromName) {
+      toFilter.add(item.newsId);
     }
   }
 
@@ -75,7 +90,8 @@ export async function applyFiltersToInserted(
 
 /**
  * Recompute is_filtered for ALL existing news of a channel.
- * Called when a filter is created, updated, or deleted.
+ * Called when a filter is created, updated, or deleted, or when the
+ * "filter forwards" option is toggled.
  * Does NOT modify filter_stats — historical data is immutable.
  */
 export async function reprocessChannelFilters(channelId: number): Promise<void> {
@@ -84,8 +100,10 @@ export async function reprocessChannelFilters(channelId: number): Promise<void> 
     .from(filters)
     .where(and(eq(filters.channelId, channelId), eq(filters.isActive, 1)));
 
+  const filterForwards = await getFilterForwards(channelId);
+
   const allNews = await db
-    .select({ id: news.id, text: news.text, hashtags: news.hashtags })
+    .select({ id: news.id, text: news.text, hashtags: news.hashtags, forwardFromName: news.forwardFromName })
     .from(news)
     .where(eq(news.channelId, channelId));
 
@@ -93,8 +111,9 @@ export async function reprocessChannelFilters(channelId: number): Promise<void> 
   const toUnfilter: number[] = [];
 
   for (const row of allNews) {
-    const isFiltered = activeFilters.some((f) => checkFilterMatch(f, { text: row.text, hashtags: row.hashtags }));
-    if (isFiltered) toFilter.push(row.id);
+    const matchesFilter = activeFilters.some((f) => checkFilterMatch(f, { text: row.text, hashtags: row.hashtags }));
+    const isForward = filterForwards && !!row.forwardFromName;
+    if (matchesFilter || isForward) toFilter.push(row.id);
     else toUnfilter.push(row.id);
   }
 

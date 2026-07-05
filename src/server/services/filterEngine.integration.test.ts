@@ -24,7 +24,7 @@ vi.mock('../db/index.js', () => ({
 }));
 
 import { eq } from 'drizzle-orm';
-import { filters, news } from '../db/schema.js';
+import { channels, filters, news } from '../db/schema.js';
 import { applyFiltersToInserted, reprocessChannelFilters } from './filterEngine.js';
 
 describe('filterEngine (integration)', () => {
@@ -86,6 +86,34 @@ describe('filterEngine (integration)', () => {
       const [row] = await testDb.db.select().from(news).where(eq(news.id, n.id));
       expect(row.isFiltered).toBe(1);
     });
+
+    it('hides forwarded news when filterForwards is enabled', async () => {
+      const ch = await seedChannel(testDb.db, { filterForwards: 1 });
+      const fwd = await seedNews(testDb.db, ch.id, { text: 'repost', telegramMsgId: 1 });
+      const own = await seedNews(testDb.db, ch.id, { text: 'original', telegramMsgId: 2 });
+
+      await applyFiltersToInserted(ch.id, [
+        { newsId: fwd.id, text: 'repost', hashtags: [], forwardFromName: 'Other Channel' },
+        { newsId: own.id, text: 'original', hashtags: [], forwardFromName: null },
+      ]);
+
+      const [rowFwd] = await testDb.db.select().from(news).where(eq(news.id, fwd.id));
+      const [rowOwn] = await testDb.db.select().from(news).where(eq(news.id, own.id));
+      expect(rowFwd.isFiltered).toBe(1);
+      expect(rowOwn.isFiltered).toBe(0);
+    });
+
+    it('does NOT hide forwarded news when filterForwards is disabled', async () => {
+      const ch = await seedChannel(testDb.db, { filterForwards: 0 });
+      const fwd = await seedNews(testDb.db, ch.id, { text: 'repost', telegramMsgId: 1 });
+
+      await applyFiltersToInserted(ch.id, [
+        { newsId: fwd.id, text: 'repost', hashtags: [], forwardFromName: 'Other Channel' },
+      ]);
+
+      const [rowFwd] = await testDb.db.select().from(news).where(eq(news.id, fwd.id));
+      expect(rowFwd.isFiltered).toBe(0);
+    });
   });
 
   describe('reprocessChannelFilters', () => {
@@ -112,6 +140,32 @@ describe('filterEngine (integration)', () => {
       await reprocessChannelFilters(ch.id);
 
       const [row] = await testDb.db.select().from(news).where(eq(news.id, n.id));
+      expect(row.isFiltered).toBe(0);
+    });
+
+    it('filters/unfilters forwarded news as filterForwards toggles', async () => {
+      const ch = await seedChannel(testDb.db, { filterForwards: 0 });
+      const fwd = await seedNews(testDb.db, ch.id, {
+        text: 'repost',
+        telegramMsgId: 1,
+        forwardFromName: 'Other Channel',
+      });
+
+      // Disabled → not filtered
+      await reprocessChannelFilters(ch.id);
+      let [row] = await testDb.db.select().from(news).where(eq(news.id, fwd.id));
+      expect(row.isFiltered).toBe(0);
+
+      // Enable filterForwards → forwarded news becomes hidden
+      await testDb.db.update(channels).set({ filterForwards: 1 }).where(eq(channels.id, ch.id));
+      await reprocessChannelFilters(ch.id);
+      [row] = await testDb.db.select().from(news).where(eq(news.id, fwd.id));
+      expect(row.isFiltered).toBe(1);
+
+      // Disable again → forwarded news is shown again
+      await testDb.db.update(channels).set({ filterForwards: 0 }).where(eq(channels.id, ch.id));
+      await reprocessChannelFilters(ch.id);
+      [row] = await testDb.db.select().from(news).where(eq(news.id, fwd.id));
       expect(row.isFiltered).toBe(0);
     });
   });

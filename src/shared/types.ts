@@ -39,6 +39,7 @@ export interface Channel {
   channelType: ChannelType;
   groupId?: number | null;
   sortOrder: number;
+  filterForwards: number;
   lastFetchedAt?: number;
   lastReadAt?: number;
   isUnavailable: number;

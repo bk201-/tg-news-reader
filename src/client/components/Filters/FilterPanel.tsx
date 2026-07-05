@@ -4,15 +4,31 @@ import { Button, Divider, Form, Input, Modal, Select, Space, Switch, Table, Tag,
 import { createStyles } from 'antd-style';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useChannels, useUpdateChannel } from '../../api/channels';
 import { useCreateFilter, useDeleteFilter, useFilters, useFilterStats, useUpdateFilter } from '../../api/filters';
 import { useUIStore } from '../../store/uiStore';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
 
 const { Text } = Typography;
 
-const useStyles = createStyles(({ css }) => ({
+const useStyles = createStyles(({ css, token }) => ({
   description: css`
     margin-bottom: 16px;
+  `,
+  forwardRow: css`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: ${token.borderRadius}px;
+    background: ${token.colorFillAlter};
+  `,
+  forwardText: css`
+    display: flex;
+    flex-direction: column;
+    flex: 1;
   `,
   form: css`
     margin-bottom: 16px;
@@ -59,6 +75,9 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
   const { filterPanelOpen, setFilterPanelOpen } = useUIStore();
   const { data: filters = [] } = useFilters(channelId);
   const { data: stats = [] } = useFilterStats(channelId);
+  const { data: channels = [] } = useChannels();
+  const channel = useMemo(() => channels.find((c) => c.id === channelId), [channels, channelId]);
+  const updateChannel = useUpdateChannel();
   const statsMap = useMemo(() => new Map(stats.map((s) => [s.filterId, s])), [stats]);
   const createFilter = useCreateFilter(channelId);
   const updateFilter = useUpdateFilter(channelId);
@@ -66,6 +85,13 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
   const [form] = Form.useForm();
   const { t } = useTranslation();
   const { styles } = useStyles();
+
+  const handleToggleForwards = useCallback(
+    (checked: boolean) => {
+      updateChannel.mutate({ id: channelId, filterForwards: checked ? 1 : 0 });
+    },
+    [updateChannel, channelId],
+  );
 
   const handleAdd = useCallback(async () => {
     const values = (await form.validateFields()) as { name: string; type: 'tag' | 'keyword'; value: string };
@@ -177,6 +203,20 @@ export function FilterPanel({ channelId }: FilterPanelProps) {
     <Modal open={filterPanelOpen} title={t('filters.title')} onCancel={handleCloseModal} footer={null} width={680}>
       <div className={styles.description}>
         <Text type="secondary">{t('filters.description')}</Text>
+      </div>
+
+      <div className={styles.forwardRow}>
+        <Switch
+          checked={channel?.filterForwards === 1}
+          onChange={handleToggleForwards}
+          loading={updateChannel.isPending}
+        />
+        <div className={styles.forwardText}>
+          <Text strong>{t('filters.filter_forwards_label')}</Text>
+          <Text type="secondary" className={styles.metaText}>
+            {t('filters.filter_forwards_desc')}
+          </Text>
+        </div>
       </div>
 
       <Form form={form} layout="inline" className={styles.form}>

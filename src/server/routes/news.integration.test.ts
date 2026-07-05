@@ -8,6 +8,7 @@ vi.mock('../config.js', () => ({
   REFRESH_EXPIRES_DAYS: 7,
   NEWS_DEFAULT_FETCH_DAYS: 3,
   NEWS_FETCH_LIMIT: 1000,
+  TG_CONNECT_DELAY_MS: 0,
 }));
 
 vi.mock('../logger.js', () => ({

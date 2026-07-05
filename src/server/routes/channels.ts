@@ -8,6 +8,7 @@ import { db } from '../db/index.js';
 import { channels, news } from '../db/schema.js';
 import { logger } from '../logger.js';
 import { fetchChannelNews } from '../services/channelFetchService.js';
+import { reprocessChannelFilters } from '../services/filterEngine.js';
 import { mediaProgressEmitter } from '../services/mediaProgress.js';
 import type { MediaProgressEvent } from '../services/mediaProgress.js';
 import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
@@ -51,6 +52,7 @@ router.get('/', async (c) => {
       channelType: r.channelType,
       groupId: r.groupId,
       sortOrder: r.sortOrder,
+      filterForwards: r.filterForwards,
       lastFetchedAt: r.lastFetchedAt,
       lastReadAt: r.lastReadAt,
       isUnavailable: r.isUnavailable,
@@ -114,12 +116,20 @@ router.put('/:id', zValidator('json', updateChannelSchema), async (c) => {
       ...(body.description !== undefined && { description: body.description }),
       ...(body.channelType !== undefined && { channelType: body.channelType }),
       ...(body.groupId !== undefined && { groupId: body.groupId }),
+      ...(body.filterForwards !== undefined && { filterForwards: body.filterForwards }),
       ...(body.lastFetchedAt !== undefined && { lastFetchedAt: body.lastFetchedAt }),
     })
     .where(eq(channels.id, id))
     .returning();
 
   if (!updated) return c.json({ error: 'Channel not found' }, 404);
+
+  // Toggling the "filter forwards" option changes which existing news are hidden —
+  // recompute is_filtered across the whole channel.
+  if (body.filterForwards !== undefined) {
+    await reprocessChannelFilters(id);
+  }
+
   return c.json(updated);
 });
 

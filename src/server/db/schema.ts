@@ -23,6 +23,7 @@ export const channels = sqliteTable('channels', {
     .default('news'),
   groupId: integer('group_id').references(() => groups.id, { onDelete: 'set null' }),
   sortOrder: integer('sort_order').notNull().default(0),
+  filterForwards: integer('filter_forwards').notNull().default(0),
   lastFetchedAt: integer('last_fetched_at'),
   lastReadAt: integer('last_read_at'),
   unreadCount: integer('unread_count').notNull().default(0),

@@ -3,10 +3,26 @@ import { describe, expect, it, vi } from 'vitest';
 // Mock downloadManager before importing strategies
 vi.mock('./downloadManager.js', () => ({ enqueueTask: vi.fn() }));
 
+// postProcess now queries the DB for hidden (filtered) news — mock it.
+const dbMock = vi.hoisted(() => ({ hiddenRows: [] as { id: number }[] }));
+vi.mock('../db/index.js', () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => Promise.resolve(dbMock.hiddenRows),
+      }),
+    }),
+  },
+}));
+
+// isVideoMessage needs the live Telegram Api — stub it for unit tests.
+vi.mock('./telegramParser.js', () => ({ isVideoMessage: vi.fn(() => false) }));
+
 import type { ChannelType } from '../../shared/types.js';
 import { getChannelStrategy } from './channelStrategies.js';
 import { enqueueTask } from './downloadManager.js';
 import type { TelegramMessage } from './telegramParser.js';
+import { isVideoMessage } from './telegramParser.js';
 
 function makeTgMsg(partial: Partial<TelegramMessage> = {}): TelegramMessage {
   return {
@@ -120,6 +136,7 @@ describe('MediaStrategy — postProcess', () => {
 
   it('enqueues tasks for photo and document messages', async () => {
     vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
     const messages: TelegramMessage[] = [
       makeTgMsg({ id: 10, rawMedia: {} as never, mediaType: 'photo' }),
       makeTgMsg({ id: 20, rawMedia: {} as never, mediaType: 'document' }),
@@ -147,6 +164,7 @@ describe('MediaStrategy — postProcess', () => {
 
   it('skips messages not in insertedMap', async () => {
     vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
     const messages: TelegramMessage[] = [makeTgMsg({ id: 10, rawMedia: {} as never, mediaType: 'photo' })];
     const insertedMap = new Map<number, number>(); // empty — nothing inserted
 
@@ -159,6 +177,32 @@ describe('MediaStrategy — postProcess', () => {
 
     expect(enqueueTask).not.toHaveBeenCalled();
   });
+
+  it('does not auto-download video from hidden (filtered) news, but keeps images', async () => {
+    vi.mocked(enqueueTask).mockClear();
+    // news 100 (photo) and 200 (video) are hidden; 300 (video) is visible
+    dbMock.hiddenRows = [{ id: 100 }, { id: 200 }];
+    vi.mocked(isVideoMessage).mockImplementation((m: TelegramMessage) => m.mediaType === 'document');
+
+    const messages: TelegramMessage[] = [
+      makeTgMsg({ id: 10, rawMedia: {} as never, mediaType: 'photo' }), // hidden photo → download
+      makeTgMsg({ id: 20, rawMedia: {} as never, mediaType: 'document' }), // hidden video → skip
+      makeTgMsg({ id: 30, rawMedia: {} as never, mediaType: 'document' }), // visible video → download
+    ];
+    const insertedMap = new Map([
+      [10, 100],
+      [20, 200],
+      [30, 300],
+    ]);
+
+    await strategy.postProcess({ channelId: 1, channelTelegramId: 'test', messages, insertedMap });
+
+    expect(enqueueTask).toHaveBeenCalledTimes(2);
+    expect(enqueueTask).toHaveBeenCalledWith(100, 'media', undefined, 0);
+    expect(enqueueTask).toHaveBeenCalledWith(300, 'media', undefined, 0);
+    expect(enqueueTask).not.toHaveBeenCalledWith(200, 'media', undefined, 0);
+    vi.mocked(isVideoMessage).mockReturnValue(false);
+  });
 });
 
 describe('BlogStrategy — postProcess & requiresMediaProcessing', () => {
@@ -166,6 +210,7 @@ describe('BlogStrategy — postProcess & requiresMediaProcessing', () => {
 
   it('enqueues tasks for photo/document messages (inherits MediaDownloadStrategy)', async () => {
     vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
     const messages: TelegramMessage[] = [makeTgMsg({ id: 1, rawMedia: {} as never, mediaType: 'photo' })];
     const insertedMap = new Map([[1, 10]]);
 
