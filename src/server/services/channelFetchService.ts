@@ -252,7 +252,12 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
   // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)
   const insertedItems = messages
     .filter((msg) => insertedMap.has(msg.id))
-    .map((msg) => ({ newsId: insertedMap.get(msg.id)!, text: msg.message, hashtags: msg.hashtags }));
+    .map((msg) => ({
+      newsId: insertedMap.get(msg.id)!,
+      text: msg.message,
+      hashtags: msg.hashtags,
+      forwardFromName: msg.forwardFromName ?? null,
+    }));
   await applyFiltersToInserted(channelId, insertedItems);
 
   const mediaProcessing = strategy.requiresMediaProcessing(messages);

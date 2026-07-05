@@ -1,5 +1,6 @@
 import type { Filter, FilterStat } from '@shared/types';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../__tests__/renderWithProviders';
 import { useUIStore } from '../../store/uiStore';
@@ -18,6 +19,12 @@ vi.mock('../../api/filters', () => ({
   useCreateFilter: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
   useUpdateFilter: () => ({ mutate: mockUpdateMutate }),
   useDeleteFilter: () => ({ mutateAsync: mockDeleteMutateAsync }),
+}));
+
+const mockUpdateChannelMutate = vi.fn();
+vi.mock('../../api/channels', () => ({
+  useChannels: () => ({ data: [{ id: 1, name: 'Ch', filterForwards: 0 }] }),
+  useUpdateChannel: () => ({ mutate: mockUpdateChannelMutate, isPending: false }),
 }));
 
 // MaybeTooltip is a wrapper — simplify for tests
@@ -60,6 +67,15 @@ describe('FilterPanel', () => {
     expect(screen.getByPlaceholderText('filters.name_placeholder')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('filters.value_placeholder')).toBeInTheDocument();
     expect(screen.getByText('filters.add')).toBeInTheDocument();
+  });
+
+  it('renders the "filter forwards" toggle and updates the channel on change', async () => {
+    renderWithProviders(<FilterPanel channelId={1} />);
+    expect(screen.getByText('filters.filter_forwards_label')).toBeInTheDocument();
+
+    const switches = screen.getAllByRole('switch');
+    await userEvent.click(switches[0]);
+    expect(mockUpdateChannelMutate).toHaveBeenCalledWith({ id: 1, filterForwards: 1 });
   });
 
   it('does not render when filterPanelOpen is false', () => {

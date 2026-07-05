@@ -41,6 +41,7 @@ export async function createTestDb(): Promise<TestDb> {
       channel_type TEXT NOT NULL DEFAULT 'news',
       group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      filter_forwards INTEGER NOT NULL DEFAULT 0,
       last_fetched_at INTEGER,
       last_read_at INTEGER,
       unread_count INTEGER NOT NULL DEFAULT 0,

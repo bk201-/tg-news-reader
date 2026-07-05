@@ -12,16 +12,18 @@ import { z } from 'zod';
 export const createChannelSchema = z.object({
   telegramId: z.string().min(1, 'telegramId is required'),
   name: z.string().min(1, 'name is required'),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   channelType: z.enum(['news', 'news_link', 'media', 'blog']).optional(),
   groupId: z.number().nullable().optional(),
+  filterForwards: z.number().int().min(0).max(1).optional(),
 });
 
 export const updateChannelSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   channelType: z.enum(['news', 'news_link', 'media', 'blog']).optional(),
   groupId: z.number().nullable().optional(),
+  filterForwards: z.number().int().min(0).max(1).optional(),
   lastFetchedAt: z.number().optional(),
 });
 

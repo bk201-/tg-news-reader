@@ -99,6 +99,7 @@ export async function runMigration(): Promise<void> {
     'ALTER TABLE channels ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE channels ADD COLUMN total_news_count INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE news ADD COLUMN forward_from_name TEXT',
+    'ALTER TABLE channels ADD COLUMN filter_forwards INTEGER NOT NULL DEFAULT 0',
   ];
   for (const sql of alterMigrations) {
     try {

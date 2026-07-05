@@ -177,6 +177,54 @@ describe('Channels routes (integration)', () => {
       expect(body.channelType).toBe('media');
     });
 
+    it('accepts description: null (channel without a description)', async () => {
+      // Regression: editing a channel that has no description used to send
+      // `description: null`, which the schema rejected → 400 → save silently failed.
+      const ch = await seedChannel(testDb.db, { name: 'NoDesc' });
+      const group = await seedGroup(testDb.db, { name: 'G' });
+
+      const res = await app.request(`/api/channels/${ch.id}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        // mirrors exactly what the client sends when only the group changes
+        body: JSON.stringify({
+          telegramId: ch.telegramId,
+          name: 'NoDesc',
+          description: null,
+          channelType: 'news',
+          groupId: group.id,
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.groupId).toBe(group.id);
+    });
+
+    it('persists filterForwards and hides existing forwarded news', async () => {
+      const ch = await seedChannel(testDb.db, { name: 'Fwd', filterForwards: 0 });
+      await testDb.db.insert(news).values({
+        channelId: ch.id,
+        telegramMsgId: 1,
+        text: 'repost',
+        postedAt: Math.floor(Date.now() / 1000),
+        forwardFromName: 'Other',
+      });
+
+      const res = await app.request(`/api/channels/${ch.id}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filterForwards: 1 }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.filterForwards).toBe(1);
+
+      const rows = await testDb.client.execute('SELECT is_filtered FROM news WHERE channel_id = ?', [ch.id]);
+      expect(rows.rows[0].is_filtered).toBe(1);
+    });
+
     it('returns 404 for missing channel', async () => {
       const res = await app.request('/api/channels/99999', {
         method: 'PUT',

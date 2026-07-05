@@ -181,6 +181,8 @@
   "filters": {
     "title": "Manage filters",
     "description": "News matching active filters will be <strong>hidden</strong>. Tags (#) are checked first, then keywords.",
+    "filter_forwards_label": "Filter forwards",
+    "filter_forwards_desc": "Hide reposts forwarded from other channels. Hidden videos are not auto-downloaded.",
     "type_tag": "Tag #",
     "type_keyword": "Keyword",
     "name_placeholder": "Filter name",

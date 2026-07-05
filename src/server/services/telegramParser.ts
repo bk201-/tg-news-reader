@@ -33,6 +33,15 @@ export interface TelegramMessage {
   forwardFromPeer?: Api.TypePeer;
 }
 
+/** True when the message's media is a video document (mime `video/*`). */
+export function isVideoMessage(msg: TelegramMessage): boolean {
+  const _Api = getApi();
+  if (!(msg.rawMedia instanceof _Api.MessageMediaDocument)) return false;
+  const doc = msg.rawMedia.document;
+  if (!(doc instanceof _Api.Document)) return false;
+  return (doc.mimeType ?? '').startsWith('video/');
+}
+
 export function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
   const _Api = getApi();
   const links: string[] = [];
