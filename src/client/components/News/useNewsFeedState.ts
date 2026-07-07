@@ -42,15 +42,31 @@ export function useNewsFeedState(channel: Channel) {
   );
 
   // After auto-advance switches to this channel, select its first news item once
-  // the list has loaded. If the channel has no items, clear the flag and stop
-  // (matching the pre-existing "just switch" behaviour).
+  // the list has loaded. If the channel genuinely has no items, clear the flag
+  // and stop (matching the pre-existing "just switch" behaviour).
+  //
+  // Important: `displayItems` can be transiently empty right after the switch —
+  // the news query, the filters query and the initial channel auto-fetch all
+  // settle independently. So we only "give up" once the list is done loading AND
+  // the initial fetch is no longer pending; until then we keep waiting for items.
   useEffect(() => {
-    if (!pendingAutoSelectFirst || data.isLoading) return;
+    if (!pendingAutoSelectFirst) return;
     if (data.displayItems.length > 0) {
       setSelectedNewsId(data.displayItems[0].id);
+      consumeAutoSelectFirst();
+      return;
     }
-    consumeAutoSelectFirst();
-  }, [pendingAutoSelectFirst, data.isLoading, data.displayItems, setSelectedNewsId, consumeAutoSelectFirst]);
+    if (!data.isLoading && !actions.fetchChannel.isPending) {
+      consumeAutoSelectFirst();
+    }
+  }, [
+    pendingAutoSelectFirst,
+    data.isLoading,
+    data.displayItems,
+    actions.fetchChannel.isPending,
+    setSelectedNewsId,
+    consumeAutoSelectFirst,
+  ]);
 
   // Tag click needs setHashTagFilter from data + createFilter from actions
   const { setHashTagFilter } = data;

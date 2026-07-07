@@ -184,13 +184,13 @@ describe('NewsListItem', () => {
   it('shows a photo icon immediately for photo mediaType on a media channel (no file yet)', () => {
     mockChannelType = 'media';
     const { container } = renderItem({ mediaType: 'photo' });
-    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="picture"]')).toBeInTheDocument();
   });
 
   it('shows a photo icon immediately for photo mediaType on a blog channel (no file yet)', () => {
     mockChannelType = 'blog';
     const { container } = renderItem({ mediaType: 'photo' });
-    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="picture"]')).toBeInTheDocument();
   });
 
   it('suppresses the photo icon on a news channel until the file is downloaded', () => {
@@ -203,7 +203,7 @@ describe('NewsListItem', () => {
   it('shows the photo icon on a news channel once the file is downloaded', () => {
     mockChannelType = 'news';
     const { container } = renderItem({ mediaType: 'photo', localMediaPath: 'photo.jpg' });
-    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="picture"]')).toBeInTheDocument();
   });
 
   it('shows the video/audio icon on a news channel immediately even without a file', () => {

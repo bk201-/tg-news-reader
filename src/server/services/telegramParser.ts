@@ -42,6 +42,20 @@ export function isVideoMessage(msg: TelegramMessage): boolean {
   return (doc.mimeType ?? '').startsWith('video/');
 }
 
+/** Reads the original file name from a document's attributes, if present. */
+function getDocumentFileName(attrs: Api.TypeDocumentAttribute[]): string | undefined {
+  const _Api = getApi();
+  for (const a of attrs) {
+    if (a instanceof _Api.DocumentAttributeFilename) return a.fileName;
+  }
+  return undefined;
+}
+
+/** True when the file name ends in a common video container extension. */
+function hasVideoExtension(fileName?: string): boolean {
+  return /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(fileName ?? '');
+}
+
 export function extractLinks(text: string, entities?: Api.TypeMessageEntity[]): string[] {
   const _Api = getApi();
   const links: string[] = [];
@@ -346,8 +360,16 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
       if (doc instanceof _Api.Document) {
         mediaSizeBytes = Number(doc.size);
         const mime = doc.mimeType ?? '';
-        if (mime.startsWith('audio/') || mime === 'application/ogg') mediaType = 'audio';
-        else if (mime.startsWith('video/')) mediaType = 'video';
+        const attrs = doc.attributes ?? [];
+        const hasVideoAttr = attrs.some((a) => a instanceof _Api.DocumentAttributeVideo);
+        const hasAudioAttr = attrs.some((a) => a instanceof _Api.DocumentAttributeAudio);
+        // Prefer Telegram's explicit media attributes over the raw mime type:
+        // some videos ship with a generic mime (e.g. application/octet-stream)
+        // but always carry a DocumentAttributeVideo. Fall back to mime, then to
+        // the filename extension for the rare case neither is set.
+        if (mime.startsWith('audio/') || mime === 'application/ogg' || hasAudioAttr) mediaType = 'audio';
+        else if (mime.startsWith('video/') || hasVideoAttr) mediaType = 'video';
+        else if (hasVideoExtension(getDocumentFileName(attrs))) mediaType = 'video';
         else mediaType = 'document';
       } else {
         mediaType = 'document';
