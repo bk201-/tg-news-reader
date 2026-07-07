@@ -178,6 +178,22 @@ describe('MediaStrategy — postProcess', () => {
     expect(enqueueTask).not.toHaveBeenCalled();
   });
 
+  it('enqueues tasks for video messages (mediaType="video")', async () => {
+    vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
+    const messages: TelegramMessage[] = [makeTgMsg({ id: 50, rawMedia: {} as never, mediaType: 'video' })];
+    const insertedMap = new Map([[50, 500]]);
+
+    await strategy.postProcess({ channelId: 1, channelTelegramId: 'test', messages, insertedMap });
+
+    expect(enqueueTask).toHaveBeenCalledTimes(1);
+    expect(enqueueTask).toHaveBeenCalledWith(500, 'media', undefined, 0);
+  });
+
+  it('requiresMediaProcessing returns true for a video message', () => {
+    expect(strategy.requiresMediaProcessing([makeTgMsg({ rawMedia: {} as never, mediaType: 'video' })])).toBe(true);
+  });
+
   it('does not auto-download video from hidden (filtered) news, but keeps images', async () => {
     vi.mocked(enqueueTask).mockClear();
     // news 100 (photo) and 200 (video) are hidden; 300 (video) is visible

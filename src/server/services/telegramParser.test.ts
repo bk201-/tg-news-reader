@@ -396,8 +396,15 @@ describe('parseMessageFields', () => {
     expect(result!.mediaSizeBytes).toBe(1024);
   });
 
-  it('parses document media with non-audio mime as document', () => {
+  it('parses document media with video mime as video', () => {
     const doc = new MockDocument({ size: BigInt(2048), mimeType: 'video/mp4' });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('video');
+  });
+
+  it('parses document media with non-audio non-video mime as document', () => {
+    const doc = new MockDocument({ size: BigInt(2048), mimeType: 'application/pdf' });
     const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
     const result = parseMessageFields(makeMsg({ media }), 'ch');
     expect(result!.mediaType).toBe('document');
