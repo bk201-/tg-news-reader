@@ -1,4 +1,4 @@
-import { FileImageOutlined, FileOutlined, PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
+import { FileOutlined, PictureOutlined, PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import type { NewsItem } from '@shared/types.ts';
 import { Checkbox, Typography } from 'antd';
 import { createStyles } from 'antd-style';
@@ -302,7 +302,7 @@ export const NewsListItem = memo(
                     {thumbKind === 'document' ? (
                       <FileOutlined className={styles.fileIcon} />
                     ) : (
-                      <FileImageOutlined className={styles.photoIcon} />
+                      <PictureOutlined className={styles.photoIcon} />
                     )}
                   </div>
                   {isAlbum && <span className={styles.albumBadge}>{item.localMediaPaths!.length}</span>}

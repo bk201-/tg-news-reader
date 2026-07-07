@@ -48,9 +48,19 @@ class MockPhotoSize {
 class MockDocument {
   size: bigint;
   mimeType: string;
-  constructor(o: { size: bigint; mimeType: string }) {
+  attributes: unknown[];
+  constructor(o: { size: bigint; mimeType: string; attributes?: unknown[] }) {
     this.size = o.size;
     this.mimeType = o.mimeType;
+    this.attributes = o.attributes ?? [];
+  }
+}
+class MockDocumentAttributeVideo {}
+class MockDocumentAttributeAudio {}
+class MockDocumentAttributeFilename {
+  fileName: string;
+  constructor(o: { fileName: string }) {
+    this.fileName = o.fileName;
   }
 }
 class MockWebPage {
@@ -239,6 +249,9 @@ const mockApi = {
   Photo: MockPhoto,
   PhotoSize: MockPhotoSize,
   Document: MockDocument,
+  DocumentAttributeVideo: MockDocumentAttributeVideo,
+  DocumentAttributeAudio: MockDocumentAttributeAudio,
+  DocumentAttributeFilename: MockDocumentAttributeFilename,
   WebPage: MockWebPage,
   Page: MockPage,
   TextPlain: MockTextPlain,
@@ -408,6 +421,39 @@ describe('parseMessageFields', () => {
     const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
     const result = parseMessageFields(makeMsg({ media }), 'ch');
     expect(result!.mediaType).toBe('document');
+  });
+
+  it('detects video via DocumentAttributeVideo even with a generic mime', () => {
+    const doc = new MockDocument({
+      size: BigInt(2048),
+      mimeType: 'application/octet-stream',
+      attributes: [new MockDocumentAttributeVideo()],
+    });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('video');
+  });
+
+  it('detects audio via DocumentAttributeAudio even with a generic mime', () => {
+    const doc = new MockDocument({
+      size: BigInt(2048),
+      mimeType: 'application/octet-stream',
+      attributes: [new MockDocumentAttributeAudio()],
+    });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('audio');
+  });
+
+  it('detects video via file extension when mime and attributes are ambiguous', () => {
+    const doc = new MockDocument({
+      size: BigInt(2048),
+      mimeType: 'application/octet-stream',
+      attributes: [new MockDocumentAttributeFilename({ fileName: 'clip.mkv' })],
+    });
+    const media = Object.assign(new MockMessageMediaDocument(), { document: doc });
+    const result = parseMessageFields(makeMsg({ media }), 'ch');
+    expect(result!.mediaType).toBe('video');
   });
 
   it('parses webpage media', () => {
