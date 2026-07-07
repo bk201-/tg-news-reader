@@ -13,6 +13,15 @@ permissions:
   contents: read
   actions: write # needed to delete old artifacts
 
+# Serialize deploys: never let two Build Main runs overlap. Rapid PR merges
+# would otherwise trigger back-to-back deploys whose revisions run at the same
+# time — two containers sharing one Telegram auth key → AUTH_KEY_DUPLICATED.
+# `cancel-in-progress: false` queues runs so each deploy fully finishes (incl.
+# the old-revision drain below) before the next one starts.
+concurrency:
+  group: build-main-deploy
+  cancel-in-progress: false
+
 jobs:
   # ── 1. Quality gate (same as PR) ─────────────────────────────────────────
   checks:
@@ -98,6 +107,40 @@ jobs:
             --name ${{ secrets.AZURE_CONTAINER_APP }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --mode Single
+
+      # ── Wait for the OLD revision(s) to fully stop ─────────────────────────
+      # Single-revision mode deactivates the previous revision, but the swap is
+      # a rolling one: the old container keeps running (and holding the Telegram
+      # auth key) for a while. The app releases the key on SIGTERM, but if the
+      # old container lingers past the new container's TG_CONNECT_DELAY_SEC, both
+      # connect at once → AUTH_KEY_DUPLICATED. So we block here until every
+      # revision except the new one reports 0 replicas and inactive, guaranteeing
+      # the old container has exited before we consider the deploy done.
+      - name: Wait for old revisions to drain (avoid Telegram session overlap)
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          NEW_SUFFIX="r${SHORT_SHA}"
+          echo "New revision suffix: --${NEW_SUFFIX}"
+          echo "Waiting for all other revisions to reach 0 replicas (max 3 min)..."
+          for i in $(seq 1 18); do
+            ALL=$(az containerapp revision list \
+              --name ${{ secrets.AZURE_CONTAINER_APP }} \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --query "[].{name:name, replicas:properties.replicas, active:properties.active}" \
+              -o json)
+            RUNNING=$(echo "$ALL" | jq --arg new "$NEW_SUFFIX" \
+              '[.[] | select((.name | endswith("--" + $new)) | not) | select((.replicas // 0) > 0 or .active == true)] | length')
+            if [ "$RUNNING" = "0" ]; then
+              echo "✅ No old revisions running — old container stopped, Telegram session released"
+              exit 0
+            fi
+            echo "  attempt $i/18: $RUNNING old revision(s) still active/running — waiting 10s..."
+            echo "$ALL" | jq -c --arg new "$NEW_SUFFIX" \
+              '.[] | select((.name | endswith("--" + $new)) | not) | select((.replicas // 0) > 0 or .active == true)'
+            sleep 10
+          done
+          echo "❌ Old revisions did not drain within 3 minutes"
+          exit 1
 
       # ── Post-deploy smoke test ─────────────────────────────────────────────
       # Polls /api/health every 10s for up to 3 minutes.
