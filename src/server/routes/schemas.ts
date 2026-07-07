@@ -15,6 +15,7 @@ export {
   fetchChannelSchema,
   readAllNewsSchema,
   markReadSchema,
+  readBatchNewsSchema,
   createGroupSchema,
   updateGroupSchema,
   verifyPinSchema,

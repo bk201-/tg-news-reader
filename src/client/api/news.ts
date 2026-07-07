@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import type { InfiniteData } from '@tanstack/react-query';
 import type { NewsFilterMode } from '../store/uiStore';
 import { api } from './client';
+import { markReadBatcher } from './markReadBatcher';
 
 export const newsKeys = {
   byChannel: (channelId: number, mode: NewsFilterMode = 'all') => ['news', channelId, mode] as const,
@@ -54,8 +55,13 @@ export function useNews(channelId: number, mode: NewsFilterMode = 'all') {
 export function useMarkRead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, isRead = 1 }: { id: number; isRead?: number; channelId: number }) =>
-      api.patch(`/news/${id}/read`, { isRead }),
+    // Optimistic UI happens in onSuccess (below); the network write is coalesced
+    // by the debounced batcher and resolves immediately so keyboard-driven
+    // toggles stay instant and don't hammer the mutating-request rate limit.
+    mutationFn: ({ id, isRead = 1 }: { id: number; isRead?: number; channelId: number }) => {
+      markReadBatcher.enqueue(id, isRead === 0 ? 0 : 1);
+      return Promise.resolve({ success: true } as const);
+    },
     onSuccess: (_data, { id, isRead = 1, channelId }) => {
       // Update the item in-place — no refetch needed
       qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>

@@ -9,7 +9,7 @@ import { logger } from '../logger.js';
 import { getChannelStrategy } from '../services/channelStrategies.js';
 import { fetchMessageById, readChannelHistory } from '../services/telegram.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
-import { markReadSchema, parseOptionalBody, readAllNewsSchema } from './schemas.js';
+import { markReadSchema, parseOptionalBody, readAllNewsSchema, readBatchNewsSchema } from './schemas.js';
 
 const router = new Hono();
 
@@ -143,6 +143,94 @@ router.post('/read-all', async (c) => {
   }
 
   return c.json({ success: true, affectedIds: flippedIds });
+});
+
+// POST /api/news/read-batch
+//
+// Batched mark-read/unread — the client accumulates individual per-item toggles
+// and flushes them here as one deferred request (see client markReadBatcher).
+//
+// Body (both optional, either or both may be present):
+//   - readIds:   IDs to flip unread→read   (synced to Telegram, updates lastReadAt)
+//   - unreadIds: IDs to flip read→unread   (local-only; Telegram has no "mark unread")
+//
+// Response: { success: true, readAffected: number[], unreadAffected: number[] }
+//   *Affected arrays contain only rows that were actually flipped (already in the
+//   target state are excluded).
+router.post('/read-batch', async (c) => {
+  const body = await parseOptionalBody(c, readBatchNewsSchema, {});
+  const readIds = body.readIds ?? [];
+  const unreadIds = body.unreadIds ?? [];
+
+  const affectedChannelIds = new Set<number>();
+
+  // ── read → unread (local only) ──────────────────────────────────────────────
+  let unreadAffected: number[] = [];
+  if (unreadIds.length > 0) {
+    const toFlip = await db
+      .select({ id: news.id, channelId: news.channelId })
+      .from(news)
+      .where(and(inArray(news.id, unreadIds), eq(news.isRead, 1)));
+    unreadAffected = toFlip.map((r) => r.id);
+    if (unreadAffected.length > 0) {
+      await db.update(news).set({ isRead: 0 }).where(inArray(news.id, unreadAffected));
+      for (const r of toFlip) affectedChannelIds.add(r.channelId);
+    }
+  }
+
+  // ── unread → read (+ Telegram sync per channel) ─────────────────────────────
+  let readAffected: number[] = [];
+  const readChannelIds = new Set<number>();
+  if (readIds.length > 0) {
+    const toFlip = await db
+      .select({ id: news.id, channelId: news.channelId })
+      .from(news)
+      .where(and(inArray(news.id, readIds), eq(news.isRead, 0)));
+    readAffected = toFlip.map((r) => r.id);
+    if (readAffected.length > 0) {
+      await db.update(news).set({ isRead: 1 }).where(inArray(news.id, readAffected));
+      for (const r of toFlip) {
+        affectedChannelIds.add(r.channelId);
+        readChannelIds.add(r.channelId);
+      }
+    }
+  }
+
+  // ── Recount denormalized unread_count for every touched channel ─────────────
+  for (const chId of affectedChannelIds) {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(news)
+      .where(and(eq(news.channelId, chId), eq(news.isRead, 0)));
+    await db
+      .update(channels)
+      .set({ unreadCount: result?.count ?? 0 })
+      .where(eq(channels.id, chId));
+  }
+
+  // ── Sync read state to Telegram for channels that gained read items ─────────
+  for (const chId of readChannelIds) {
+    try {
+      const [channel] = await db.select().from(channels).where(eq(channels.id, chId));
+      if (!channel) continue;
+      // Only consider the items we just flipped in this channel for the read boundary.
+      const [result] = await db
+        .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
+        .from(news)
+        .where(and(eq(news.channelId, chId), inArray(news.id, readAffected)));
+      if (result?.maxMsgId) {
+        await readChannelHistory(channel.telegramId, result.maxMsgId);
+      }
+      if (result?.maxPostedAt && (!channel.lastReadAt || result.maxPostedAt > channel.lastReadAt)) {
+        await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, chId));
+      }
+    } catch (err) {
+      // Non-critical: local state already updated, Telegram sync failed
+      logger.warn({ module: 'news', channelId: chId, err }, 'failed to sync batch read state to Telegram');
+    }
+  }
+
+  return c.json({ success: true, readAffected, unreadAffected });
 });
 
 // DELETE /api/news/read - delete all read news (excluding items with active downloads)

@@ -52,6 +52,17 @@ export const markReadSchema = z.object({
   isRead: z.number().optional(),
 });
 
+/**
+ * Batch mark-read payload sent by the client-side debounced batcher.
+ * `readIds`   → flip to read (unread→read), synced to Telegram.
+ * `unreadIds` → flip to unread (read→unread), local-only.
+ * Both are optional; either or both may be present in one request.
+ */
+export const readBatchNewsSchema = z.object({
+  readIds: z.array(z.number()).optional(),
+  unreadIds: z.array(z.number()).optional(),
+});
+
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
 export const createGroupSchema = z.object({

@@ -1,11 +1,10 @@
-import { PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
+import { FileImageOutlined, PlayCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import type { NewsItem } from '@shared/types.ts';
 import { Checkbox, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { mediaUrl } from '../../../api/mediaUrl';
 import { useMarkRead } from '../../../api/news';
 import type { NewsFilterMode } from '../../../store/uiStore';
 import { useUIStore } from '../../../store/uiStore';
@@ -99,11 +98,17 @@ const useStyles = createStyles(({ css, token }) => ({
   thumbDimmed: css`
     opacity: 0.4;
   `,
-  thumbImg: css`
+  thumbPhotoPlaceholder: css`
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    display: block;
+    background: ${token.colorFillSecondary};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `,
+  photoIcon: css`
+    font-size: 20px;
+    color: ${token.colorTextTertiary};
   `,
   thumbVideo: css`
     width: 100%;
@@ -260,7 +265,9 @@ export const NewsListItem = memo(
                 </div>
               ) : (
                 <div className={styles.thumbPhoto}>
-                  <img src={mediaUrl(firstMediaPath!)} alt="" className={styles.thumbImg} />
+                  <div className={styles.thumbPhotoPlaceholder}>
+                    <FileImageOutlined className={styles.photoIcon} />
+                  </div>
                   {isAlbum && <span className={styles.albumBadge}>{item.localMediaPaths!.length}</span>}
                 </div>
               )}

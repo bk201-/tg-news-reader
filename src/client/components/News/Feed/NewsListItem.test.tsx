@@ -10,10 +10,6 @@ vi.mock('../../../api/news', () => ({
   useMarkRead: () => ({ mutate: vi.fn() }),
 }));
 
-vi.mock('../../../api/mediaUrl', () => ({
-  mediaUrl: (path: string) => `/api/media/${path}`,
-}));
-
 vi.mock('./NewsHashtags', () => ({
   NewsHashtags: ({ hashtags }: { hashtags: string[] }) => <div data-testid="hashtags">{hashtags.join(', ')}</div>,
 }));
@@ -95,6 +91,14 @@ describe('NewsListItem', () => {
   it('renders album badge when multiple media', () => {
     renderItem({ localMediaPaths: ['a.jpg', 'b.jpg', 'c.jpg'], mediaType: 'photo' });
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('does not load an <img> for photo thumbnails (placeholder only, image loads on open)', () => {
+    const { container } = renderItem({ localMediaPath: 'photo.jpg', mediaType: 'photo' });
+    // No network image request should be issued from the list row.
+    expect(container.querySelector('img')).not.toBeInTheDocument();
+    // A thumbnail placeholder area is still rendered.
+    expect(container.querySelector('[class*="thumb"]')).toBeInTheDocument();
   });
 
   it('renders nothing when filtered out and mode is "filtered"', () => {

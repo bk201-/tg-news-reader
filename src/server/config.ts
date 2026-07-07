@@ -2,6 +2,16 @@ export const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-produc
 export const JWT_ACCESS_EXPIRES_SEC = 15 * 60; // 15 min
 export const REFRESH_EXPIRES_DAYS = 7;
 
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// Applied only in production (see server/index.ts). GET/HEAD requests are cheap
+// and idempotent, so they get a higher ceiling than mutating requests.
+/** Sliding window length in ms. Env: RATE_LIMIT_WINDOW_SEC (default 60) */
+export const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_SEC ?? '60', 10) * 1_000;
+/** Base request budget per window for mutating methods (POST/PUT/PATCH/DELETE/OPTIONS…). Env: RATE_LIMIT_MAX (default 120) */
+export const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX ?? '120', 10);
+/** GET/HEAD budget = RATE_LIMIT_MAX × this. Env: RATE_LIMIT_GET_MULTIPLIER (default 5) */
+export const RATE_LIMIT_GET_MULTIPLIER = parseInt(process.env.RATE_LIMIT_GET_MULTIPLIER ?? '5', 10);
+
 // ─── Download Manager ─────────────────────────────────────────────────────────
 /** Number of concurrent download workers. Env: DOWNLOAD_WORKER_CONCURRENCY */
 export const DOWNLOAD_WORKER_CONCURRENCY = parseInt(process.env.DOWNLOAD_WORKER_CONCURRENCY ?? '10', 10);
