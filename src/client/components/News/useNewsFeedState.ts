@@ -7,7 +7,7 @@
  *   Feed/useNewsFeedScroll.ts  — FAB, sentinel, scroll-to-index, auto-advance on filter
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { Channel } from '../../../shared/types';
 import type { DigestParams } from '../../api/digest';
 import { useUIStore } from '../../store/uiStore';
@@ -28,6 +28,8 @@ export function useNewsFeedState(channel: Channel) {
     newsViewMode,
     setNewsViewMode,
     autoAdvance,
+    pendingAutoSelectFirst,
+    consumeAutoSelectFirst,
   } = useUIStore();
 
   const data = useNewsFeedData(channel);
@@ -38,6 +40,17 @@ export function useNewsFeedState(channel: Channel) {
     data.serverFilteredOut,
     data.setMediaProgressKey,
   );
+
+  // After auto-advance switches to this channel, select its first news item once
+  // the list has loaded. If the channel has no items, clear the flag and stop
+  // (matching the pre-existing "just switch" behaviour).
+  useEffect(() => {
+    if (!pendingAutoSelectFirst || data.isLoading) return;
+    if (data.displayItems.length > 0) {
+      setSelectedNewsId(data.displayItems[0].id);
+    }
+    consumeAutoSelectFirst();
+  }, [pendingAutoSelectFirst, data.isLoading, data.displayItems, setSelectedNewsId, consumeAutoSelectFirst]);
 
   // Tag click needs setHashTagFilter from data + createFilter from actions
   const { setHashTagFilter } = data;

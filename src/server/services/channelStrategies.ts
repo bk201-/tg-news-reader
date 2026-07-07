@@ -6,6 +6,9 @@ import { enqueueTask } from './downloadManager.js';
 import type { TelegramMessage } from './telegram.js';
 import { isVideoMessage } from './telegramParser.js';
 
+/** Media types eligible for auto-download by media strategies (photos + files + video). */
+const DOWNLOADABLE_MEDIA_TYPES = new Set(['photo', 'document', 'video']);
+
 export interface ItemFlags {
   /** When true, post text goes to collapsible top panel instead of inline body */
   textInPanel: boolean;
@@ -65,9 +68,7 @@ abstract class MediaDownloadStrategy implements ChannelStrategy {
   abstract shouldSkipMessage(msg: TelegramMessage): boolean;
 
   async postProcess({ messages, insertedMap }: PostProcessArgs): Promise<void> {
-    const toQueue = messages.filter(
-      (m) => (m.mediaType === 'photo' || m.mediaType === 'document') && insertedMap.has(m.id),
-    );
+    const toQueue = messages.filter((m) => DOWNLOADABLE_MEDIA_TYPES.has(m.mediaType ?? '') && insertedMap.has(m.id));
     if (toQueue.length === 0) return;
 
     // Hidden (filtered) news must not auto-download heavy video — the user can
@@ -88,7 +89,7 @@ abstract class MediaDownloadStrategy implements ChannelStrategy {
   }
 
   requiresMediaProcessing(messages: TelegramMessage[]): boolean {
-    return messages.some((m) => m.mediaType === 'photo' || m.mediaType === 'document');
+    return messages.some((m) => DOWNLOADABLE_MEDIA_TYPES.has(m.mediaType ?? ''));
   }
 }
 

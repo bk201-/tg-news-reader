@@ -10,6 +10,11 @@ vi.mock('../../../api/news', () => ({
   useMarkRead: () => ({ mutate: vi.fn() }),
 }));
 
+let mockChannelType: string | undefined = 'media';
+vi.mock('../../../api/channels', () => ({
+  useChannels: () => ({ data: [{ id: 1, channelType: mockChannelType }] }),
+}));
+
 vi.mock('./NewsHashtags', () => ({
   NewsHashtags: ({ hashtags }: { hashtags: string[] }) => <div data-testid="hashtags">{hashtags.join(', ')}</div>,
 }));
@@ -33,6 +38,7 @@ describe('NewsListItem', () => {
 
   beforeEach(() => {
     onClick = vi.fn();
+    mockChannelType = 'media';
   });
 
   const renderItem = (itemOverrides: Partial<NewsItem> = {}, props = {}) =>
@@ -162,5 +168,59 @@ describe('NewsListItem', () => {
       />,
     );
     expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  // ── Media-type icons shown immediately from mediaType ──────────────────
+  it('shows a play icon immediately for video mediaType before the file downloads', () => {
+    const { container } = renderItem({ mediaType: 'video' });
+    expect(container.querySelector('[aria-label="play-circle"]')).toBeInTheDocument();
+  });
+
+  it('shows a file icon for document mediaType', () => {
+    const { container } = renderItem({ mediaType: 'document' });
+    expect(container.querySelector('[aria-label="file"]')).toBeInTheDocument();
+  });
+
+  it('shows a photo icon immediately for photo mediaType on a media channel (no file yet)', () => {
+    mockChannelType = 'media';
+    const { container } = renderItem({ mediaType: 'photo' });
+    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+  });
+
+  it('shows a photo icon immediately for photo mediaType on a blog channel (no file yet)', () => {
+    mockChannelType = 'blog';
+    const { container } = renderItem({ mediaType: 'photo' });
+    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+  });
+
+  it('suppresses the photo icon on a news channel until the file is downloaded', () => {
+    mockChannelType = 'news';
+    const { container } = renderItem({ mediaType: 'photo' });
+    // No thumbnail rendered while the photo file is still missing.
+    expect(container.querySelector('[class*="thumb"]')).not.toBeInTheDocument();
+  });
+
+  it('shows the photo icon on a news channel once the file is downloaded', () => {
+    mockChannelType = 'news';
+    const { container } = renderItem({ mediaType: 'photo', localMediaPath: 'photo.jpg' });
+    expect(container.querySelector('[aria-label="file-image"]')).toBeInTheDocument();
+  });
+
+  it('shows the video/audio icon on a news channel immediately even without a file', () => {
+    mockChannelType = 'news_link';
+    const { container: v } = renderItem({ mediaType: 'video' });
+    expect(v.querySelector('[aria-label="play-circle"]')).toBeInTheDocument();
+    const { container: a } = renderItem({ mediaType: 'audio' });
+    expect(a.querySelector('[aria-label="sound"]')).toBeInTheDocument();
+  });
+
+  it('renders no thumbnail for webpage mediaType', () => {
+    const { container } = renderItem({ mediaType: 'webpage' });
+    expect(container.querySelector('[class*="thumb"]')).not.toBeInTheDocument();
+  });
+
+  it('detects legacy video documents by file extension', () => {
+    const { container } = renderItem({ mediaType: 'document', localMediaPath: 'clip.mp4' });
+    expect(container.querySelector('[aria-label="play-circle"]')).toBeInTheDocument();
   });
 });

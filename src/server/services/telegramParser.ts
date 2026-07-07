@@ -346,7 +346,9 @@ export function parseMessageFields(msg: Api.Message, channelUsername: string): T
       if (doc instanceof _Api.Document) {
         mediaSizeBytes = Number(doc.size);
         const mime = doc.mimeType ?? '';
-        mediaType = mime.startsWith('audio/') || mime === 'application/ogg' ? 'audio' : 'document';
+        if (mime.startsWith('audio/') || mime === 'application/ogg') mediaType = 'audio';
+        else if (mime.startsWith('video/')) mediaType = 'video';
+        else mediaType = 'document';
       } else {
         mediaType = 'document';
       }
