@@ -24,11 +24,14 @@ vi.mock('../services/telegram.js', () => ({
   getReadInboxMaxId: vi.fn(),
 }));
 
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
 import { seedChannel, seedNews, seedDownload } from '../__tests__/seed.js';
 import { createTestDb } from '../__tests__/testDb.js';
 import type { TestDb } from '../__tests__/testDb.js';
+import { channels, news } from '../db/schema.js';
+import { readChannelHistory } from '../services/telegram.js';
 
 let testDb: TestDb;
 
@@ -288,6 +291,91 @@ describe('News routes (integration)', () => {
       const body = await res.json();
       // Only the previously-read row should appear in affectedIds
       expect(body.affectedIds).toEqual([wasRead.id]);
+    });
+  });
+
+  // ── POST /api/news/read-batch ──────────────────────────────────────────────
+
+  describe('POST /api/news/read-batch', () => {
+    it('flips readIds unread→read and unreadIds read→unread in one request', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 1 });
+      const a = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 101 });
+      const b = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 102 });
+
+      const res = await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readIds: [a.id], unreadIds: [b.id] }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.readAffected).toEqual([a.id]);
+      expect(body.unreadAffected).toEqual([b.id]);
+
+      const readState = await testDb.db.select().from(news).where(eq(news.channelId, ch.id));
+      const byId = new Map(readState.map((r) => [r.id, r.isRead]));
+      expect(byId.get(a.id)).toBe(1);
+      expect(byId.get(b.id)).toBe(0);
+    });
+
+    it('recounts the channel unread_count after a batch', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 3 });
+      const a = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 111 });
+      const bb = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 112 });
+      await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 113 });
+
+      await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readIds: [a.id, bb.id] }),
+      });
+
+      const [row] = await testDb.db.select().from(channels).where(eq(channels.id, ch.id));
+      expect(row.unreadCount).toBe(1);
+    });
+
+    it('excludes rows already in the target state from the affected arrays', async () => {
+      const ch = await seedChannel(testDb.db, { unreadCount: 1 });
+      const unread = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 121 });
+      const alreadyRead = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 122 });
+
+      const res = await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readIds: [unread.id, alreadyRead.id] }),
+      });
+
+      const body = await res.json();
+      expect(body.readAffected).toEqual([unread.id]);
+    });
+
+    it('syncs read state to Telegram for the max flipped msg id', async () => {
+      vi.mocked(readChannelHistory).mockClear();
+      const ch = await seedChannel(testDb.db, { unreadCount: 2, telegramId: 'batch_sync_chan' });
+      const a = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 200 });
+      const b = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 210 });
+
+      await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readIds: [a.id, b.id] }),
+      });
+
+      expect(readChannelHistory).toHaveBeenCalledWith('batch_sync_chan', 210);
+    });
+
+    it('handles an empty body without error', async () => {
+      const res = await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ success: true, readAffected: [], unreadAffected: [] });
     });
   });
 

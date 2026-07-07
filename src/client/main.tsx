@@ -5,6 +5,7 @@ import 'dayjs/locale/ru';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ApiError } from './api/client';
+import { markReadBatcher } from './api/markReadBatcher';
 import { App } from './App';
 import i18n from './i18n';
 import { logger } from './logger';
@@ -103,6 +104,13 @@ const queryClient = new QueryClient({
       },
     },
   },
+});
+
+// On a failed mark-read batch flush, resync the affected news + channel counts
+// from the server so optimistic UI can't drift out of sync permanently.
+markReadBatcher.setReconciler(() => {
+  void queryClient.invalidateQueries({ queryKey: ['news'] });
+  void queryClient.invalidateQueries({ queryKey: ['channels'] });
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

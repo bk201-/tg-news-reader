@@ -12,8 +12,13 @@ vi.mock('./client', () => ({
   },
 }));
 
+vi.mock('./markReadBatcher', () => ({
+  markReadBatcher: { enqueue: vi.fn(), flush: vi.fn(), setReconciler: vi.fn() },
+}));
+
 import type { NewsItem, Channel } from '@shared/types';
 import { api } from './client';
+import { markReadBatcher } from './markReadBatcher';
 import {
   updatePaginatedItems,
   flattenPaginatedItems,
@@ -27,6 +32,7 @@ import {
 import type { NewsResponse } from './news';
 
 const mockedApi = vi.mocked(api);
+const mockedBatcher = vi.mocked(markReadBatcher);
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -133,7 +139,7 @@ describe('useMarkRead', () => {
       await result.current.mutateAsync({ id: 1, isRead: 1, channelId: 1 });
     });
 
-    expect(mockedApi.patch).toHaveBeenCalledWith('/news/1/read', { isRead: 1 });
+    expect(mockedBatcher.enqueue).toHaveBeenCalledWith(1, 1);
 
     // News item should be updated in cache
     const cached = queryClient.getQueryData<InfiniteData<NewsResponse>>(newsKeys.byChannel(1));
@@ -155,7 +161,7 @@ describe('useMarkRead', () => {
       await result.current.mutateAsync({ id: 5, isRead: 0, channelId: 1 });
     });
 
-    expect(mockedApi.patch).toHaveBeenCalledWith('/news/5/read', { isRead: 0 });
+    expect(mockedBatcher.enqueue).toHaveBeenCalledWith(5, 0);
     const channels = queryClient.getQueryData<Channel[]>(['channels']);
     expect(channels![0].unreadCount).toBe(1);
   });
