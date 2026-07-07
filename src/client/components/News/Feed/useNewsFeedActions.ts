@@ -36,7 +36,14 @@ export function useNewsFeedActions(
 ) {
   const { message } = App.useApp();
   const { t } = useTranslation();
-  const { setSelectedNewsId, newsFilterMode, setSelectedChannelId, autoAdvance, hashTagFilter } = useUIStore();
+  const {
+    setSelectedNewsId,
+    newsFilterMode,
+    setSelectedChannelId,
+    autoAdvance,
+    hashTagFilter,
+    requestAutoSelectFirst,
+  } = useUIStore();
   const { data: allChannels = [] } = useChannels();
 
   const markAllRead = useMarkAllRead();
@@ -62,8 +69,11 @@ export function useNewsFeedActions(
     if (currentIdx === -1 || sameGroup.length <= 1) return;
 
     const next = sameGroup[(currentIdx + 1) % sameGroup.length];
+    // Ask the feed to select the first news item once the new channel loads,
+    // so auto-advance actually lands the user on something to read.
+    requestAutoSelectFirst();
     setSelectedChannelId(next.id);
-  }, [allChannels, channel.id, channel.groupId, setSelectedChannelId]);
+  }, [allChannels, channel.id, channel.groupId, setSelectedChannelId, requestAutoSelectFirst]);
 
   // Called after a USER-TRIGGERED fetch (button, double-space at end).
   const onUserFetchSuccess = useCallback(

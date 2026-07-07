@@ -15,6 +15,7 @@ describe('uiStore', () => {
       headerHidden: false,
       lightbox: null,
       openAddChannel: false,
+      pendingAutoSelectFirst: false,
     });
   });
 
@@ -69,6 +70,14 @@ describe('uiStore', () => {
     useUIStore.getState().toggleAutoAdvance();
     expect(useUIStore.getState().autoAdvance).toBe(true);
     expect(localStorage.getItem('autoAdvance')).toBe('true');
+  });
+
+  it('request/consumeAutoSelectFirst toggles the pending flag', () => {
+    expect(useUIStore.getState().pendingAutoSelectFirst).toBe(false);
+    useUIStore.getState().requestAutoSelectFirst();
+    expect(useUIStore.getState().pendingAutoSelectFirst).toBe(true);
+    useUIStore.getState().consumeAutoSelectFirst();
+    expect(useUIStore.getState().pendingAutoSelectFirst).toBe(false);
   });
 
   it('openLightbox / closeLightbox / setLightboxAlbumIndex', () => {

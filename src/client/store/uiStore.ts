@@ -55,6 +55,11 @@ interface UIStore {
   // Auto-advance to next channel after fetch with no new items
   autoAdvance: boolean;
   toggleAutoAdvance: () => void;
+  // Set when auto-advance switches channel: the feed should select the first
+  // news item once the new channel's list has loaded (if any). Consumed once.
+  pendingAutoSelectFirst: boolean;
+  requestAutoSelectFirst: () => void;
+  consumeAutoSelectFirst: () => void;
   // Mobile header hide-on-scroll
   headerHidden: boolean;
   setHeaderHidden: (v: boolean) => void;
@@ -121,6 +126,9 @@ export const useUIStore = create<UIStore>()((set) => ({
       localStorage.setItem('autoAdvance', String(next));
       return { autoAdvance: next };
     }),
+  pendingAutoSelectFirst: false,
+  requestAutoSelectFirst: () => set({ pendingAutoSelectFirst: true }),
+  consumeAutoSelectFirst: () => set({ pendingAutoSelectFirst: false }),
   headerHidden: false,
   setHeaderHidden: (v) => set({ headerHidden: v }),
   // Lightbox
