@@ -9,6 +9,9 @@ import { isVideoMessage } from './telegramParser.js';
 /** Media types eligible for auto-download by media strategies (photos + files + video). */
 const DOWNLOADABLE_MEDIA_TYPES = new Set(['photo', 'document', 'video']);
 
+/** Media types the MediaStrategy keeps (inserts). Text-only and webpage-only are dropped. */
+const MEDIA_KEEP_TYPES = new Set(['photo', 'video', 'document', 'audio']);
+
 export interface ItemFlags {
   /** When true, post text goes to collapsible top panel instead of inline body */
   textInPanel: boolean;
@@ -100,8 +103,8 @@ class MediaStrategy extends MediaDownloadStrategy {
   }
 
   shouldSkipMessage(msg: TelegramMessage): boolean {
-    // Keep photo, document (videos/files), audio. Drop text-only and webpage-only.
-    return !msg.rawMedia || (msg.mediaType !== 'photo' && msg.mediaType !== 'document' && msg.mediaType !== 'audio');
+    // Keep photo, video, document (files), audio. Drop text-only and webpage-only.
+    return !msg.rawMedia || !MEDIA_KEEP_TYPES.has(msg.mediaType ?? '');
   }
 }
 
