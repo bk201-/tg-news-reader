@@ -64,9 +64,24 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
     return new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
   }
 
-  // Subsequent fetches: lastFetchedAt is the DB boundary — everything before it
-  // is already stored. No Telegram readInboxMaxId round-trip needed.
-  return new Date(channel.lastFetchedAt * 1000);
+  // Subsequent fetches: the boundary must be the newest content we've already
+  // accounted for — NOT the wall-clock lastFetchedAt. lastFetchedAt is always later
+  // than every real post, so using it excludes all not-yet-fetched history and, once
+  // read items are cleaned up (deleteReadNewsMedia), permanently empties the channel:
+  // Telegram returns nothing newer than "now" and the channel can never refill.
+  //
+  // Watermark = max(read position, newest stored post). Fall back to the default
+  // look-back window when the channel holds nothing and was never read (e.g. after
+  // every item was read + deleted) so a re-fetch repopulates recent posts.
+  const [row] = await db
+    .select({ maxPostedAt: sql<number | null>`MAX(${news.postedAt})` })
+    .from(news)
+    .where(eq(news.channelId, channel.id));
+  const boundary = Math.max(channel.lastReadAt ?? 0, row?.maxPostedAt ?? 0);
+  if (boundary > 0) {
+    return new Date(boundary * 1000);
+  }
+  return new Date(Date.now() - NEWS_DEFAULT_FETCH_DAYS * 24 * 60 * 60 * 1000);
 }
 
 // ─── Read-item cleanup ────────────────────────────────────────────────────────

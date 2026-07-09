@@ -15,11 +15,16 @@ export interface TestDb {
 }
 
 /**
- * Create a fresh in-memory SQLite database with all tables.
- * Each call returns an isolated DB — safe for parallel test suites.
+ * Create a fresh SQLite database with all tables.
+ *
+ * Defaults to an isolated in-memory DB — safe for parallel test suites.
+ * Pass a `file:` URL when the code under test uses interactive `db.transaction()`:
+ * libsql opens a separate connection per transaction, and every `:memory:`
+ * connection is its own empty database, so transactional writes/reads would hit
+ * a table-less connection. A file-backed DB shares state across connections.
  */
-export async function createTestDb(): Promise<TestDb> {
-  const client = createClient({ url: ':memory:' });
+export async function createTestDb(url = ':memory:'): Promise<TestDb> {
+  const client = createClient({ url });
 
   await client.executeMultiple('PRAGMA foreign_keys = ON;');
 

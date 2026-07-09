@@ -234,6 +234,25 @@ describe('News routes (integration)', () => {
       expect(body.affectedIds).toEqual([]);
     });
 
+    it('advances last_read_at even when the Telegram sync fails', async () => {
+      // Regression (bug B): the read watermark is local bookkeeping and must persist
+      // even if readChannelHistory throws — otherwise last_read_at stays NULL and the
+      // channel can be emptied on the next fetch.
+      const ch = await seedChannel(testDb.db, { unreadCount: 1, lastReadAt: null });
+      await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 500, postedAt: 12345 });
+      vi.mocked(readChannelHistory).mockRejectedValueOnce(new Error('FLOOD_WAIT'));
+
+      const res = await app.request('/api/news/read-all', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: ch.id }),
+      });
+      expect(res.status).toBe(200);
+
+      const [row] = await testDb.db.select().from(channels).where(eq(channels.id, ch.id));
+      expect(row.lastReadAt).toBe(12345);
+    });
+
     it('isRead=0 flips read items back to unread (toolbar undo-toggle)', async () => {
       const ch = await seedChannel(testDb.db, { unreadCount: 0 });
       const a = await seedNews(testDb.db, ch.id, { isRead: 1, telegramMsgId: 21 });
@@ -364,6 +383,23 @@ describe('News routes (integration)', () => {
       });
 
       expect(readChannelHistory).toHaveBeenCalledWith('batch_sync_chan', 210);
+    });
+
+    it('advances last_read_at even when the Telegram sync fails', async () => {
+      // Regression (bug B): watermark must persist independently of the TG round-trip.
+      vi.mocked(readChannelHistory).mockRejectedValueOnce(new Error('FLOOD_WAIT'));
+      const ch = await seedChannel(testDb.db, { unreadCount: 1, lastReadAt: null, telegramId: 'batch_fail_chan' });
+      const item = await seedNews(testDb.db, ch.id, { isRead: 0, telegramMsgId: 600, postedAt: 54321 });
+
+      const res = await app.request('/api/news/read-batch', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readIds: [item.id] }),
+      });
+      expect(res.status).toBe(200);
+
+      const [row] = await testDb.db.select().from(channels).where(eq(channels.id, ch.id));
+      expect(row.lastReadAt).toBe(54321);
     });
 
     it('handles an empty body without error', async () => {

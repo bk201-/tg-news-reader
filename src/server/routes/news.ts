@@ -118,27 +118,29 @@ router.post('/read-all', async (c) => {
 
   // Sync read state to Telegram only on read direction (Telegram has no "mark unread").
   if (targetIsRead === 1 && body.channelId) {
-    try {
-      const [channel] = await db.select().from(channels).where(eq(channels.id, body.channelId));
-      if (channel) {
-        const [result] = await db
-          .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
-          .from(news)
-          .where(eq(news.channelId, body.channelId));
+    const [channel] = await db.select().from(channels).where(eq(channels.id, body.channelId));
+    if (channel) {
+      const [result] = await db
+        .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
+        .from(news)
+        .where(eq(news.channelId, body.channelId));
 
-        if (result?.maxMsgId) {
+      // Advance the read watermark FIRST — it's local bookkeeping (the incremental-fetch
+      // boundary) and must not depend on the Telegram round-trip succeeding. Losing it
+      // can empty the channel on the next fetch once read items are cleaned up.
+      if (result?.maxPostedAt) {
+        await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, body.channelId));
+      }
+
+      // Best-effort mirror of the read position to Telegram.
+      if (result?.maxMsgId) {
+        try {
           await readChannelHistory(channel.telegramId, result.maxMsgId);
-        }
-
-        // Update lastReadAt so the next fetch uses this as the boundary
-        // for incremental fetching (avoids re-fetching already-read messages).
-        if (result?.maxPostedAt) {
-          await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, body.channelId));
+        } catch (err) {
+          // Non-critical: local state already updated, Telegram sync failed
+          logger.warn({ module: 'news', channelId: body.channelId, err }, 'failed to sync read state to Telegram');
         }
       }
-    } catch (err) {
-      // Non-critical: local state already updated, Telegram sync failed
-      logger.warn({ module: 'news', channelId: body.channelId, err }, 'failed to sync read state to Telegram');
     }
   }
 
@@ -210,23 +212,28 @@ router.post('/read-batch', async (c) => {
 
   // ── Sync read state to Telegram for channels that gained read items ─────────
   for (const chId of readChannelIds) {
-    try {
-      const [channel] = await db.select().from(channels).where(eq(channels.id, chId));
-      if (!channel) continue;
-      // Only consider the items we just flipped in this channel for the read boundary.
-      const [result] = await db
-        .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
-        .from(news)
-        .where(and(eq(news.channelId, chId), inArray(news.id, readAffected)));
-      if (result?.maxMsgId) {
+    const [channel] = await db.select().from(channels).where(eq(channels.id, chId));
+    if (!channel) continue;
+    // Only consider the items we just flipped in this channel for the read boundary.
+    const [result] = await db
+      .select({ maxMsgId: max(news.telegramMsgId), maxPostedAt: max(news.postedAt) })
+      .from(news)
+      .where(and(eq(news.channelId, chId), inArray(news.id, readAffected)));
+
+    // Advance the read watermark FIRST — must not depend on the Telegram sync
+    // (it's the incremental-fetch boundary).
+    if (result?.maxPostedAt && (!channel.lastReadAt || result.maxPostedAt > channel.lastReadAt)) {
+      await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, chId));
+    }
+
+    // Best-effort mirror of the read position to Telegram.
+    if (result?.maxMsgId) {
+      try {
         await readChannelHistory(channel.telegramId, result.maxMsgId);
+      } catch (err) {
+        // Non-critical: local state already updated, Telegram sync failed
+        logger.warn({ module: 'news', channelId: chId, err }, 'failed to sync batch read state to Telegram');
       }
-      if (result?.maxPostedAt && (!channel.lastReadAt || result.maxPostedAt > channel.lastReadAt)) {
-        await db.update(channels).set({ lastReadAt: result.maxPostedAt }).where(eq(channels.id, chId));
-      }
-    } catch (err) {
-      // Non-critical: local state already updated, Telegram sync failed
-      logger.warn({ module: 'news', channelId: chId, err }, 'failed to sync batch read state to Telegram');
     }
   }
 
