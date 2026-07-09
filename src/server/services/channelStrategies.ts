@@ -9,8 +9,14 @@ import { isVideoMessage } from './telegramParser.js';
 /** Media types eligible for auto-download by media strategies (photos + files + video). */
 const DOWNLOADABLE_MEDIA_TYPES = new Set(['photo', 'document', 'video']);
 
-/** Media types the MediaStrategy keeps (inserts). Text-only and webpage-only are dropped. */
-const MEDIA_KEEP_TYPES = new Set(['photo', 'video', 'document', 'audio']);
+/**
+ * Media types a media channel treats as "real" content: kept on insert by
+ * MediaStrategy and shown in the default ("filtered") news view. Anything else
+ * (text-only, webpage-only) is dropped/hidden. Shared with the news route so the
+ * insert whitelist and the display whitelist can never drift apart.
+ */
+export const MEDIA_VISIBLE_TYPES = ['photo', 'video', 'document', 'audio'] as const;
+const MEDIA_KEEP_TYPES = new Set<string>(MEDIA_VISIBLE_TYPES);
 
 export interface ItemFlags {
   /** When true, post text goes to collapsible top panel instead of inline body */
