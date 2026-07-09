@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, max, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, max, notInArray, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { ChannelType, NewsItem } from '../../shared/types.js';
@@ -6,7 +6,7 @@ import { db } from '../db/index.js';
 import { toNewsItem } from '../db/mappers.js';
 import { channels, downloads, news } from '../db/schema.js';
 import { logger } from '../logger.js';
-import { getChannelStrategy } from '../services/channelStrategies.js';
+import { getChannelStrategy, MEDIA_VISIBLE_TYPES } from '../services/channelStrategies.js';
 import { fetchMessageById, readChannelHistory } from '../services/telegram.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 import { markReadSchema, parseOptionalBody, readAllNewsSchema, readBatchNewsSchema } from './schemas.js';
@@ -321,12 +321,12 @@ router.get('/', async (c) => {
   if (view === 'filtered' && channelId !== undefined) {
     conditions.push(eq(news.isFiltered, 0));
     if (isMediaChannel) {
-      conditions.push(sql`${news.mediaType} IN ('photo', 'document', 'audio')`);
+      conditions.push(inArray(news.mediaType, [...MEDIA_VISIBLE_TYPES]));
     }
   } else if (view === 'hidden' && channelId !== undefined) {
     // Inverse of 'filtered': anything that would be excluded from the filtered view.
     if (isMediaChannel) {
-      conditions.push(sql`(${news.isFiltered} = 1 OR ${news.mediaType} NOT IN ('photo', 'document', 'audio'))`);
+      conditions.push(or(eq(news.isFiltered, 1), notInArray(news.mediaType, [...MEDIA_VISIBLE_TYPES]))!);
     } else {
       conditions.push(eq(news.isFiltered, 1));
     }
@@ -355,7 +355,7 @@ router.get('/', async (c) => {
   if (!cursor && channelId !== undefined) {
     const isMedia = isMediaChannel || (await isChannelMedia(channelId));
     const hiddenCondition = isMedia
-      ? sql`(${news.isFiltered} = 1 OR ${news.mediaType} NOT IN ('photo', 'document', 'audio'))`
+      ? or(eq(news.isFiltered, 1), notInArray(news.mediaType, [...MEDIA_VISIBLE_TYPES]))!
       : eq(news.isFiltered, 1);
     const [result] = await db
       .select({ count: sql<number>`count(*)` })

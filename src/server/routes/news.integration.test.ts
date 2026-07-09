@@ -638,6 +638,21 @@ describe('News routes (integration)', () => {
       expect(body.items[0].mediaType).toBe('photo');
     });
 
+    it('shows video posts in the visible view of a media channel (regression)', async () => {
+      const ch = await seedChannel(testDb.db, { channelType: 'media' });
+      const video = await seedNews(testDb.db, ch.id, { mediaType: 'video', postedAt: 100, telegramMsgId: 82 });
+      await seedNews(testDb.db, ch.id, { mediaType: 'webpage', postedAt: 200, telegramMsgId: 83 });
+
+      const res = await app.request(`/api/news?channelId=${ch.id}&view=filtered`, { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // Video must NOT be treated as hidden — it is real media content.
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].id).toBe(video.id);
+      expect(body.items[0].mediaType).toBe('video');
+      expect(body.filteredOut).toBe(1); // only the webpage post is hidden
+    });
+
     it('view=filtered behaves the same as filtered=1', async () => {
       const ch = await seedChannel(testDb.db);
       await seedNews(testDb.db, ch.id, { isFiltered: 0, postedAt: 100, telegramMsgId: 90 });
