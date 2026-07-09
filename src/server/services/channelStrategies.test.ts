@@ -106,6 +106,10 @@ describe('MediaStrategy', () => {
     expect(strategy.shouldSkipMessage(makeTgMsg({ rawMedia: {} as never, mediaType: 'audio' }))).toBe(false);
   });
 
+  it('keeps video messages (regression: video channels must not be emptied)', () => {
+    expect(strategy.shouldSkipMessage(makeTgMsg({ rawMedia: {} as never, mediaType: 'video' }))).toBe(false);
+  });
+
   it('skips webpage-only messages', () => {
     expect(strategy.shouldSkipMessage(makeTgMsg({ rawMedia: {} as never, mediaType: 'webpage' }))).toBe(true);
   });
