@@ -411,6 +411,36 @@ describe('Channels routes (integration)', () => {
       expect(readChannelHistory).toHaveBeenCalledWith(ch.telegramId, 200);
     });
 
+    it('advances last_read_at even when the Telegram sync fails', async () => {
+      // Regression (bug B): the read watermark must be written regardless of the
+      // Telegram round-trip — otherwise last_read_at stays NULL and a later fetch
+      // (which cleans up read items) permanently empties the channel.
+      const ch = await seedChannel(testDb.db, { unreadCount: 1, lastReadAt: null });
+      await testDb.db
+        .insert(news)
+        .values({ channelId: ch.id, telegramMsgId: 700, postedAt: 99999, isRead: 0, text: 'x' });
+
+      vi.mocked(readChannelHistory).mockRejectedValueOnce(new Error('FLOOD_WAIT'));
+      vi.mocked(fetchChannelNews).mockResolvedValueOnce({
+        inserted: 0,
+        total: 0,
+        mediaProcessing: false,
+        totalNewsCount: 1,
+        unreadCount: 0,
+      });
+
+      const res = await app.request(`/api/channels/${ch.id}/mark-read-and-fetch`, {
+        method: 'POST',
+        headers,
+      });
+      expect(res.status).toBe(200);
+
+      const listRes = await app.request('/api/channels', { headers });
+      const list = await listRes.json();
+      const updated = list.find((x: { id: number }) => x.id === ch.id);
+      expect(updated.lastReadAt).toBe(99999);
+    });
+
     it('returns 404 for non-existent channel', async () => {
       const res = await app.request('/api/channels/99999/mark-read-and-fetch', {
         method: 'POST',
