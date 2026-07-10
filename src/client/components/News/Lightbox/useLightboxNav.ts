@@ -4,8 +4,8 @@ import type { InfiniteData } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import type { NewsResponse } from '../../../api/news';
 
-/** Media types that appear in the lightbox (photo + document covers images and videos) */
-const LIGHTBOX_MEDIA_TYPES = new Set(['photo', 'document']);
+/** Media types that appear in the lightbox (photo, video, and document image/video files) */
+const LIGHTBOX_MEDIA_TYPES = new Set(['photo', 'video', 'document']);
 
 /** How many entries before the end of the list to trigger fetchNextPage */
 const PREFETCH_THRESHOLD = 5;
