@@ -43,15 +43,24 @@ function setup(items: NewsItem[], newsId: number, albumIndex = 0) {
 describe('useLightboxNav', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('filters only photo/document items', () => {
+  it('filters photo/video/document items, excluding webpage/audio', () => {
     const items = [
       makeItem(1, { mediaType: 'photo' }),
       makeItem(2, { mediaType: 'webpage' }),
       makeItem(3, { mediaType: 'document' }),
+      makeItem(4, { mediaType: 'video', localMediaPath: 'ch/4.mp4' }),
+      makeItem(5, { mediaType: 'audio' }),
     ];
     const { result } = setup(items, 1);
-    expect(result.current.entries).toHaveLength(2);
-    expect(result.current.entries.map((e) => e.newsId)).toEqual([1, 3]);
+    expect(result.current.entries.map((e) => e.newsId)).toEqual([1, 3, 4]);
+  });
+
+  it('includes video items in the lightbox (regression: mediaType "video" was filtered out)', () => {
+    const items = [makeItem(1, { mediaType: 'video', localMediaPath: 'ch/1.mp4' })];
+    const { result } = setup(items, 1);
+    expect(result.current.entries).toHaveLength(1);
+    expect(result.current.isVideo).toBe(true);
+    expect(result.current.firstMediaPath).toBe('ch/1.mp4');
   });
 
   it('go(1) moves to the next item', () => {
