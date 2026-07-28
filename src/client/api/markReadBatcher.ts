@@ -16,6 +16,15 @@ import { logger } from '../logger';
 import { useAuthStore } from '../store/authStore';
 import { api } from './client';
 
+/**
+ * Feature flag: coalesce single-item mark-read toggles into a batched
+ * `POST /news/read-batch`. Temporarily disabled — since the GET rate limit was
+ * relaxed, per-item `PATCH /news/:id/read` requests are fine and simpler.
+ * Flip back to `true` to re-enable batching. Note: "mark all" always stays a
+ * single `POST /news/read-all` request regardless of this flag.
+ */
+export const MARK_READ_BATCHING_ENABLED = false;
+
 /** Wait this long after the last enqueue before flushing. */
 export const BATCH_DEBOUNCE_MS = 700;
 /** Never wait longer than this from the first pending item before flushing. */
