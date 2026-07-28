@@ -3,7 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import type { InfiniteData } from '@tanstack/react-query';
 import type { NewsFilterMode } from '../store/uiStore';
 import { api } from './client';
-import { markReadBatcher } from './markReadBatcher';
+import { MARK_READ_BATCHING_ENABLED, markReadBatcher } from './markReadBatcher';
 
 export const newsKeys = {
   byChannel: (channelId: number, mode: NewsFilterMode = 'all') => ['news', channelId, mode] as const,
@@ -55,14 +55,19 @@ export function useNews(channelId: number, mode: NewsFilterMode = 'all') {
 export function useMarkRead() {
   const qc = useQueryClient();
   return useMutation({
-    // Optimistic UI happens in onSuccess (below); the network write is coalesced
-    // by the debounced batcher and resolves immediately so keyboard-driven
-    // toggles stay instant and don't hammer the mutating-request rate limit.
-    mutationFn: ({ id, isRead = 1 }: { id: number; isRead?: number; channelId: number }) => {
-      markReadBatcher.enqueue(id, isRead === 0 ? 0 : 1);
-      return Promise.resolve({ success: true } as const);
+    // The optimistic cache update runs in onMutate so the UI stays instant
+    // regardless of transport. When batching is enabled the network write is
+    // coalesced by the debounced batcher; otherwise a single per-item
+    // PATCH /news/:id/read is fired directly.
+    mutationFn: async ({ id, isRead = 1 }: { id: number; isRead?: number; channelId: number }) => {
+      const target: 0 | 1 = isRead === 0 ? 0 : 1;
+      if (MARK_READ_BATCHING_ENABLED) {
+        markReadBatcher.enqueue(id, target);
+        return;
+      }
+      await api.patch<NewsItem>(`/news/${id}/read`, { isRead: target });
     },
-    onSuccess: (_data, { id, isRead = 1, channelId }) => {
+    onMutate: ({ id, isRead = 1, channelId }) => {
       // Update the item in-place — no refetch needed
       qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
         updatePaginatedItems(old, (items) => items.map((n) => (n.id === id ? { ...n, isRead } : n))),
