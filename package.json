@@ -40,7 +40,7 @@
     "@types/turndown": "^5.0.6",
     "antd": "^6.4.3",
     "antd-style": "^4.1.0",
-    "axios": "^1.16.1",
+    "axios": "^1.18.0",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.20",
     "dotenv": "^17.4.2",
