@@ -25,7 +25,7 @@ vi.mock('fs', async (importOriginal) => {
 import { existsSync, statSync, createReadStream } from 'fs';
 import { Readable } from 'stream';
 import { Hono } from 'hono';
-import { createTestUser, authHeaders } from '../__tests__/auth.js';
+import { createTestSession, createTestUser, authHeaders, generateTestToken } from '../__tests__/auth.js';
 import { createTestDb } from '../__tests__/testDb.js';
 import type { TestDb } from '../__tests__/testDb.js';
 
@@ -60,11 +60,15 @@ function mockFileExists(size: number) {
 describe('Media routes (integration)', () => {
   let app: ReturnType<typeof createApp>;
   let headers: Record<string, string>;
+  let mediaCookie: string;
 
   beforeAll(async () => {
     testDb = await createTestDb();
     const user = await createTestUser(testDb.db);
     headers = await authHeaders(user.id);
+    const session = await createTestSession(testDb.db, user.id);
+    const mediaToken = await generateTestToken(user.id, { sessionId: session.id });
+    mediaCookie = `media_token=${mediaToken}`;
   });
 
   beforeEach(() => {
@@ -78,6 +82,16 @@ describe('Media routes (integration)', () => {
     it('returns 401 without auth', async () => {
       const res = await app.request('/api/media/testChannel/photo.jpg');
       expect(res.status).toBe(401);
+    });
+
+    it('accepts a valid media cookie so the media URL stays stable across access-token rotation', async () => {
+      mockFileExists(1024);
+
+      const res = await app.request('/api/media/testChannel/video.mp4', {
+        headers: { Cookie: mediaCookie },
+      });
+
+      expect(res.status).toBe(200);
     });
 
     it('returns 400 for path traversal in channel', async () => {
@@ -189,15 +203,37 @@ describe('Media routes (integration)', () => {
       expect(res.status).toBe(416);
     });
 
-    it('returns 416 when end >= totalSize', async () => {
+    it('clamps an explicit range end that exceeds the file size', async () => {
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(statSync).mockReturnValue({ size: 1000 } as ReturnType<typeof statSync>);
+      vi.mocked(createReadStream).mockReturnValue(
+        Readable.from(Buffer.alloc(1000, 'x')) as ReturnType<typeof createReadStream>,
+      );
 
       const res = await app.request('/api/media/testChannel/video.mp4', {
         headers: { ...headers, Range: 'bytes=0-1000' },
       });
 
-      expect(res.status).toBe(416);
+      expect(res.status).toBe(206);
+      expect(res.headers.get('Content-Range')).toBe('bytes 0-999/1000');
+      expect(res.headers.get('Content-Length')).toBe('1000');
+    });
+
+    it('serves suffix ranges from the end of the file for mobile media metadata requests', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(statSync).mockReturnValue({ size: 1000 } as ReturnType<typeof statSync>);
+      vi.mocked(createReadStream).mockReturnValue(
+        Readable.from(Buffer.alloc(200, 'x')) as ReturnType<typeof createReadStream>,
+      );
+
+      const res = await app.request('/api/media/testChannel/video.mp4', {
+        headers: { ...headers, Range: 'bytes=-200' },
+      });
+
+      expect(res.status).toBe(206);
+      expect(res.headers.get('Content-Range')).toBe('bytes 800-999/1000');
+      expect(res.headers.get('Content-Length')).toBe('200');
+      expect(createReadStream).toHaveBeenCalledWith(expect.any(String), { start: 800, end: 999 });
     });
   });
 });

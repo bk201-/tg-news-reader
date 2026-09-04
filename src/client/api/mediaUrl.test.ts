@@ -7,19 +7,17 @@ describe('mediaUrl', () => {
     useAuthStore.setState({ accessToken: null });
   });
 
-  it('returns authenticated URL with token query param', () => {
+  it('returns a stable same-origin URL while the access token rotates', () => {
     useAuthStore.setState({ accessToken: 'my-jwt-token' });
-    const url = mediaUrl('channel123/image.jpg');
-    expect(url).toBe('/api/media/channel123/image.jpg?token=my-jwt-token');
+    const beforeRefresh = mediaUrl('channel123/video.mp4');
+    useAuthStore.setState({ accessToken: 'rotated-jwt-token' });
+    const afterRefresh = mediaUrl('channel123/video.mp4');
+
+    expect(beforeRefresh).toBe('/api/media/channel123/video.mp4');
+    expect(afterRefresh).toBe(beforeRefresh);
   });
 
-  it('encodes special characters in the token', () => {
-    useAuthStore.setState({ accessToken: 'token with spaces+special' });
-    const url = mediaUrl('ch/img.jpg');
-    expect(url).toContain('?token=token%20with%20spaces%2Bspecial');
-  });
-
-  it('returns plain URL without token when not authenticated', () => {
+  it('returns the same URL without an access token', () => {
     const url = mediaUrl('channel123/image.jpg');
     expect(url).toBe('/api/media/channel123/image.jpg');
   });

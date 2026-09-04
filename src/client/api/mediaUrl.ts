@@ -1,12 +1,8 @@
-import { useAuthStore } from '../store/authStore';
-
 /**
- * Returns an authenticated URL for a media path served at /api/media/.
- * Appends ?token= so that browser-native requests (img src, video src, EventSource)
- * pass the JWT without needing custom headers.
+ * Returns a stable same-origin media URL.
+ * The server authenticates browser-native media requests with the HttpOnly
+ * media cookie, so access-token rotation cannot replace the src mid-playback.
  */
 export function mediaUrl(localMediaPath: string): string {
-  const token = useAuthStore.getState().accessToken;
-  const base = `/api/media/${localMediaPath}`;
-  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  return `/api/media/${localMediaPath}`;
 }
