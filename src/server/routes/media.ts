@@ -37,18 +37,31 @@ router.get('/:channel/:filename', (c) => {
   const rangeHeader = c.req.header('range');
 
   if (rangeHeader) {
-    // Parse "bytes=start-end"
-    const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
-    if (!match) {
+    const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+    if (!match || totalSize === 0 || (!match[1] && !match[2])) {
       return c.body(null, 416, {
         'Content-Range': `bytes */${totalSize}`,
       });
     }
 
-    const start = match[1] ? parseInt(match[1], 10) : 0;
-    const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+    let start: number;
+    let end: number;
 
-    if (start > end || end >= totalSize) {
+    if (!match[1]) {
+      const suffixLength = parseInt(match[2], 10);
+      if (suffixLength <= 0) {
+        return c.body(null, 416, {
+          'Content-Range': `bytes */${totalSize}`,
+        });
+      }
+      start = Math.max(totalSize - suffixLength, 0);
+      end = totalSize - 1;
+    } else {
+      start = parseInt(match[1], 10);
+      end = match[2] ? Math.min(parseInt(match[2], 10), totalSize - 1) : totalSize - 1;
+    }
+
+    if (start >= totalSize || start > end) {
       return c.body(null, 416, {
         'Content-Range': `bytes */${totalSize}`,
       });

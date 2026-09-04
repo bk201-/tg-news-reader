@@ -27,6 +27,13 @@ function refreshCookieOptions() {
   };
 }
 
+function mediaCookieOptions() {
+  return {
+    ...refreshCookieOptions(),
+    path: '/api/media',
+  };
+}
+
 async function issueAccessToken(
   userId: number,
   role: string,
@@ -42,6 +49,10 @@ async function issueAccessToken(
 }
 
 export { issueAccessToken };
+
+async function issueMediaToken(userId: number, role: string, sessionId: string, expiresAt: number): Promise<string> {
+  return sign({ sub: String(userId), role, sessionId, exp: expiresAt }, JWT_SECRET, 'HS256');
+}
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 
@@ -94,6 +105,7 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
 
   logger.info({ module: 'auth', ip, event: 'login_ok', userId: user.id, sessionId }, 'login successful');
   setCookie(c, 'refresh_token', `${sessionId}:${refreshToken}`, refreshCookieOptions());
+  setCookie(c, 'media_token', await issueMediaToken(user.id, user.role, sessionId, expiresAt), mediaCookieOptions());
 
   return c.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });
 });
@@ -134,6 +146,7 @@ router.post('/refresh', async (c) => {
     .where(eq(sessions.id, sessionId));
 
   setCookie(c, 'refresh_token', `${sessionId}:${newRefreshToken}`, refreshCookieOptions());
+  setCookie(c, 'media_token', await issueMediaToken(user.id, user.role, sessionId, newExpiresAt), mediaCookieOptions());
 
   const unlockedGroupIds = JSON.parse(session.unlockedGroupIds ?? '[]') as number[];
   const accessToken = await issueAccessToken(user.id, user.role, sessionId, unlockedGroupIds);
@@ -148,6 +161,7 @@ router.post('/logout', async (c) => {
     await db.delete(sessions).where(eq(sessions.id, sessionId));
   }
   deleteCookie(c, 'refresh_token', { path: '/' });
+  deleteCookie(c, 'media_token', { path: '/api/media' });
   return c.json({ success: true });
 });
 

@@ -68,9 +68,11 @@ describe('Auth routes (integration)', () => {
       expect(body.accessToken).toBeDefined();
       expect(body.user.email).toBe('user@test.com');
 
-      // Refresh cookie should be set
+      // Session cookies should be set
       const setCookie = res.headers.get('set-cookie');
       expect(setCookie).toContain('refresh_token=');
+      expect(setCookie).toContain('media_token=');
+      expect(setCookie).toContain('Path=/api/media');
     });
 
     it('returns 401 for unknown email', async () => {
@@ -132,6 +134,7 @@ describe('Auth routes (integration)', () => {
       const body = await res.json();
       expect(body.accessToken).toBeDefined();
       expect(body.user.email).toBe('r@test.com');
+      expect(res.headers.get('set-cookie')).toContain('media_token=');
     });
 
     it('returns 401 without a refresh cookie', async () => {
@@ -167,6 +170,7 @@ describe('Auth routes (integration)', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
+      expect(res.headers.get('set-cookie')).toContain('media_token=');
 
       // Session should be gone — refresh should fail
       const refreshRes = await app.request('/api/auth/refresh', {
