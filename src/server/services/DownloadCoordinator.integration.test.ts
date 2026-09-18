@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as storageModule from './downloadStorage.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ vi.mock('../config.js', () => ({
   WORKER_RESTART_BASE_MS: 10,
   WORKER_RESTART_JITTER_MS: 0,
   ARTICLE_WORKER_CONCURRENCY: 3,
+  DOWNLOAD_STORAGE_RESERVE_BYTES: 1024 ** 3,
 }));
 
 vi.mock('../logger.js', () => ({
@@ -46,6 +48,18 @@ vi.mock('./telegramBridge.js', () => ({
   isBridgeMessage: vi.fn((msg: { type: string }) => msg.type.startsWith('tg:')),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  statfs: vi.fn().mockResolvedValue({ bavail: 10 * 1024 * 1024, bsize: 4096 }),
+}));
+
+vi.mock('./downloadStorage.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof storageModule>()),
+  get downloadStorage() {
+    return storage;
+  },
+}));
+
 // ─── DB mock ────────────────────────────────────────────────────────────────
 
 import { seedChannel, seedNews, seedDownload } from '../__tests__/seed.js';
@@ -68,10 +82,14 @@ vi.mock('./downloadProgress.js', () => ({
   emitTaskUpdate: vi.fn(),
 }));
 
+import { statfs } from 'node:fs/promises';
 import { sendAlert } from './alertBot.js';
 import { DownloadCoordinator } from './DownloadCoordinator.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
+import { DownloadStorage } from './downloadStorage.js';
 import { handleBridgeMessage } from './telegramBridge.js';
+
+let storage: DownloadStorage;
 
 describe('DownloadCoordinator (integration)', () => {
   let channelId: number;
@@ -87,6 +105,7 @@ describe('DownloadCoordinator (integration)', () => {
     await testDb.client.execute('DELETE FROM channels');
     createdWorkers.length = 0;
     vi.clearAllMocks();
+    storage = new DownloadStorage();
 
     const ch = await seedChannel(testDb.db);
     channelId = ch.id;
@@ -126,6 +145,19 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Task dispatch ────────────────────────────────────────────────────────
 
   describe('task dispatch', () => {
+    it('does not start downloads when less than 1 GiB is free', async () => {
+      vi.mocked(statfs).mockResolvedValueOnce({ bavail: 100, bsize: 4096 } as Awaited<ReturnType<typeof statfs>>);
+      await seedDownload(testDb.db, newsId, { status: 'pending', priority: 10 });
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(createdWorkers[0].postMessage).not.toHaveBeenCalled();
+      const rows = await testDb.client.execute('SELECT status FROM downloads WHERE news_id = ?', [newsId]);
+      expect(rows.rows[0].status).toBe('pending');
+      expect(coordinator.stopped).toBe(false);
+    });
+
     it('dispatches a pending task to an available worker', async () => {
       await seedDownload(testDb.db, newsId, { status: 'pending', priority: 0 });
 
@@ -174,6 +206,28 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Worker message handling ──────────────────────────────────────────────
 
   describe('worker messages', () => {
+    it('pauses the whole queue and retains a task on ENOSPC instead of failing it', async () => {
+      const dl = await seedDownload(testDb.db, newsId);
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await new Promise((r) => setTimeout(r, 50));
+
+      const next = await seedNews(testDb.db, channelId);
+      await seedDownload(testDb.db, next.id);
+      createdWorkers[0].postMessage.mockClear();
+      createdWorkers[0].emit('message', {
+        type: 'error',
+        taskId: dl.id,
+        message: 'ENOSPC: no space left on device',
+      });
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(createdWorkers[0].postMessage).not.toHaveBeenCalled();
+      const rows = await testDb.client.execute('SELECT status FROM downloads WHERE id = ?', [dl.id]);
+      expect(rows.rows[0].status).toBe('pending');
+      expect(coordinator.stopped).toBe(false);
+    });
+
     it('handles "done" message — marks task done and emits update', async () => {
       const dl = await seedDownload(testDb.db, newsId, { status: 'pending', priority: 0 });
 

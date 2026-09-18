@@ -26,6 +26,7 @@ import { logger } from '../logger.js';
 import { DB_POLL_POLICY, withRetry } from '../utils/retry.js';
 import { sendAlert } from './alertBot.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
+import { downloadStorage, isStorageCapacityError, StoragePausedError } from './downloadStorage.js';
 import { handleBridgeMessage, isBridgeMessage } from './telegramBridge.js';
 
 const WAKEUP_EVENT = 'wakeup';
@@ -80,6 +81,7 @@ interface ErrorMsg {
   type: 'error';
   taskId: number;
   message: string;
+  code?: string;
 }
 type WorkerMsg = DoneMsg | ErrorMsg | { type: string };
 
@@ -195,7 +197,7 @@ export class DownloadCoordinator {
       return;
     }
     if (msg.type === 'done') void this.onTaskDone(workerId, (msg as DoneMsg).taskId);
-    else if (msg.type === 'error') void this.onTaskError(workerId, (msg as ErrorMsg).taskId, (msg as ErrorMsg).message);
+    else if (msg.type === 'error') void this.onTaskError(workerId, msg as ErrorMsg);
   }
 
   private async onTaskDone(workerId: number, taskId: number): Promise<void> {
@@ -213,18 +215,20 @@ export class DownloadCoordinator {
     void this.tryDispatch();
   }
 
-  private async onTaskError(workerId: number, taskId: number, errorMsg: string): Promise<void> {
+  private async onTaskError(workerId: number, { taskId, message: errorMsg, code }: ErrorMsg): Promise<void> {
+    const storageError = isStorageCapacityError({ message: errorMsg, code });
+    if (storageError) downloadStorage.pause(new StoragePausedError(errorMsg));
     const now = Math.floor(Date.now() / 1000);
     await db
       .update(downloads)
-      .set({ status: 'failed', error: errorMsg, processedAt: now })
+      .set({ status: storageError ? 'pending' : 'failed', error: errorMsg, processedAt: storageError ? null : now })
       .where(eq(downloads.id, taskId));
     const failedTask = await getTaskWithContext(taskId);
     if (failedTask) {
       if (failedTask.type === 'article') this.runningArticles = Math.max(0, this.runningArticles - 1);
-      emitTaskUpdate({ ...failedTask, status: 'failed', error: errorMsg });
+      emitTaskUpdate(failedTask);
     }
-    logger.error({ module: 'download', taskId, err: errorMsg }, 'task permanently failed');
+    if (!storageError) logger.error({ module: 'download', taskId, err: errorMsg }, 'task permanently failed');
     this.available.add(workerId);
     void this.tryDispatch();
   }
@@ -266,6 +270,7 @@ export class DownloadCoordinator {
 
     let task: typeof downloads.$inferSelect | undefined;
     try {
+      await downloadStorage.check();
       [task] = await withRetry(
         () => {
           // Media-only workers: never claim article tasks.
@@ -286,13 +291,22 @@ export class DownloadCoordinator {
         'poll',
       );
     } catch (err) {
-      logger.error({ module: 'download', err }, 'db poll failed permanently — will retry in 1s');
+      if (!(err instanceof StoragePausedError)) {
+        if (isStorageCapacityError(err)) downloadStorage.pause(err);
+        logger.error({ module: 'download', err }, 'db poll failed permanently — will retry in 1s');
+      }
       this.available.add(workerId);
       this.schedulePoll();
       return;
     }
 
     if (!task) {
+      this.available.add(workerId);
+      this.schedulePoll();
+      return;
+    }
+
+    if (downloadStorage.status.paused) {
       this.available.add(workerId);
       this.schedulePoll();
       return;
@@ -307,7 +321,7 @@ export class DownloadCoordinator {
 
     const [claimed] = await db
       .update(downloads)
-      .set({ status: 'processing' })
+      .set({ status: 'processing', error: null, processedAt: null })
       .where(and(eq(downloads.id, task.id), eq(downloads.status, 'pending')))
       .returning();
 
@@ -318,6 +332,12 @@ export class DownloadCoordinator {
     }
 
     const taskCtx = await getTaskWithContext(task.id);
+    if (downloadStorage.status.paused) {
+      await db.update(downloads).set({ status: 'pending' }).where(eq(downloads.id, task.id));
+      this.available.add(workerId);
+      this.schedulePoll();
+      return;
+    }
     if (taskCtx) emitTaskUpdate({ ...taskCtx, status: 'processing' });
 
     if (task.type === 'article') this.runningArticles++;

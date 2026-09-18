@@ -26,6 +26,7 @@ import ttsRouter from './routes/tts.js';
 import versionRouter from './routes/version.js';
 import { sendAlert } from './services/alertBot.js';
 import { isWorkerPoolStopped, startWorkerPool } from './services/downloadManager.js';
+import { downloadStorage } from './services/downloadStorage.js';
 import { renderErrorHtml } from './services/errorHtml.js';
 import { disconnectTelegramClient, isTelegramDelayed } from './services/telegram.js';
 import { getTelegramCircuitState, getTelegramSessionExpired } from './services/telegramCircuitBreaker.js';
@@ -176,7 +177,8 @@ app.get('/api/health', async (c) => {
   const sessionExpired = getTelegramSessionExpired();
   const connectDelayed = isTelegramDelayed();
   const workerPoolStopped = isWorkerPoolStopped();
-  const status = !dbOk || telegramCircuit === 'open' || workerPoolStopped ? 'degraded' : 'ok';
+  const storage = downloadStorage.status;
+  const status = !dbOk || telegramCircuit === 'open' || workerPoolStopped || storage.paused ? 'degraded' : 'ok';
 
   return c.json({
     status,
@@ -184,7 +186,7 @@ app.get('/api/health', async (c) => {
     uptime: Math.floor(process.uptime()),
     db: dbOk ? 'ok' : 'error',
     telegram: { circuit: telegramCircuit, sessionExpired, connectDelayed },
-    downloads: { workerPoolStopped },
+    downloads: { workerPoolStopped, storage },
   });
 });
 

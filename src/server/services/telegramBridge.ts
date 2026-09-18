@@ -42,6 +42,7 @@ export interface TgErrorMsg {
   type: 'tg:error';
   reqId: number;
   message: string;
+  code?: string;
 }
 
 /** Union of all messages a worker can send to the bridge. */
@@ -102,7 +103,8 @@ async function downloadMediaForWorker(worker: Worker, msg: TgDownloadMediaMsg, w
       { module: 'telegram', workerId, reqId: msg.reqId, msgId: msg.msgId, err },
       'bridge: tg:downloadMedia failed',
     );
-    const reply: TgErrorMsg = { type: 'tg:error', reqId: msg.reqId, message };
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : undefined;
+    const reply: TgErrorMsg = { type: 'tg:error', reqId: msg.reqId, message, code };
     worker.postMessage(reply);
   }
 }
