@@ -2,11 +2,12 @@
  * Telegram API — public functions: fetch messages, channel info, read history, download media.
  */
 
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import type { Api } from 'telegram';
 import { MAX_IMG_DOC_SIZE_BYTES, MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '../config.js';
 import { logger } from '../logger.js';
+import { downloadMediaFile } from './downloadMediaFile.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
 import { ensureAndGetApi, getTelegramClient } from './telegramClient.js';
 import { extractInstantViewPage, parseMessageFields } from './telegramParser.js';
@@ -50,11 +51,6 @@ async function resolveInstantViewImages(msg: TelegramMessage, channelTelegramId:
   if (!msg.instantViewImages?.length || !msg.instantViewContent) return;
 
   const dir = join(process.cwd(), 'data', channelTelegramId);
-  try {
-    mkdirSync(dir, { recursive: true });
-  } catch {
-    // best-effort — a failed mkdir surfaces as a download error below
-  }
 
   let content = msg.instantViewContent;
   const _Api = await ensureAndGetApi();
@@ -71,10 +67,11 @@ async function resolveInstantViewImages(msg: TelegramMessage, channelTelegramId:
         : new _Api.MessageMediaDocument({ document: img.media as Api.TypeDocument });
     try {
       if (!existsSync(filepath)) {
-        await telegramCircuit.execute(async () => {
+        const saved = await telegramCircuit.execute(async () => {
           const tg = await getTelegramClient();
-          await tg.downloadMedia(media, { outputFile: filepath });
+          return downloadMediaFile(filepath, 0, (writer) => tg.downloadMedia(media, { outputFile: writer }));
         }, 'downloadInstantViewImage');
+        if (!saved) continue;
       }
       // Replace the placeholder inside the markdown image target: (iv://N) → (rel)
       content = content.split(`(${img.placeholder})`).join(`(${rel})`);
@@ -304,6 +301,7 @@ export async function downloadMessageMedia(
   if (!msg.rawMedia) return null;
 
   let ext: string;
+  let expectedBytes = msg.mediaSizeBytes ?? 0;
 
   if (msg.rawMedia instanceof _Api.MessageMediaPhoto) {
     ext = 'jpg';
@@ -312,6 +310,7 @@ export async function downloadMessageMedia(
     const doc = msg.rawMedia.document;
     if (!(doc instanceof _Api.Document)) return null;
     const sizeNum = Number(doc.size ?? 0);
+    expectedBytes = sizeNum;
     const mime = doc.mimeType ?? '';
     if (mime === 'image/jpeg') ext = 'jpg';
     else if (mime === 'image/png') ext = 'png';
@@ -339,7 +338,6 @@ export async function downloadMessageMedia(
   }
 
   const dir = join(process.cwd(), 'data', channelTelegramId);
-  mkdirSync(dir, { recursive: true });
 
   const filename = `${msg.id}.${ext!}`;
   const filepath = join(dir, filename);
@@ -348,21 +346,10 @@ export async function downloadMessageMedia(
 
   return telegramCircuit.execute(async () => {
     const tg = await getTelegramClient();
-    try {
-      const result = await tg.downloadMedia(msg.rawMedia!, { outputFile: filepath });
-      if (!result) return null;
-      return `${channelTelegramId}/${filename}`;
-    } catch (err) {
-      // Remove partial file so the next retry downloads a clean copy
-      if (existsSync(filepath)) {
-        try {
-          unlinkSync(filepath);
-        } catch {
-          // best-effort — ignore cleanup errors
-        }
-      }
-      throw err;
-    }
+    const saved = await downloadMediaFile(filepath, expectedBytes, (writer) =>
+      tg.downloadMedia(msg.rawMedia!, { outputFile: writer }),
+    );
+    return saved ? `${channelTelegramId}/${filename}` : null;
   }, 'downloadMessageMedia');
 }
 

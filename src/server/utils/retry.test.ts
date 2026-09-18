@@ -25,6 +25,17 @@ function testPolicy(overrides: Partial<RetryPolicy> = {}): RetryPolicy {
 
 // ─── withRetry ────────────────────────────────────────────────────────────────
 
+describe('storage errors', () => {
+  it.each(['ENOSPC', 'EDQUOT', 'SQLITE_FULL', 'STORAGE_PAUSED'])(
+    'does not retry %s even with network wording',
+    (code) => {
+      const error = Object.assign(new Error('network mount connection write failed'), { code });
+      expect(isTransientDownloadError(error)).toBe(false);
+      expect(isTransientTelegramError(error)).toBe(false);
+    },
+  );
+});
+
 describe('withRetry', () => {
   it('succeeds on first try', async () => {
     const fn = vi.fn().mockResolvedValue('ok');

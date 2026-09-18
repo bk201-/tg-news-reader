@@ -162,5 +162,19 @@ describe('telegramBridge', () => {
 
       expect(worker.postMessage.mock.calls[0][0].reqId).toBe(42);
     });
+
+    it('preserves storage error codes across the worker bridge', async () => {
+      mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
+      mockDownloadMessageMedia.mockRejectedValueOnce(Object.assign(new Error('write failed'), { code: 'EDQUOT' }));
+      const worker = createFakeWorker();
+      handleBridgeMessage(worker, createDownloadMsg(), 0);
+      await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalled());
+      expect(worker.postMessage).toHaveBeenCalledWith({
+        type: 'tg:error',
+        reqId: 1,
+        message: 'write failed',
+        code: 'EDQUOT',
+      });
+    });
   });
 });

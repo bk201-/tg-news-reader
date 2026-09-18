@@ -19,6 +19,31 @@ Media files are stored in `/app/data` inside the container. This path is mounted
 
 The volume and mount were set up once via `az containerapp update --yaml`. Subsequent `az containerapp update --image` calls (used in CI) **preserve** `volumeMounts` — confirmed empirically. No extra CI step needed.
 
+### Low-space download protection
+
+Downloads keep **1 GiB free** on the filesystem mounted at `data/` by default.
+`DOWNLOAD_STORAGE_RESERVE_MB` can raise this reserve (minimum/default: `1024`).
+Capacity is checked using `statfs(data/)`, not the container's root filesystem.
+Manual downloads cannot bypass the reserve. Checks and chunk writes are serialized
+across Telegram downloads, including Instant View images, to avoid concurrent
+writers spending the same available space.
+
+Insufficient space, `ENOSPC`, or `EDQUOT` pauses the entire download queue; affected
+tasks return to `pending`. In-flight media downloads stop at their next write and
+remove their temporary `.part` files. Only successfully closed files are renamed
+to the final media path. Existing completed files are not deleted.
+
+The website and health/readiness endpoints remain available. `/api/health` returns
+HTTP 200 with `status: degraded` and `downloads.storage` describing the pause.
+A warning and optional Telegram alert report the transition.
+
+Free space is rechecked at most once per minute while paused. Free space must cover
+the reserve plus the blocked write/download before the queue resumes. After a quota
+error, the reported free space must also increase, preventing endless retries on
+mounts that overstate available space. Free files or raise the Azure Files share
+quota to recover. The preventive threshold depends on the mount's reported capacity;
+an account-wide quota not reflected by the mount is handled by the write-error pause.
+
 If the mount ever needs to be re-applied (e.g. after the Container App is recreated from scratch):
 
 ```bash

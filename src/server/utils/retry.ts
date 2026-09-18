@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { isStorageCapacityError } from './storageErrors.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export async function withRetry<T>(fn: () => Promise<T>, policy: RetryPolicy, co
 /** Transient errors from the Telegram MTProto layer / gramjs. */
 export function isTransientTelegramError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
+  if (isStorageCapacityError(err)) return false;
   const msg = err.message.toLowerCase();
   return (
     err.constructor.name === 'FloodWaitError' ||
@@ -141,6 +143,7 @@ export function isTransientDownloadError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
   const code = (err as NodeJS.ErrnoException).code ?? '';
+  if (isStorageCapacityError(err)) return false;
   return (
     err.constructor.name === 'FloodWaitError' ||
     err.constructor.name === 'FileReferenceExpiredError' ||

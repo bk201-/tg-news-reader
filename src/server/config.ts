@@ -17,6 +17,11 @@ export const RATE_LIMIT_GET_MULTIPLIER = parseInt(process.env.RATE_LIMIT_GET_MUL
 export const DOWNLOAD_WORKER_CONCURRENCY = parseInt(process.env.DOWNLOAD_WORKER_CONCURRENCY ?? '10', 10);
 /** How long (ms) to keep a completed task before auto-deleting it. Env: DOWNLOAD_TASK_CLEANUP_DELAY_SEC */
 export const DOWNLOAD_TASK_CLEANUP_DELAY_MS = parseInt(process.env.DOWNLOAD_TASK_CLEANUP_DELAY_SEC ?? '30', 10) * 1_000;
+/** Free space kept on the media filesystem, including for user-initiated downloads (default 1 GiB). */
+export const DOWNLOAD_STORAGE_RESERVE_BYTES = Number(process.env.DOWNLOAD_STORAGE_RESERVE_MB ?? '1024') * 1024 * 1024;
+if (!Number.isFinite(DOWNLOAD_STORAGE_RESERVE_BYTES) || DOWNLOAD_STORAGE_RESERVE_BYTES < 1024 * 1024 * 1024) {
+  throw new Error('DOWNLOAD_STORAGE_RESERVE_MB must be at least 1024');
+}
 
 // ─── Worker pool circuit breaker ──────────────────────────────────────────────
 /**

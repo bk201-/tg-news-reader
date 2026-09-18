@@ -97,6 +97,7 @@ vi.mock('../config.js', () => ({
   MAX_PHOTO_SIZE_BYTES: 5 * 1024 * 1024,
   MAX_VIDEO_SIZE_BYTES: 75 * 1024 * 1024,
   MAX_IMG_DOC_SIZE_BYTES: 5 * 1024 * 1024,
+  DOWNLOAD_STORAGE_RESERVE_BYTES: 1024 ** 3,
 }));
 
 vi.mock('./telegramClient.js', () => ({

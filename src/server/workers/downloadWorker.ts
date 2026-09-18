@@ -80,6 +80,7 @@ interface ErrorMsg {
   type: 'error';
   taskId: number;
   message: string;
+  code?: string;
 }
 
 type IncomingMsg = TaskMsg | MainToWorkerBridgeMsg;
@@ -97,7 +98,7 @@ parentPort!.on('message', (msg: IncomingMsg) => {
   }
   if (msg.type === 'tg:error') {
     if (pendingIpc?.reqId === msg.reqId) {
-      pendingIpc.reject(new Error(msg.message));
+      pendingIpc.reject(Object.assign(new Error(msg.message), { code: msg.code }));
       pendingIpc = null;
     }
     return;
@@ -268,7 +269,8 @@ async function handleTask(task: TaskPayload): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ module: 'download', workerId, taskId: task.id, type: task.type, err }, 'task failed');
-    const reply: ErrorMsg = { type: 'error', taskId: task.id, message };
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : undefined;
+    const reply: ErrorMsg = { type: 'error', taskId: task.id, message, code };
     parentPort!.postMessage(reply);
   }
 }
