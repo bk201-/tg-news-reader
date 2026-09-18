@@ -72,9 +72,9 @@ describe('DownloadStorage', () => {
   it('waits before probing again and resumes low-space downloads after cleanup', async () => {
     vi.useFakeTimers();
     free(GiB - 1);
-    await expect(storage.check()).rejects.toThrow();
+    await expect(storage.check()).rejects.toThrow('Insufficient free storage');
     free(2 * GiB);
-    await expect(storage.check()).rejects.toThrow();
+    await expect(storage.check()).rejects.toThrow('Insufficient free storage');
     expect(statfs).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(60_000);
     await storage.check();
