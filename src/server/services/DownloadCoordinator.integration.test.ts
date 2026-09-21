@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as storageModule from './downloadStorage.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -77,10 +77,13 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-vi.mock('./downloadProgress.js', () => ({
-  downloadProgressEmitter: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
-  emitTaskUpdate: vi.fn(),
-}));
+vi.mock('./downloadProgress.js', async () => {
+  const { EventEmitter } = await import('node:events');
+  const emitter = new EventEmitter();
+  vi.spyOn(emitter, 'on');
+  vi.spyOn(emitter, 'emit');
+  return { downloadProgressEmitter: emitter, emitTaskUpdate: vi.fn() };
+});
 
 import { statfs } from 'node:fs/promises';
 import { sendAlert } from './alertBot.js';
@@ -111,6 +114,14 @@ describe('DownloadCoordinator (integration)', () => {
     channelId = ch.id;
     const n = await seedNews(testDb.db, channelId);
     newsId = n.id;
+  });
+
+  afterEach(async () => {
+    // Stop each test's fake pool through its circuit breaker, including poll timers.
+    for (const worker of createdWorkers) worker.emit('error', new Error('test teardown'));
+    downloadProgressEmitter.removeAllListeners();
+    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
   // ── start() ──────────────────────────────────────────────────────────────
@@ -145,6 +156,85 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Task dispatch ────────────────────────────────────────────────────────
 
   describe('task dispatch', () => {
+    it.each(['main', 'worker'])('resumes a paused pending task immediately after %s-thread cleanup', async (source) => {
+      vi.mocked(statfs).mockResolvedValueOnce({ bavail: 100, bsize: 4096 } as Awaited<ReturnType<typeof statfs>>);
+      await seedDownload(testDb.db, newsId);
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await vi.waitFor(() => expect(storage.status.paused).toBe(true));
+      expect(createdWorkers[0].postMessage).not.toHaveBeenCalled();
+
+      if (source === 'main') downloadProgressEmitter.emit('storage_freed');
+      else createdWorkers[0].emit('message', { type: 'storage_freed' });
+
+      await vi.waitFor(() => expect(createdWorkers[0].postMessage).toHaveBeenCalled());
+      expect(storage.status.paused).toBe(false);
+    });
+
+    it('automatically retries the paused queue when space is freed outside the app', async () => {
+      vi.useFakeTimers();
+      vi.mocked(statfs).mockResolvedValueOnce({ bavail: 100, bsize: 4096 } as Awaited<ReturnType<typeof statfs>>);
+      await seedDownload(testDb.db, newsId);
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await vi.waitFor(() => expect(storage.status.paused).toBe(true));
+
+      await vi.advanceTimersByTimeAsync(61_000);
+
+      await vi.waitFor(() => expect(createdWorkers[0].postMessage).toHaveBeenCalled());
+      expect(storage.status.paused).toBe(false);
+    });
+
+    it.each(['tasks_removed', 'task_removed'])('reconsiders smaller pending work after %s', async (event) => {
+      await expect(storage.check(100 * 1024 ** 3)).rejects.toMatchObject({ code: 'STORAGE_PAUSED' });
+      const oversizedTask = await seedDownload(testDb.db, newsId);
+      const image = await seedNews(testDb.db, channelId, { mediaType: 'photo' });
+      const imageTask = await seedDownload(testDb.db, image.id);
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(createdWorkers[0].postMessage).not.toHaveBeenCalled();
+
+      if (event === 'tasks_removed') {
+        await testDb.client.execute('DELETE FROM news WHERE id = ?', [newsId]);
+        downloadProgressEmitter.emit(event, [newsId]);
+      } else {
+        await testDb.client.execute('DELETE FROM downloads WHERE id = ?', [oversizedTask.id]);
+        downloadProgressEmitter.emit(event, oversizedTask.id);
+      }
+
+      await vi.waitFor(() =>
+        expect(createdWorkers[0].postMessage).toHaveBeenCalledWith({
+          type: 'task',
+          payload: expect.objectContaining({ id: imageTask.id }),
+        }),
+      );
+    });
+
+    it('dispatches manual requests, then images, then other media with FIFO within each tier', async () => {
+      const video = await seedNews(testDb.db, channelId, { mediaType: 'video' });
+      const photo = await seedNews(testDb.db, channelId, { mediaType: 'photo' });
+      const imageDocument = await seedNews(testDb.db, channelId, { mediaType: 'document' });
+      const manual = await seedNews(testDb.db, channelId, { mediaType: 'video' });
+      const videoTask = await seedDownload(testDb.db, video.id, { createdAt: 1 });
+      const photoTask = await seedDownload(testDb.db, photo.id, { createdAt: 2 });
+      const imageTask = await seedDownload(testDb.db, imageDocument.id, { priority: 5, createdAt: 3 });
+      const manualTask = await seedDownload(testDb.db, manual.id, { priority: 10, createdAt: 4 });
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      for (const task of [manualTask, photoTask, imageTask, videoTask]) {
+        await vi.waitFor(() =>
+          expect(createdWorkers[0].postMessage).toHaveBeenCalledWith({
+            type: 'task',
+            payload: expect.objectContaining({ id: task.id }),
+          }),
+        );
+        createdWorkers[0].postMessage.mockClear();
+        createdWorkers[0].emit('message', { type: 'done', taskId: task.id });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
     it('does not start downloads when less than 1 GiB is free', async () => {
       vi.mocked(statfs).mockResolvedValueOnce({ bavail: 100, bsize: 4096 } as Awaited<ReturnType<typeof statfs>>);
       await seedDownload(testDb.db, newsId, { status: 'pending', priority: 10 });
@@ -206,6 +296,26 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Worker message handling ──────────────────────────────────────────────
 
   describe('worker messages', () => {
+    it.each(['done', 'error'])('releases the article slot after a deleted task reports %s', async (type) => {
+      const task = await seedDownload(testDb.db, newsId, { type: 'article', url: 'https://example.com' });
+      const coordinator = new DownloadCoordinator(1);
+      await coordinator.start();
+      await vi.waitFor(() => expect(createdWorkers[0].postMessage).toHaveBeenCalled());
+      await testDb.client.execute('DELETE FROM news WHERE id = ?', [newsId]);
+      const next = await seedNews(testDb.db, channelId);
+      const nextTask = await seedDownload(testDb.db, next.id, { type: 'article', url: 'https://example.com/next' });
+      createdWorkers[0].postMessage.mockClear();
+
+      createdWorkers[0].emit('message', { type, taskId: task.id, message: 'cancelled' });
+
+      await vi.waitFor(() =>
+        expect(createdWorkers[0].postMessage).toHaveBeenCalledWith({
+          type: 'task',
+          payload: expect.objectContaining({ id: nextTask.id }),
+        }),
+      );
+    });
+
     it('pauses the whole queue and retains a task on ENOSPC instead of failing it', async () => {
       const dl = await seedDownload(testDb.db, newsId);
       const coordinator = new DownloadCoordinator(1);

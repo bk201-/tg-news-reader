@@ -209,11 +209,61 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 
 - `enqueueTask(newsId, type, url?, priority=0)` — INSERT with `onConflictDoUpdate`, resets failed → pending, keeps MAX(priority)
 - `startWorkerPool(n)` — called in `server/index.ts`; resets `processing → pending` on startup (crash recovery)
-- Priorities: 0 = background (size limits apply), 10 = user-initiated (size limits bypassed)
+- Priorities: 10 = user-initiated (size limits bypassed), 5 = background images (photos and image documents), 0 = other background media. Equal priorities use creation time, then task ID (FIFO).
+- `downloadPriority.ts` supplies the same ordering for dispatch and the visible queue. Already-queued photos receive effective priority 5 without a DB migration; image documents are classified by MIME type when enqueued. Running tasks are not preempted.
 - Pool circuit breaker: ≥ ⌈N × ratio⌉ crashes in sliding window → `logger.fatal` + `sendAlert` + `process.exit(1)`
 - Auto-cleanup of done tasks after `DOWNLOAD_TASK_CLEANUP_DELAY_MS` ms (default 30 s)
-- SSE: `GET /api/downloads/stream` — `init` + `task_update` events
+- SSE: `GET /api/downloads/stream` — `init`, `task_update`, `tasks_removed` (news cleanup),
+  `task_removed` (manual cancellation) and `queue_changed` (priority/retry) events.
+- Cancel deletes pending/failed tasks atomically and updates connected queues. If a worker already claimed the
+  task, cancellation returns 409 instead of pretending to interrupt an active transfer.
+- Prioritize raises priority to at least 10, resets failed tasks for retry (including already-manual tasks),
+  and refreshes the queue order. Action buttons show pending state and request errors.
+
+**Storage recovery**: the shared storage gate preserves `DOWNLOAD_STORAGE_RESERVE_BYTES` (default 1 GiB) and periodically retries paused tasks (up to 60 seconds between capacity probes). Successful media-file cleanup emits `storage_freed`; the coordinator immediately expires the pause cooldown, rechecks actual capacity, and resumes pending work only if enough space is available. Cleanup in worker threads forwards the notification to the main thread. Failed or missing-file deletions do not trigger recovery.
+
+Removing queued tasks also triggers a capacity recheck: the size of a deleted, oversized download must not keep smaller remaining tasks paused. Each new file still undergoes its own size/reserve check.
+
+**Read/filtered news**: filtered items do not auto-download media. Channel refresh deletes read news and cascades deletion of their download tasks, notifying the queue via `tasks_removed`. Workers discard media returned after a news row was deleted instead of leaving orphan files.
+
 - `DownloadsPanel` / `DownloadsPinnedContent`: when both `media` and `article` tasks are active, the task list renders two sections ("Media" / "Articles") separated by a labelled divider.
+
+### Orphan media maintenance
+
+Run from the application directory with the **matching database and mounted `data` volume**:
+
+```powershell
+# Preview only; no media is deleted
+npm run media:cleanup
+
+# Stop ALL app replicas and other storage writers first
+npm run media:cleanup -- --apply --offline
+```
+
+The standalone utility and its tests live in `scripts/media-cleanup`; it is not part of the running server
+or the production image. Run it from a checkout with development dependencies installed (`tsx` is required).
+On Azure, use a separate maintenance environment with that checkout, the same mounted volume and database
+configuration, with every application replica stopped for `--apply`. A local run only scans the local
+`data` directory unless the target storage is mounted there.
+Do not run against production storage with an unrelated or empty database. Back up the volume before applying.
+
+- Loads all news references, including single media, albums, and Instant View images embedded in article content.
+  Read/filtered news still protect their files while their rows exist.
+- Scans direct channel folders, including folders of deleted channels. No Azure credentials or listing API
+  are needed: it enumerates the mounted filesystem. Scanning progress uses folders completed/total plus
+  file counts; deletion progress uses candidates processed/total.
+- Removes only unreferenced application-named media and abandoned `.part` files. SQLite/root files,
+  `tts` (managed separately), unknown filenames, symlinks and nested directories are left alone.
+- Reports candidate/deleted file counts, exact logical bytes, skipped entries and errors, ending with a JSON summary.
+  `bytesDeleted` is the sum of successfully unlinked file sizes, not an Azure quota/free-space measurement.
+  Failed deletions are logged and produce a nonzero exit code; DB/listing failures abort before deleting anything.
+- Applying requires `--offline` acknowledgement and reserves `SERVER_PORT` (default 3173), refusing if a local
+  app already owns it. This port guard cannot detect writers in other containers: stopping all replicas is mandatory.
+  A `.media-cleanup.lock` file prevents concurrent maintenance runs. If a run is forcibly killed,
+  remove **only that file**, after confirming no cleanup is still running, before retrying.
+- Cleanup is deliberately offline: a downloaded file can exist before its news row is updated, so deleting
+  apparently unreferenced files while workers/fetches are active would risk deleting valid downloads.
+  Restart the app afterwards; the worker pool performs its normal capacity check and crash recovery.
 
 ---
 

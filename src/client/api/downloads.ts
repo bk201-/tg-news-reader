@@ -38,7 +38,7 @@ export function usePrioritizeDownload() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.patch<{ success: boolean }>(`/downloads/${id}/prioritize`, {}),
-    onSuccess: () => {
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: downloadsKeys.all });
     },
   });
@@ -48,7 +48,7 @@ export function useCancelDownload() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete<{ success: boolean }>(`/downloads/${id}`),
-    onSuccess: () => {
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: downloadsKeys.all });
     },
   });
@@ -90,6 +90,23 @@ export function useDownloadsSSE() {
         es.addEventListener('init', (e: MessageEvent) => {
           const tasks = JSON.parse(e.data as string) as DownloadTask[];
           qc.setQueryData(downloadsKeys.all, tasks);
+        });
+
+        es.addEventListener('tasks_removed', (e: MessageEvent) => {
+          const { newsIds } = JSON.parse(e.data as string) as { newsIds: number[] };
+          const removed = new Set(newsIds);
+          qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
+            old.filter((task) => !removed.has(task.newsId)),
+          );
+        });
+
+        es.addEventListener('task_removed', (e: MessageEvent) => {
+          const { taskId } = JSON.parse(e.data as string) as { taskId: number };
+          qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) => old.filter((task) => task.id !== taskId));
+        });
+
+        es.addEventListener('queue_changed', () => {
+          void qc.invalidateQueries({ queryKey: downloadsKeys.all });
         });
 
         es.addEventListener('task_update', (e: MessageEvent) => {

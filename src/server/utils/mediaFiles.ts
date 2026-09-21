@@ -4,24 +4,28 @@
 
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { logger } from '../logger.js';
+import { downloadProgressEmitter } from '../services/downloadProgress.js';
 
-function deleteMediaFile(localMediaPath: string | null) {
-  if (!localMediaPath) return;
+function deleteMediaFile(localMediaPath: string | null): boolean {
+  if (!localMediaPath) return false;
   const filepath = join(process.cwd(), 'data', localMediaPath);
   if (existsSync(filepath)) {
     try {
       unlinkSync(filepath);
-    } catch {
-      /* ignore */
+      return true;
+    } catch (err) {
+      logger.warn({ module: 'download', err }, 'could not delete media file');
     }
   }
+  return false;
 }
 
 /** Delete all media files for a news row (handles both single and album). */
 export function deleteAllMediaFiles(localMediaPath: string | null, localMediaPaths: string[] | null) {
-  if (localMediaPaths) {
-    localMediaPaths.forEach(deleteMediaFile);
-  } else if (localMediaPath) {
-    deleteMediaFile(localMediaPath);
+  let freed = false;
+  for (const path of localMediaPaths ?? [localMediaPath]) {
+    if (deleteMediaFile(path)) freed = true;
   }
+  if (freed) downloadProgressEmitter.emit('storage_freed');
 }

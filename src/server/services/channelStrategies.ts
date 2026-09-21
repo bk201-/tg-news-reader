@@ -3,8 +3,8 @@ import type { ChannelType } from '../../shared/types.js';
 import { db } from '../db/index.js';
 import { news } from '../db/schema.js';
 import { enqueueTask } from './downloadManager.js';
+import { getMediaDownloadPriority } from './downloadPriority.js';
 import type { TelegramMessage } from './telegram.js';
-import { isVideoMessage } from './telegramParser.js';
 
 /** Media types eligible for auto-download by media strategies (photos + files + video). */
 const DOWNLOADABLE_MEDIA_TYPES = new Set(['photo', 'document', 'video']);
@@ -77,12 +77,12 @@ abstract class MediaDownloadStrategy implements ChannelStrategy {
   abstract shouldSkipMessage(msg: TelegramMessage): boolean;
 
   async postProcess({ messages, insertedMap }: PostProcessArgs): Promise<void> {
-    const toQueue = messages.filter((m) => DOWNLOADABLE_MEDIA_TYPES.has(m.mediaType ?? '') && insertedMap.has(m.id));
+    const toQueue = messages
+      .filter((m) => DOWNLOADABLE_MEDIA_TYPES.has(m.mediaType ?? '') && insertedMap.has(m.id))
+      .sort((a, b) => getMediaDownloadPriority(b) - getMediaDownloadPriority(a));
     if (toQueue.length === 0) return;
 
-    // Hidden (filtered) news must not auto-download heavy video — the user can
-    // still download it manually. Images (photos / image documents) are cheap,
-    // so they are downloaded regardless.
+    // Filters suppress all automatic media downloads, including photos and albums.
     const insertedIds = toQueue.map((m) => insertedMap.get(m.id)!);
     const hiddenRows = await db
       .select({ id: news.id })
@@ -92,8 +92,8 @@ abstract class MediaDownloadStrategy implements ChannelStrategy {
 
     for (const msg of toQueue) {
       const newsId = insertedMap.get(msg.id)!;
-      if (hiddenIds.has(newsId) && isVideoMessage(msg)) continue;
-      await enqueueTask(newsId, 'media', undefined, 0);
+      if (hiddenIds.has(newsId)) continue;
+      await enqueueTask(newsId, 'media', undefined, getMediaDownloadPriority(msg));
     }
   }
 

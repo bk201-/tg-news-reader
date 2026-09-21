@@ -10,7 +10,7 @@
  */
 
 import { Worker } from 'worker_threads';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, eq, getTableColumns } from 'drizzle-orm';
 import type { DownloadTask } from '../../shared/types.js';
 import {
   ARTICLE_WORKER_CONCURRENCY,
@@ -25,6 +25,7 @@ import { channels, downloads, news } from '../db/schema.js';
 import { logger } from '../logger.js';
 import { DB_POLL_POLICY, withRetry } from '../utils/retry.js';
 import { sendAlert } from './alertBot.js';
+import { downloadOrderBy, downloadPriority } from './downloadPriority.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 import { downloadStorage, isStorageCapacityError, StoragePausedError } from './downloadStorage.js';
 import { handleBridgeMessage, isBridgeMessage } from './telegramBridge.js';
@@ -40,7 +41,7 @@ async function getTaskWithContext(id: number): Promise<DownloadTask | null> {
       newsId: downloads.newsId,
       type: downloads.type,
       url: downloads.url,
-      priority: downloads.priority,
+      priority: downloadPriority,
       status: downloads.status,
       error: downloads.error,
       createdAt: downloads.createdAt,
@@ -94,8 +95,8 @@ export class DownloadCoordinator {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly concurrency: number;
   private _stopped = false;
-  /** Number of article tasks currently being processed across all workers. */
-  private runningArticles = 0;
+  /** Track slots independently of DB rows, which read-news cleanup may delete. */
+  private readonly articleWorkers = new Set<number>();
   /** Max concurrent article (jsdom) tasks — capped to avoid OOM. */
   private readonly maxConcurrentArticles: number;
 
@@ -113,6 +114,9 @@ export class DownloadCoordinator {
     await db.update(downloads).set({ status: 'pending' }).where(eq(downloads.status, 'processing'));
     for (let i = 0; i < this.concurrency; i++) this.spawnWorker(i);
     downloadProgressEmitter.on(WAKEUP_EVENT, () => void this.tryDispatch());
+    downloadProgressEmitter.on('storage_freed', () => void this.onStorageFreed());
+    downloadProgressEmitter.on('tasks_removed', () => void this.onStorageFreed());
+    downloadProgressEmitter.on('task_removed', () => void this.onStorageFreed());
     logger.info(
       { module: 'download', concurrency: this.concurrency, maxConcurrentArticles: this.maxConcurrentArticles },
       `worker pool started (${this.concurrency} workers, max ${this.maxConcurrentArticles} article tasks)`,
@@ -148,6 +152,7 @@ export class DownloadCoordinator {
   }
 
   private handleWorkerCrash(id: number, err: unknown): void {
+    this.articleWorkers.delete(id);
     this.available.delete(id);
     this.workers.delete(id);
 
@@ -192,6 +197,10 @@ export class DownloadCoordinator {
   }
 
   private handleWorkerMessage(worker: Worker, workerId: number, msg: WorkerMsg): void {
+    if (msg.type === 'storage_freed') {
+      void this.onStorageFreed();
+      return;
+    }
     if (isBridgeMessage(msg)) {
       handleBridgeMessage(worker, msg, workerId);
       return;
@@ -201,11 +210,11 @@ export class DownloadCoordinator {
   }
 
   private async onTaskDone(workerId: number, taskId: number): Promise<void> {
+    this.articleWorkers.delete(workerId);
     const now = Math.floor(Date.now() / 1000);
     await db.update(downloads).set({ status: 'done', processedAt: now }).where(eq(downloads.id, taskId));
     const doneTask = await getTaskWithContext(taskId);
     if (doneTask) {
-      if (doneTask.type === 'article') this.runningArticles = Math.max(0, this.runningArticles - 1);
       emitTaskUpdate({ ...doneTask, status: 'done' });
       setTimeout(() => {
         void db.delete(downloads).where(eq(downloads.id, taskId));
@@ -216,6 +225,7 @@ export class DownloadCoordinator {
   }
 
   private async onTaskError(workerId: number, { taskId, message: errorMsg, code }: ErrorMsg): Promise<void> {
+    this.articleWorkers.delete(workerId);
     const storageError = isStorageCapacityError({ message: errorMsg, code });
     if (storageError) downloadStorage.pause(new StoragePausedError(errorMsg));
     const now = Math.floor(Date.now() / 1000);
@@ -225,10 +235,10 @@ export class DownloadCoordinator {
       .where(eq(downloads.id, taskId));
     const failedTask = await getTaskWithContext(taskId);
     if (failedTask) {
-      if (failedTask.type === 'article') this.runningArticles = Math.max(0, this.runningArticles - 1);
       emitTaskUpdate(failedTask);
     }
-    if (!storageError) logger.error({ module: 'download', taskId, err: errorMsg }, 'task permanently failed');
+    if (!storageError && failedTask)
+      logger.error({ module: 'download', taskId, err: errorMsg }, 'task permanently failed');
     this.available.add(workerId);
     void this.tryDispatch();
   }
@@ -275,16 +285,17 @@ export class DownloadCoordinator {
         () => {
           // Media-only workers: never claim article tasks.
           // Article-capable workers: claim anything, but still respect the in-flight cap.
-          const canClaimArticle = hasArticleCapable && this.runningArticles < this.maxConcurrentArticles;
+          const canClaimArticle = hasArticleCapable && this.articleWorkers.size < this.maxConcurrentArticles;
           return db
-            .select()
+            .select({ ...getTableColumns(downloads), priority: downloadPriority })
             .from(downloads)
+            .innerJoin(news, eq(downloads.newsId, news.id))
             .where(
               canClaimArticle
                 ? eq(downloads.status, 'pending')
                 : and(eq(downloads.status, 'pending'), eq(downloads.type, 'media')),
             )
-            .orderBy(desc(downloads.priority), asc(downloads.createdAt))
+            .orderBy(...downloadOrderBy)
             .limit(1);
         },
         DB_POLL_POLICY,
@@ -340,7 +351,7 @@ export class DownloadCoordinator {
     }
     if (taskCtx) emitTaskUpdate({ ...taskCtx, status: 'processing' });
 
-    if (task.type === 'article') this.runningArticles++;
+    if (task.type === 'article') this.articleWorkers.add(workerId);
 
     worker.postMessage({
       type: 'task',
@@ -348,6 +359,11 @@ export class DownloadCoordinator {
     });
 
     if (this.available.size > 0) void this.tryDispatch();
+  }
+
+  private async onStorageFreed(): Promise<void> {
+    await downloadStorage.notifySpaceFreed();
+    await this.tryDispatch();
   }
 
   private schedulePoll(): void {

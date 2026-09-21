@@ -25,6 +25,7 @@ vi.mock('./news', () => ({
   updatePaginatedItems: vi.fn(),
 }));
 
+import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 import { api } from './client';
 import {
   downloadsKeys,
@@ -33,9 +34,60 @@ import {
   usePrioritizeDownload,
   useCancelDownload,
   useNewsDownloadTask,
+  useDownloadsSSE,
 } from './downloads';
 
 const mockedApi = vi.mocked(api);
+
+describe('useDownloadsSSE removal', () => {
+  it('removes only the cancelled task, keeping its sibling article task', () => {
+    vi.clearAllMocks();
+    const { Wrapper, queryClient } = createWrapper();
+    const tasks: DownloadTask[] = [
+      { id: 1, newsId: 10, type: 'media', priority: 0, status: 'pending', createdAt: 0 },
+      { id: 2, newsId: 10, type: 'article', priority: 0, status: 'pending', createdAt: 0 },
+    ];
+    queryClient.setQueryData(downloadsKeys.all, tasks);
+    const { unmount } = renderHook(() => useDownloadsSSE(), { wrapper: Wrapper });
+    const es = new EventTarget() as EventSource;
+    vi.mocked(createReconnectingEventSource).mock.calls[0][0].onConnect(es);
+    act(() => es.dispatchEvent(new MessageEvent('task_removed', { data: JSON.stringify({ taskId: 1 }) })));
+    expect(queryClient.getQueryData(downloadsKeys.all)).toEqual([tasks[1]]);
+    unmount();
+  });
+
+  it('refetches authoritative queue ordering when another client prioritizes a task', () => {
+    vi.clearAllMocks();
+    const { Wrapper, queryClient } = createWrapper();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const { unmount } = renderHook(() => useDownloadsSSE(), { wrapper: Wrapper });
+    const es = new EventTarget() as EventSource;
+    vi.mocked(createReconnectingEventSource).mock.calls[0][0].onConnect(es);
+    act(() => es.dispatchEvent(new MessageEvent('queue_changed', { data: '{}' })));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: downloadsKeys.all });
+    unmount();
+  });
+
+  it('removes all tasks for deleted news without fetching deleted articles', () => {
+    vi.clearAllMocks();
+    const { Wrapper, queryClient } = createWrapper();
+    const tasks: DownloadTask[] = [
+      { id: 1, newsId: 10, type: 'media', priority: 0, status: 'processing', createdAt: 0 },
+      { id: 2, newsId: 10, type: 'article', priority: 0, status: 'pending', createdAt: 0 },
+      { id: 3, newsId: 20, type: 'media', priority: 0, status: 'pending', createdAt: 0 },
+    ];
+    queryClient.setQueryData(downloadsKeys.all, tasks);
+    const { unmount } = renderHook(() => useDownloadsSSE(), { wrapper: Wrapper });
+    const es = new EventTarget() as EventSource;
+    vi.mocked(createReconnectingEventSource).mock.calls[0][0].onConnect(es);
+
+    act(() => es.dispatchEvent(new MessageEvent('tasks_removed', { data: JSON.stringify({ newsIds: [10] }) })));
+
+    expect(queryClient.getQueryData(downloadsKeys.all)).toEqual([tasks[2]]);
+    expect(mockedApi.get).not.toHaveBeenCalled();
+    unmount();
+  });
+});
 
 function createWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -80,6 +132,18 @@ describe('useCreateDownload', () => {
 describe('usePrioritizeDownload', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('refreshes stale queue state after a failed priority request and preserves the error', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    mockedApi.patch.mockRejectedValueOnce(new Error('Task not found'));
+    const { result } = renderHook(() => usePrioritizeDownload(), { wrapper: Wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync(5)).rejects.toThrow('Task not found');
+    });
+    expect(spy).toHaveBeenCalledWith({ queryKey: downloadsKeys.all });
+    await waitFor(() => expect(result.current.error?.message).toBe('Task not found'));
+  });
+
   it('patches and invalidates', async () => {
     const { Wrapper, queryClient } = createWrapper();
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -96,6 +160,17 @@ describe('usePrioritizeDownload', () => {
 
 describe('useCancelDownload', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('refreshes stale queue state when cancellation races with worker dispatch', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    mockedApi.delete.mockRejectedValueOnce(new Error('Only pending or failed tasks can be cancelled'));
+    const { result } = renderHook(() => useCancelDownload(), { wrapper: Wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync(5)).rejects.toThrow('Only pending or failed tasks can be cancelled');
+    });
+    expect(spy).toHaveBeenCalledWith({ queryKey: downloadsKeys.all });
+  });
 
   it('deletes and invalidates', async () => {
     const { Wrapper, queryClient } = createWrapper();

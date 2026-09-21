@@ -52,6 +52,17 @@ export class DownloadStorage {
     await this.exclusive(() => this.ensureSpace(requiredBytes));
   }
 
+  /** Retry current work after cleanup; every file still gets its own capacity check. */
+  async notifySpaceFreed(): Promise<void> {
+    await this.exclusive(async () => {
+      if (this.pauseState) {
+        this.pauseState.retryAt = 0;
+        // Cleanup may have removed the large task that originally paused the queue.
+        this.pauseState.requiredBytes = 0;
+      }
+    });
+  }
+
   async write(bytes: number, write: () => Promise<void>): Promise<void> {
     await this.exclusive(async () => {
       await this.ensureSpace(bytes);

@@ -59,6 +59,8 @@ const {
   }
 
   const _mockApi = {
+    Photo: class {},
+    MessageMediaPhoto: class {},
     Message: _MockMessage,
     WebPage: _MockWebPage,
     Page: _MockPage,
@@ -118,9 +120,11 @@ vi.mock('./telegramParser.js', () => ({
   parseMessageFields: (...args: unknown[]) => mockParseMessageFields(...args),
   extractInstantViewPage: (...args: unknown[]) => mockExtractInstantViewPage(...args),
 }));
+vi.mock('./downloadMediaFile.js', () => ({ downloadMediaFile: vi.fn().mockResolvedValue(true) }));
 
 import { logger } from '../logger.js';
-import { fetchChannelMessages, fetchMessageById } from './telegramApi.js';
+import { downloadMediaFile } from './downloadMediaFile.js';
+import { fetchChannelMessages, fetchMessageById, resolveInstantViewImages } from './telegramApi.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +145,26 @@ describe('telegramApi — resolvePartialInstantView', () => {
   }
 
   describe('fetchChannelMessages', () => {
+    it('leaves Instant View images unresolved until channel filters have been applied', async () => {
+      mockGetMessages.mockResolvedValueOnce([new MockMessage({ id: 1, message: 'text', date: 1700000000 })]);
+      mockParseMessageFields.mockReturnValueOnce(
+        makeParsedMsg({
+          instantViewContent: '![photo](iv://0)',
+          instantViewImages: [{ placeholder: 'iv://0', media: new mockApi.Photo() as never }],
+        }),
+      );
+
+      const [result] = await fetchChannelMessages('test_channel');
+
+      expect(downloadMediaFile).not.toHaveBeenCalled();
+      expect(result.instantViewImages).toHaveLength(1);
+
+      await resolveInstantViewImages(result, 'test_channel');
+
+      expect(downloadMediaFile).toHaveBeenCalledOnce();
+      expect(result.instantViewContent).toBe('![photo](test_channel/iv_1_0.jpg)');
+    });
+
     it('resolves partial IV pages via messages.getWebPage', async () => {
       const msg = new MockMessage({ id: 1, message: 'text', date: 1700000000 });
       mockGetMessages.mockResolvedValueOnce([msg]);
@@ -272,6 +296,22 @@ describe('telegramApi — resolvePartialInstantView', () => {
   });
 
   describe('fetchMessageById', () => {
+    it('does not download IV images for metadata-only callers', async () => {
+      mockGetMessages.mockResolvedValueOnce([new MockMessage({ id: 42, message: 'text', date: 1700000000 })]);
+      mockParseMessageFields.mockReturnValueOnce(
+        makeParsedMsg({
+          id: 42,
+          instantViewContent: '![photo](iv://0)',
+          instantViewImages: [{ placeholder: 'iv://0', media: new mockApi.Photo() as never }],
+        }),
+      );
+
+      const result = await fetchMessageById('test_channel', 42, { downloadImages: false });
+
+      expect(result?.instantViewImages).toHaveLength(1);
+      expect(downloadMediaFile).not.toHaveBeenCalled();
+    });
+
     it('resolves partial IV for a single message', async () => {
       const msg = new MockMessage({ id: 42, message: 'text', date: 1700000000 });
       mockGetMessages.mockResolvedValueOnce([msg]);

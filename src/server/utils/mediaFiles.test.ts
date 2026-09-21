@@ -4,15 +4,35 @@ vi.mock('fs', () => ({
   existsSync: vi.fn(),
   unlinkSync: vi.fn(),
 }));
+vi.mock('../logger.js', () => ({ logger: { warn: vi.fn() } }));
 
 import { existsSync, unlinkSync } from 'fs';
+import { downloadProgressEmitter } from '../services/downloadProgress.js';
 import { deleteAllMediaFiles } from './mediaFiles.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockUnlinkSync = vi.mocked(unlinkSync);
 
 describe('deleteAllMediaFiles', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUnlinkSync.mockReset();
+  });
+
+  it('notifies the queue only after successfully freeing disk space', () => {
+    const emit = vi.spyOn(downloadProgressEmitter, 'emit');
+    mockExistsSync.mockReturnValue(true);
+    deleteAllMediaFiles('channel/1.jpg', ['channel/1.jpg', 'channel/2.jpg']);
+    expect(emit).toHaveBeenCalledExactlyOnceWith('storage_freed');
+
+    emit.mockClear();
+    mockUnlinkSync.mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+    deleteAllMediaFiles('channel/locked.jpg', null);
+    expect(emit).not.toHaveBeenCalled();
+    emit.mockRestore();
+  });
 
   it('does nothing when both paths are null', () => {
     deleteAllMediaFiles(null, null);

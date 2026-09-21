@@ -81,6 +81,33 @@ describe('DownloadStorage', () => {
     expect(storage.status.paused).toBe(false);
   });
 
+  it('rechecks immediately after cleanup without bypassing the storage reserve', async () => {
+    vi.useFakeTimers();
+    free(GiB - 1);
+    await expect(storage.check()).rejects.toMatchObject({ code: 'STORAGE_PAUSED' });
+
+    await storage.notifySpaceFreed();
+    await expect(storage.check()).rejects.toMatchObject({ code: 'STORAGE_PAUSED' });
+    expect(storage.status.paused).toBe(true);
+
+    free(2 * GiB);
+    await storage.notifySpaceFreed();
+    await storage.check();
+    expect(storage.status.paused).toBe(false);
+    expect(statfs).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retain a deleted large task size as the minimum for the remaining queue', async () => {
+    free(2 * GiB);
+    await expect(storage.check(3 * GiB)).rejects.toMatchObject({ code: 'STORAGE_PAUSED' });
+    await storage.notifySpaceFreed();
+
+    await storage.check(1024);
+
+    expect(storage.status.paused).toBe(false);
+    await expect(storage.check(3 * GiB)).rejects.toMatchObject({ code: 'STORAGE_PAUSED' });
+  });
+
   it('fails closed when capacity cannot be read, then recovers', async () => {
     vi.useFakeTimers();
     vi.mocked(statfs).mockRejectedValueOnce(new Error('mount unavailable'));
