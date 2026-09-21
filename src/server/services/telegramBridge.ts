@@ -76,7 +76,7 @@ export function isBridgeMessage(msg: { type: string }): msg is WorkerToMainBridg
 
 async function downloadMediaForWorker(worker: Worker, msg: TgDownloadMediaMsg, workerId: number): Promise<void> {
   try {
-    const tgMsg = await fetchMessageById(msg.channelTelegramId, msg.msgId);
+    const tgMsg = await fetchMessageById(msg.channelTelegramId, msg.msgId, { downloadImages: false });
 
     if (!tgMsg?.rawMedia) {
       // No media on this message — not an error, just nothing to download

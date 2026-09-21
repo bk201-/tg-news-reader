@@ -23,13 +23,16 @@ import { ARTICLE_MAX_HTML_BYTES } from '../config.js';
 import { db } from '../db/index.js';
 import { news, channels } from '../db/schema.js';
 import { logger } from '../logger.js';
+import { downloadProgressEmitter } from '../services/downloadProgress.js';
 import { parseHtml, buildFullContent } from '../services/readability.js';
 import type { TgDownloadMediaMsg, MainToWorkerBridgeMsg } from '../services/telegramBridge.js';
+import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 import { withRetry, TASK_POLICY, HTTP_FETCH_POLICY } from '../utils/retry.js';
 
 // ─── Worker identity ──────────────────────────────────────────────────────────
 
 const { workerId } = workerData as { workerId: number };
+downloadProgressEmitter.on('storage_freed', () => parentPort!.postMessage({ type: 'storage_freed' }));
 
 // ─── IPC slot for Telegram bridge round-trips ─────────────────────────────────
 // The worker processes one task at a time, so at most one IPC call is pending.
@@ -43,11 +46,24 @@ type IpcSlot = {
 let pendingIpc: IpcSlot = null;
 let reqCounter = 0;
 
-function ipcDownloadMedia(
+async function ipcDownloadMedia(
+  newsId: number,
   channelTelegramId: string,
   msgId: number,
   ignoreLimit: boolean,
-): Promise<{ path: string | null; reason?: 'no_media' | 'size_limit' }> {
+): Promise<{ path: string | null; reason?: 'no_media' | 'size_limit' | 'filtered' | 'deleted' }> {
+  // Recheck before every file (and retry): filters can change while a task is queued
+  // or an album is downloading. Explicit user downloads still bypass this gate.
+  const [item] = await db.select({ isFiltered: news.isFiltered }).from(news).where(eq(news.id, newsId));
+  if (!item) {
+    logger.debug({ module: 'download', workerId, newsId }, 'media cancelled: news was deleted');
+    return { path: null, reason: 'deleted' };
+  }
+  if (!ignoreLimit && item.isFiltered === 1) {
+    logger.debug({ module: 'download', workerId, newsId }, 'background media skipped: news is filtered');
+    return { path: null, reason: 'filtered' };
+  }
+
   return new Promise((resolve, reject) => {
     const reqId = ++reqCounter;
     pendingIpc = { reqId, resolve, reject };
@@ -125,7 +141,10 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
     .innerJoin(channels, eq(news.channelId, channels.id))
     .where(eq(news.id, newsId));
 
-  if (!row) throw new Error(`News ${newsId} not found`);
+  if (!row) {
+    logger.debug({ module: 'download', workerId, newsId }, 'media cancelled: news was deleted');
+    return;
+  }
 
   // Already downloaded — skip for background tasks (idempotent).
   // User-initiated (priority ≥ 10) always re-downloads — handles the case where
@@ -135,38 +154,30 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
 
   const ignoreLimit = priority >= 10;
 
-  if (row.albumMsgIds) {
-    // ── Album: download each member via IPC ───────────────────────────────────
-    const albumIds = row.albumMsgIds;
-    const paths: string[] = [];
-
-    for (const msgId of albumIds) {
-      const { path, reason } = await ipcDownloadMedia(row.channelTelegramId, msgId, ignoreLimit);
-      if (reason === 'no_media') continue; // slot in album has no media — skip silently
-      if (reason === 'size_limit') continue; // too large for background — skip, don't fail album
-      if (path) paths.push(path);
+  const paths: string[] = [];
+  let saved = false;
+  try {
+    for (const msgId of row.albumMsgIds ?? [row.telegramMsgId]) {
+      const { path, reason } = await ipcDownloadMedia(newsId, row.channelTelegramId, msgId, ignoreLimit);
+      if (reason === 'filtered' || reason === 'deleted') break;
+      if (reason === 'no_media' || reason === 'size_limit') continue;
+      if (!path) throw new Error('Download returned no path');
+      paths.push(path);
     }
 
-    if (paths.length === 0) {
-      // All slots were either no_media or size_limit — treat as done (nothing to store)
-      return;
+    if (paths.length === 0) return;
+    const [updated] = await db
+      .update(news)
+      .set({ localMediaPath: paths[0], ...(row.albumMsgIds ? { localMediaPaths: paths } : {}) })
+      .where(eq(news.id, newsId))
+      .returning({ id: news.id });
+    saved = !!updated;
+  } finally {
+    // Cleanup may delete the row while Telegram is writing a file. Do not leave
+    // files from that in-flight download (or an interrupted album) orphaned.
+    if (!saved && paths.length > 0) {
+      deleteAllMediaFiles(paths[0], row.albumMsgIds ? paths : null);
     }
-
-    await db.update(news).set({ localMediaPath: paths[0], localMediaPaths: paths }).where(eq(news.id, newsId));
-  } else {
-    // ── Single media ──────────────────────────────────────────────────────────
-    const { path, reason } = await ipcDownloadMedia(row.channelTelegramId, row.telegramMsgId, ignoreLimit);
-
-    if (reason === 'no_media') return; // message has no media — nothing to do, mark done
-    if (reason === 'size_limit') {
-      // Background download (priority < 10): file too large to auto-download — skip silently.
-      // User-initiated downloads always have ignoreLimit=true so they never reach this branch.
-      logger.debug({ module: 'download', workerId, newsId }, 'media skipped: exceeds background size limit');
-      return;
-    }
-
-    if (!path) throw new Error('Download returned no path'); // unexpected — will retry
-    await db.update(news).set({ localMediaPath: path }).where(eq(news.id, newsId));
   }
 }
 
@@ -174,6 +185,11 @@ async function processArticleTask(newsId: number, url: string): Promise<void> {
   // Fetch HTML with retry — throws on HTTP 5xx or network errors, triggers TASK_POLICY retry
   const response = await withRetry(
     async () => {
+      const [item] = await db.select({ id: news.id }).from(news).where(eq(news.id, newsId));
+      if (!item) {
+        logger.debug({ module: 'download', workerId, newsId }, 'article cancelled: news was deleted');
+        return null;
+      }
       const r = await fetch(url, {
         headers: {
           'User-Agent':
@@ -189,6 +205,7 @@ async function processArticleTask(newsId: number, url: string): Promise<void> {
     HTTP_FETCH_POLICY,
     `article-fetch:${newsId}`,
   );
+  if (!response) return;
 
   // Guard against huge pages — jsdom parsing multiplies memory 5-10×.
   // Treat oversized pages as a permanent failure (no retry) to avoid OOM.

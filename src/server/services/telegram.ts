@@ -24,5 +24,6 @@ export {
   readChannelHistory,
   downloadMessageMedia,
   fetchMessageById,
+  resolveInstantViewImages,
 } from './telegramApi.js';
 export type { ChannelInfo } from './telegramApi.js';

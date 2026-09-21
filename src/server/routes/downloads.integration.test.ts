@@ -14,15 +14,16 @@ vi.mock('../logger.js', () => ({
 
 vi.mock('../services/downloadManager.js', () => ({
   enqueueTask: vi.fn().mockResolvedValue(undefined),
-  prioritizeTask: vi.fn().mockResolvedValue(undefined),
+  prioritizeTask: vi.fn().mockResolvedValue(true),
   getActiveTasks: vi.fn().mockResolvedValue([]),
   startWorkerPool: vi.fn(),
   isWorkerPoolStopped: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('../services/downloadProgress.js', () => ({
-  downloadProgressEmitter: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
-}));
+vi.mock('../services/downloadProgress.js', async () => {
+  const { EventEmitter } = await import('node:events');
+  return { downloadProgressEmitter: new EventEmitter() };
+});
 
 import { Hono } from 'hono';
 import { createTestUser, authHeaders } from '../__tests__/auth.js';
@@ -43,6 +44,7 @@ vi.mock('../db/index.js', () => ({
 
 import { authMiddleware } from '../middleware/auth.js';
 import { enqueueTask, prioritizeTask, getActiveTasks } from '../services/downloadManager.js';
+import { downloadProgressEmitter } from '../services/downloadProgress.js';
 import downloadsRouter from './downloads.js';
 
 function createApp() {
@@ -71,6 +73,44 @@ describe('Downloads routes (integration)', () => {
   });
 
   // ── GET /api/downloads ────────────────────────────────────────────────────
+
+  it('streams task removals and unregisters the listener on disconnect', async () => {
+    const controller = new AbortController();
+    const response = await app.request('/api/downloads/stream', { headers, signal: controller.signal });
+    const reader = response.body!.getReader();
+    try {
+      await reader.read(); // init event
+      await vi.waitFor(() => expect(downloadProgressEmitter.listenerCount('tasks_removed')).toBe(1));
+      downloadProgressEmitter.emit('tasks_removed', [10, 20]);
+      const { value } = await reader.read();
+      expect(new TextDecoder().decode(value)).toContain('event: tasks_removed\ndata: {"newsIds":[10,20]}');
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
+    expect(downloadProgressEmitter.listenerCount('tasks_removed')).toBe(0);
+  });
+
+  it('streams individual cancellation and priority changes, then cleans up listeners', async () => {
+    const controller = new AbortController();
+    const response = await app.request('/api/downloads/stream', { headers, signal: controller.signal });
+    const reader = response.body!.getReader();
+    try {
+      await reader.read();
+      await vi.waitFor(() => expect(downloadProgressEmitter.listenerCount('task_removed')).toBe(1));
+      downloadProgressEmitter.emit('task_removed', 42);
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+        'event: task_removed\ndata: {"taskId":42}',
+      );
+      downloadProgressEmitter.emit('queue_changed');
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain('event: queue_changed\ndata: {}');
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
+    expect(downloadProgressEmitter.listenerCount('task_removed')).toBe(0);
+    expect(downloadProgressEmitter.listenerCount('queue_changed')).toBe(0);
+  });
 
   describe('GET /api/downloads', () => {
     it('returns 401 without auth', async () => {
@@ -118,6 +158,18 @@ describe('Downloads routes (integration)', () => {
   // ── PATCH /api/downloads/:id/prioritize ───────────────────────────────────
 
   describe('PATCH /api/downloads/:id/prioritize', () => {
+    it('returns 404 for a missing task instead of silently succeeding', async () => {
+      vi.mocked(prioritizeTask).mockResolvedValueOnce(false as never);
+      const res = await app.request('/api/downloads/99999/prioritize', { method: 'PATCH', headers });
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects malformed IDs instead of prioritizing a different task', async () => {
+      const res = await app.request('/api/downloads/42oops/prioritize', { method: 'PATCH', headers });
+      expect(res.status).toBe(400);
+      expect(prioritizeTask).not.toHaveBeenCalled();
+    });
+
     it('calls prioritizeTask with the correct id', async () => {
       const res = await app.request('/api/downloads/42/prioritize', {
         method: 'PATCH',
@@ -132,6 +184,35 @@ describe('Downloads routes (integration)', () => {
   // ── DELETE /api/downloads/:id ─────────────────────────────────────────────
 
   describe('DELETE /api/downloads/:id', () => {
+    it('broadcasts removal by task ID without removing sibling tasks for the same news', async () => {
+      const ch = await seedChannel(testDb.db);
+      const n = await seedNews(testDb.db, ch.id);
+      const dl = await seedDownload(testDb.db, n.id);
+      const onRemoved = vi.fn();
+      downloadProgressEmitter.once('task_removed', onRemoved);
+
+      const res = await app.request(`/api/downloads/${dl.id}`, { method: 'DELETE', headers });
+
+      expect(res.status).toBe(200);
+      expect(onRemoved).toHaveBeenCalledWith(dl.id);
+      downloadProgressEmitter.off('task_removed', onRemoved);
+    });
+
+    it('does not pretend to cancel an active network download', async () => {
+      const ch = await seedChannel(testDb.db);
+      const n = await seedNews(testDb.db, ch.id);
+      const dl = await seedDownload(testDb.db, n.id, { status: 'processing' });
+      const res = await app.request(`/api/downloads/${dl.id}`, { method: 'DELETE', headers });
+      expect(res.status).toBe(409);
+      const rows = await testDb.client.execute('SELECT id FROM downloads WHERE id = ?', [dl.id]);
+      expect(rows.rows).toHaveLength(1);
+    });
+
+    it('rejects malformed IDs', async () => {
+      const res = await app.request('/api/downloads/42oops', { method: 'DELETE', headers });
+      expect(res.status).toBe(400);
+    });
+
     it('deletes a download task from the DB', async () => {
       const ch = await seedChannel(testDb.db);
       const n = await seedNews(testDb.db, ch.id);

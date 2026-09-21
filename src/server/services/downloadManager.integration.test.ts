@@ -78,6 +78,26 @@ describe('downloadManager — public API (integration)', () => {
   // ── enqueueTask ──────────────────────────────────────────────────────────
 
   describe('enqueueTask', () => {
+    it('does not enqueue background media for filtered news', async () => {
+      await testDb.client.execute('UPDATE news SET is_filtered = 1 WHERE id = ?', [newsId]);
+
+      await enqueueTask(newsId, 'media');
+
+      const rows = await testDb.client.execute('SELECT * FROM downloads');
+      expect(rows.rows).toHaveLength(0);
+      expect(downloadProgressEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('allows an explicit media download for filtered news', async () => {
+      await testDb.client.execute('UPDATE news SET is_filtered = 1 WHERE id = ?', [newsId]);
+
+      await enqueueTask(newsId, 'media', undefined, 10);
+
+      const rows = await testDb.client.execute('SELECT * FROM downloads');
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0].priority).toBe(10);
+    });
+
     it('inserts a pending task and emits wakeup', async () => {
       await enqueueTask(newsId, 'media', undefined, 0);
 
@@ -155,6 +175,32 @@ describe('downloadManager — public API (integration)', () => {
   // ── prioritizeTask ───────────────────────────────────────────────────────
 
   describe('prioritizeTask', () => {
+    it('returns false for a missing task without announcing a successful change', async () => {
+      expect(await prioritizeTask(99999)).toBe(false);
+      expect(downloadProgressEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('announces queue changes so other clients refresh priority and ordering', async () => {
+      await enqueueTask(newsId, 'media');
+      const [task] = await getActiveTasks();
+      vi.clearAllMocks();
+
+      expect(await prioritizeTask(task.id)).toBe(true);
+      expect(downloadProgressEmitter.emit).toHaveBeenCalledWith('queue_changed');
+    });
+
+    it('clears the completion timestamp when retrying a failed manual task', async () => {
+      await enqueueTask(newsId, 'media', undefined, 10);
+      const [task] = await getActiveTasks();
+      await testDb.client.execute(
+        "UPDATE downloads SET status = 'failed', error = 'err', processed_at = 123 WHERE id = ?",
+        [task.id],
+      );
+      await prioritizeTask(task.id);
+      const [updated] = await getActiveTasks();
+      expect(updated).toMatchObject({ status: 'pending', error: null, processedAt: null, priority: 10 });
+    });
+
     it('sets priority to 10 and emits wakeup', async () => {
       await enqueueTask(newsId, 'media', undefined, 0);
       const rows = await testDb.client.execute('SELECT id FROM downloads WHERE news_id = ?', [newsId]);
@@ -197,6 +243,24 @@ describe('downloadManager — public API (integration)', () => {
   // ── getActiveTasks ───────────────────────────────────────────────────────
 
   describe('getActiveTasks', () => {
+    it('lists manual requests before all images, including previously queued photos, then other media', async () => {
+      const video = await seedNews(testDb.db, channelId, { mediaType: 'video' });
+      const photo = await seedNews(testDb.db, channelId, { mediaType: 'photo' });
+      const imageDocument = await seedNews(testDb.db, channelId, { mediaType: 'document' });
+      const manual = await seedNews(testDb.db, channelId, { mediaType: 'audio' });
+      await enqueueTask(video.id, 'media');
+      await enqueueTask(photo.id, 'media');
+      await enqueueTask(imageDocument.id, 'media', undefined, 5);
+      await enqueueTask(manual.id, 'media', undefined, 10);
+
+      expect((await getActiveTasks()).map((task) => task.newsId)).toEqual([
+        manual.id,
+        photo.id,
+        imageDocument.id,
+        video.id,
+      ]);
+    });
+
     it('returns empty array when no tasks', async () => {
       const tasks = await getActiveTasks();
       expect(tasks).toEqual([]);

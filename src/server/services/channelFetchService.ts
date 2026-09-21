@@ -5,17 +5,18 @@
  * make the business logic framework-agnostic (no Hono dependency).
  */
 
-import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { ChannelType } from '../../shared/types.js';
 import { NEWS_DEFAULT_FETCH_DAYS, NEWS_FETCH_LIMIT } from '../config.js';
 import { db } from '../db/index.js';
-import { channels, downloads, news } from '../db/schema.js';
+import { channels, news } from '../db/schema.js';
 import { logger } from '../logger.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 import { getChannelStrategy } from './channelStrategies.js';
 import type { PostProcessArgs } from './channelStrategies.js';
+import { downloadProgressEmitter } from './downloadProgress.js';
 import { applyFiltersToInserted } from './filterEngine.js';
-import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId } from './telegram.js';
+import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, resolveInstantViewImages } from './telegram.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
     // messages the user hasn't read yet (avoids loading the entire channel history).
     const readMaxId = await getReadInboxMaxId(channel.telegramId);
     if (readMaxId) {
-      const readMsg = await fetchMessageById(channel.telegramId, readMaxId);
+      const readMsg = await fetchMessageById(channel.telegramId, readMaxId, { downloadImages: false });
       if (readMsg) {
         await db.update(channels).set({ lastReadAt: readMsg.date }).where(eq(channels.id, channel.id));
         return new Date(readMsg.date * 1000);
@@ -88,30 +89,47 @@ async function computeSinceDate(channel: ChannelRow, since?: string): Promise<Da
 
 /**
  * Delete all read news for a channel and remove their media files from disk.
- * Skips items that have active (pending/processing) download tasks to avoid
- * losing in-progress work.
+ * Download tasks are removed atomically by ON DELETE CASCADE.
  */
-async function deleteReadNewsMedia(channelId: number): Promise<number> {
-  // Find news IDs with active download tasks — protect them from deletion
-  const activeDownloadNewsIds = await db
-    .select({ newsId: downloads.newsId })
-    .from(downloads)
-    .where(sql`${downloads.status} IN ('pending', 'processing')`);
-  const protectedIds = activeDownloadNewsIds.map((r) => r.newsId);
+async function deleteReadNewsMedia(channelId: number): Promise<{ deletedCount: number; lastReadAt: number | null }> {
+  const { deleted, lastReadAt } = await db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(news)
+      .where(and(eq(news.channelId, channelId), eq(news.isRead, 1)))
+      .returning({
+        id: news.id,
+        postedAt: news.postedAt,
+        localMediaPath: news.localMediaPath,
+        localMediaPaths: news.localMediaPaths,
+      });
 
-  const conditions = [eq(news.channelId, channelId), eq(news.isRead, 1)];
-  if (protectedIds.length > 0) conditions.push(notInArray(news.id, protectedIds));
+    let lastReadAt: number | null = null;
+    if (deleted.length > 0) {
+      // Telegram read-sync is asynchronous. Preserve the local watermark before
+      // discarding the rows, otherwise refresh may immediately fetch them again.
+      const latest = deleted.reduce((max, row) => Math.max(max, row.postedAt), 0);
+      const [channel] = await tx
+        .update(channels)
+        .set({ lastReadAt: sql`MAX(COALESCE(${channels.lastReadAt}, 0), ${latest})` })
+        .where(eq(channels.id, channelId))
+        .returning({ lastReadAt: channels.lastReadAt });
+      lastReadAt = channel.lastReadAt;
+    }
+    return { deleted, lastReadAt };
+  });
 
-  const deleted = await db
-    .delete(news)
-    .where(and(...conditions))
-    .returning({ localMediaPath: news.localMediaPath, localMediaPaths: news.localMediaPaths });
+  if (deleted.length > 0) {
+    downloadProgressEmitter.emit(
+      'tasks_removed',
+      deleted.map((row) => row.id),
+    );
+  }
 
   for (const row of deleted) {
     deleteAllMediaFiles(row.localMediaPath, row.localMediaPaths);
   }
 
-  return deleted.length;
+  return { deletedCount: deleted.length, lastReadAt };
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -128,13 +146,12 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
   if (!channel) throw new Error('Channel not found');
 
   // Clean up read news (and their media files) before fetching new ones.
-  // Items with active downloads are protected from deletion.
-  const deletedCount = await deleteReadNewsMedia(channelId);
+  const { deletedCount, lastReadAt } = await deleteReadNewsMedia(channelId);
   if (deletedCount > 0) {
     logger.info({ module: 'channels', channelId, deletedCount }, 'deleted read news before fetch');
   }
 
-  const sinceDate = await computeSinceDate(channel, opts.since);
+  const sinceDate = await computeSinceDate({ ...channel, lastReadAt: lastReadAt ?? channel.lastReadAt }, opts.since);
 
   // When the user explicitly requests a date range (rare: Fetch-period dropdown),
   // honour it fully — no message-count cap. Otherwise apply NEWS_FETCH_LIMIT
@@ -275,17 +292,35 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
     }));
   await applyFiltersToInserted(channelId, insertedItems);
 
-  const mediaProcessing = strategy.requiresMediaProcessing(messages);
+  const visibleRows = allMsgIds.length
+    ? await db
+        .select({ id: news.id, telegramMsgId: news.telegramMsgId })
+        .from(news)
+        .where(and(eq(news.channelId, channelId), inArray(news.telegramMsgId, allMsgIds), eq(news.isFiltered, 0)))
+    : [];
+  const visibleMap = new Map(visibleRows.map((row) => [row.telegramMsgId, row.id]));
+  const visibleMessages = messages.filter((msg) => visibleMap.has(msg.id));
+
+  for (const msg of visibleMessages) {
+    if (!msg.instantViewImages?.length || !msg.instantViewContent) continue;
+    await resolveInstantViewImages(msg, channel.telegramId);
+    await db
+      .update(news)
+      .set({ fullContent: msg.instantViewContent, fullContentFormat: 'markdown' })
+      .where(eq(news.id, visibleMap.get(msg.id)!));
+  }
+
+  const mediaProcessing = strategy.requiresMediaProcessing(visibleMessages.filter((msg) => insertedMap.has(msg.id)));
 
   const args: PostProcessArgs = {
     channelId,
     channelTelegramId: channel.telegramId,
-    messages,
+    messages: visibleMessages,
     insertedMap,
   };
 
-  // Fire post-processing in background — just queues tasks, returns immediately
-  void strategy.postProcess(args);
+  // Only queue here; downloads themselves run in the worker pool.
+  await strategy.postProcess(args);
 
   logger.info(
     { module: 'channels', channelId, inserted, updated, total: messages.length, mediaProcessing },

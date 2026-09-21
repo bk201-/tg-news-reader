@@ -76,6 +76,7 @@ describe('telegramBridge', () => {
       expect(reply.reqId).toBe(1);
       expect(reply.result).toBe('data/channel/file.jpg');
       expect(reply.reason).toBeUndefined();
+      expect(mockFetchMessageById).toHaveBeenCalledWith('test_channel', 100, { downloadImages: false });
     });
 
     it('replies with no_media when message has no rawMedia', async () => {

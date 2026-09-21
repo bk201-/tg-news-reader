@@ -15,14 +15,10 @@ vi.mock('../db/index.js', () => ({
   },
 }));
 
-// isVideoMessage needs the live Telegram Api — stub it for unit tests.
-vi.mock('./telegramParser.js', () => ({ isVideoMessage: vi.fn(() => false) }));
-
 import type { ChannelType } from '../../shared/types.js';
 import { getChannelStrategy } from './channelStrategies.js';
 import { enqueueTask } from './downloadManager.js';
 import type { TelegramMessage } from './telegramParser.js';
-import { isVideoMessage } from './telegramParser.js';
 
 function makeTgMsg(partial: Partial<TelegramMessage> = {}): TelegramMessage {
   return {
@@ -138,6 +134,22 @@ describe('BlogStrategy', () => {
 describe('MediaStrategy — postProcess', () => {
   const strategy = getChannelStrategy('media');
 
+  it('queues images before waking workers for older video posts from the same fetch', async () => {
+    vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
+    await strategy.postProcess({
+      channelId: 1,
+      channelTelegramId: 'test',
+      messages: [makeTgMsg({ id: 1, mediaType: 'video' }), makeTgMsg({ id: 2, mediaType: 'photo' })],
+      insertedMap: new Map([
+        [1, 10],
+        [2, 20],
+      ]),
+    });
+    expect(enqueueTask).toHaveBeenNthCalledWith(1, 20, 'media', undefined, 5);
+    expect(enqueueTask).toHaveBeenNthCalledWith(2, 10, 'media', undefined, 0);
+  });
+
   it('enqueues tasks for photo and document messages', async () => {
     vi.mocked(enqueueTask).mockClear();
     dbMock.hiddenRows = [];
@@ -162,7 +174,7 @@ describe('MediaStrategy — postProcess', () => {
     });
 
     expect(enqueueTask).toHaveBeenCalledTimes(2);
-    expect(enqueueTask).toHaveBeenCalledWith(100, 'media', undefined, 0);
+    expect(enqueueTask).toHaveBeenCalledWith(100, 'media', undefined, 5);
     expect(enqueueTask).toHaveBeenCalledWith(200, 'media', undefined, 0);
   });
 
@@ -198,14 +210,13 @@ describe('MediaStrategy — postProcess', () => {
     expect(strategy.requiresMediaProcessing([makeTgMsg({ rawMedia: {} as never, mediaType: 'video' })])).toBe(true);
   });
 
-  it('does not auto-download video from hidden (filtered) news, but keeps images', async () => {
+  it('does not auto-download any media from hidden (filtered) news', async () => {
     vi.mocked(enqueueTask).mockClear();
     // news 100 (photo) and 200 (video) are hidden; 300 (video) is visible
     dbMock.hiddenRows = [{ id: 100 }, { id: 200 }];
-    vi.mocked(isVideoMessage).mockImplementation((m: TelegramMessage) => m.mediaType === 'document');
 
     const messages: TelegramMessage[] = [
-      makeTgMsg({ id: 10, rawMedia: {} as never, mediaType: 'photo' }), // hidden photo → download
+      makeTgMsg({ id: 10, rawMedia: {} as never, mediaType: 'photo' }), // hidden photo → skip
       makeTgMsg({ id: 20, rawMedia: {} as never, mediaType: 'document' }), // hidden video → skip
       makeTgMsg({ id: 30, rawMedia: {} as never, mediaType: 'document' }), // visible video → download
     ];
@@ -217,11 +228,41 @@ describe('MediaStrategy — postProcess', () => {
 
     await strategy.postProcess({ channelId: 1, channelTelegramId: 'test', messages, insertedMap });
 
-    expect(enqueueTask).toHaveBeenCalledTimes(2);
-    expect(enqueueTask).toHaveBeenCalledWith(100, 'media', undefined, 0);
+    expect(enqueueTask).toHaveBeenCalledTimes(1);
+    expect(enqueueTask).not.toHaveBeenCalledWith(100, 'media', undefined, expect.any(Number));
     expect(enqueueTask).toHaveBeenCalledWith(300, 'media', undefined, 0);
     expect(enqueueTask).not.toHaveBeenCalledWith(200, 'media', undefined, 0);
-    vi.mocked(isVideoMessage).mockReturnValue(false);
+  });
+});
+
+describe.each(['media', 'blog'] as const)('%s filtered media', (channelType) => {
+  it.each([
+    { mediaType: 'photo', mimeType: '', priority: 5 },
+    { mediaType: 'document', mimeType: 'image/png', priority: 5 },
+    { mediaType: 'document', mimeType: 'application/pdf', priority: 0 },
+    { mediaType: 'video', mimeType: 'video/mp4', priority: 0 },
+  ])('assigns automatic priority $priority for $mediaType $mimeType', async ({ mediaType, mimeType, priority }) => {
+    vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [];
+    await getChannelStrategy(channelType).postProcess({
+      channelId: 1,
+      channelTelegramId: 'test',
+      messages: [makeTgMsg({ id: 10, mediaType, rawMedia: { document: { mimeType } } as never })],
+      insertedMap: new Map([[10, 100]]),
+    });
+    expect(enqueueTask).toHaveBeenCalledExactlyOnceWith(100, 'media', undefined, priority);
+  });
+
+  it.each(['photo', 'document', 'video'])('does not enqueue hidden %s albums', async (mediaType) => {
+    vi.mocked(enqueueTask).mockClear();
+    dbMock.hiddenRows = [{ id: 100 }];
+    await getChannelStrategy(channelType).postProcess({
+      channelId: 1,
+      channelTelegramId: 'test',
+      messages: [makeTgMsg({ id: 10, mediaType, albumTelegramIds: [10, 11] })],
+      insertedMap: new Map([[10, 100]]),
+    });
+    expect(enqueueTask).not.toHaveBeenCalled();
   });
 });
 
@@ -241,7 +282,7 @@ describe('BlogStrategy — postProcess & requiresMediaProcessing', () => {
       insertedMap,
     });
 
-    expect(enqueueTask).toHaveBeenCalledWith(10, 'media', undefined, 0);
+    expect(enqueueTask).toHaveBeenCalledWith(10, 'media', undefined, 5);
   });
 
   it('requiresMediaProcessing returns true when messages have document media', () => {

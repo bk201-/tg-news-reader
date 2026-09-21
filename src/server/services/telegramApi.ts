@@ -47,7 +47,7 @@ async function resolvePartialInstantView(msg: TelegramMessage): Promise<void> {
  * markdown to point at local /api/media paths. Failed/leftover placeholders are stripped.
  * `channelTelegramId` is the numeric channel id used as the media directory name.
  */
-async function resolveInstantViewImages(msg: TelegramMessage, channelTelegramId: string): Promise<void> {
+export async function resolveInstantViewImages(msg: TelegramMessage, channelTelegramId: string): Promise<void> {
   if (!msg.instantViewImages?.length || !msg.instantViewContent) return;
 
   const dir = join(process.cwd(), 'data', channelTelegramId);
@@ -159,14 +159,7 @@ async function _fetchChannelMessages(
     }
   }
 
-  // ── Download Instant View images (eager) ────────────────────────────────────
-  // channelUsername is the numeric channel telegramId here (see callers), which
-  // matches the media directory used by downloadMessageMedia.
-  for (const msg of allMessages) {
-    if (msg.instantViewImages?.length) {
-      await resolveInstantViewImages(msg, channelUsername);
-    }
-  }
+  // Image downloads are deferred to channelFetchService, after filtering.
 
   // ── Resolve forward source channel names (entity cache lookup) ───────────
   // After getHistory, gramjs caches all entities from the response,
@@ -353,7 +346,11 @@ export async function downloadMessageMedia(
   }, 'downloadMessageMedia');
 }
 
-export async function fetchMessageById(channelUsername: string, msgId: number): Promise<TelegramMessage | null> {
+export async function fetchMessageById(
+  channelUsername: string,
+  msgId: number,
+  options: { downloadImages?: boolean } = {},
+): Promise<TelegramMessage | null> {
   try {
     return await telegramCircuit.execute(async () => {
       const _Api = await ensureAndGetApi();
@@ -364,7 +361,7 @@ export async function fetchMessageById(channelUsername: string, msgId: number): 
       const parsed = parseMessageFields(msg, channelUsername);
       if (parsed) {
         await resolvePartialInstantView(parsed);
-        if (parsed.instantViewImages?.length) {
+        if (options.downloadImages !== false && parsed.instantViewImages?.length) {
           await resolveInstantViewImages(parsed, channelUsername);
         }
       }
