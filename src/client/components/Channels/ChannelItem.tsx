@@ -85,22 +85,26 @@ export function ChannelItem({
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
 
-  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoMode, setInfoMode] = useState<'closed' | 'hover' | 'pinned'>('closed');
+  const infoOpen = infoMode !== 'closed';
   const handleSelect = useCallback(() => onSelect(ch.id), [onSelect, ch.id]);
-  const closeInfo = useCallback(() => setInfoOpen(false), []);
+  const closeInfo = useCallback(() => setInfoMode('closed'), []);
   const toggleInfo = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setInfoOpen((open) => !open);
+    setInfoMode((mode) => (mode === 'pinned' ? 'closed' : 'pinned'));
+  }, []);
+  const handleInfoHover = useCallback((open: boolean) => {
+    setInfoMode((mode) => (mode === 'pinned' ? mode : open ? 'hover' : 'closed'));
   }, []);
   const infoContent = useMemo(
-    () => <>{infoOpen && <ChannelInfoContent channel={ch} onClose={closeInfo} />}</>,
-    [ch, infoOpen, closeInfo],
+    () => <>{infoOpen && <ChannelInfoContent channel={ch} onClose={closeInfo} showClose={infoMode === 'pinned'} />}</>,
+    [ch, infoOpen, infoMode, closeInfo],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setInfoOpen(false);
+        closeInfo();
         return;
       }
       if (e.target !== e.currentTarget) return;
@@ -109,7 +113,7 @@ export function ChannelItem({
         handleSelect();
       }
     },
-    [handleSelect],
+    [handleSelect, closeInfo],
   );
 
   return (
@@ -144,7 +148,7 @@ export function ChannelItem({
         <Popover
           content={infoContent}
           open={infoOpen}
-          onOpenChange={setInfoOpen}
+          onOpenChange={handleInfoHover}
           trigger={POPOVER_TRIGGER}
           mouseEnterDelay={0.4}
           placement="right"

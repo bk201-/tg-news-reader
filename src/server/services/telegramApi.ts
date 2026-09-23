@@ -8,6 +8,7 @@ import type { Api } from 'telegram';
 import { MAX_IMG_DOC_SIZE_BYTES, MAX_PHOTO_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '../config.js';
 import { logger } from '../logger.js';
 import { downloadMediaFile } from './downloadMediaFile.js';
+import { isUnavailableTelegramChannelError } from './telegramChannelErrors.js';
 import { telegramCircuit } from './telegramCircuitBreaker.js';
 import { ensureAndGetApi, getTelegramClient } from './telegramClient.js';
 import { extractInstantViewPage, parseMessageFields } from './telegramParser.js';
@@ -272,6 +273,7 @@ export async function getReadInboxMaxId(channelUsername: string): Promise<number
     }, 'getReadInboxMaxId');
   } catch (err) {
     logger.warn({ module: 'telegram', channelUsername, err }, 'Failed to get readInboxMaxId from Telegram');
+    if (isUnavailableTelegramChannelError(err)) throw err;
     return null;
   }
 }

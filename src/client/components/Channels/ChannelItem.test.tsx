@@ -73,7 +73,10 @@ describe('ChannelItem information popover', () => {
     expect(await screen.findByText(/channels.info.storage_bytes/)).toHaveTextContent('"bytes":"1,234"');
     expect(screen.getByText('Saved').tagName).toBe('STRONG');
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('channels.info.description_source')).toBeInTheDocument();
+    expect(screen.queryByText('channels.info.description_source')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'channels.info.close' })).not.toBeInTheDocument();
+    expect(screen.queryByText('channels.info.storage_scope')).not.toBeInTheDocument();
+    expect(screen.getByText(/channels.info.checked_at/)).toBeInTheDocument();
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
@@ -117,6 +120,20 @@ describe('ChannelItem information popover', () => {
     expect(screen.getByText(/channels.info.storage_bytes/)).toHaveTextContent('"bytes":"2,684,354,560"');
   });
 
+  it('pins a hovered popover on click and keeps Close available after the pointer leaves', async () => {
+    const user = userEvent.setup();
+    setup();
+    const button = screen.getByRole('button', { name: /channels.info.open/ });
+    await user.hover(button);
+    await screen.findByRole('dialog');
+    await user.click(button);
+    expect(screen.getByRole('button', { name: 'channels.info.close' })).toBeInTheDocument();
+    await user.unhover(button);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'channels.info.close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
   it('supports keyboard info activation and Escape while preserving row selection', async () => {
     const user = userEvent.setup();
     const props = setup();
@@ -148,7 +165,7 @@ describe('ChannelItem information popover', () => {
     setup({ description: '' });
     fireEvent.click(screen.getByRole('button', { name: /channels.info.open/ }));
     expect(await screen.findByRole('status')).toHaveTextContent('channels.info.storage_loading');
-    expect(screen.getByText('channels.info.no_description')).toBeInTheDocument();
+    expect(screen.queryByText('channels.info.no_description')).not.toBeInTheDocument();
     await act(async () => reject(new Error('disk offline')));
     expect(await screen.findByRole('alert')).toHaveTextContent('channels.info.storage_error');
     expect(screen.queryByText(/channels.info.storage_bytes/)).not.toBeInTheDocument();

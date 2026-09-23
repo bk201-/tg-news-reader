@@ -3,6 +3,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { notifyError } = vi.hoisted(() => ({ notifyError: vi.fn() }));
+vi.mock('antd', () => ({ App: { useApp: () => ({ message: { error: notifyError } }) } }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string, options: { error: string }) => `${key}: ${options.error}` }),
+}));
+
 vi.mock('./client', () => ({
   api: {
     get: vi.fn().mockResolvedValue([]),
@@ -105,11 +111,26 @@ describe('useDeleteChannel', () => {
 describe('useFetchChannel', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('reconciles channel availability after a rejected refresh', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    const error = new Error('Telegram channel is unavailable');
+    mockedApi.post.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useFetchChannel(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ id: 1 })).rejects.toBe(error);
+    });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: channelKeys.all });
+    expect(notifyError).toHaveBeenCalledWith('channels.refresh_failed: Telegram channel is unavailable');
+  });
+
   it('posts to /channels/:id/fetch and updates cache', async () => {
     const { Wrapper, queryClient } = createWrapper();
     // Seed channels cache
     queryClient.setQueryData(channelKeys.all, [
-      { id: 1, name: 'Ch1', unreadCount: 0, totalNewsCount: 5, lastFetchedAt: null },
+      { id: 1, name: 'Ch1', unreadCount: 0, totalNewsCount: 5, lastFetchedAt: null, isUnavailable: 1 },
     ]);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -125,6 +146,7 @@ describe('useFetchChannel', () => {
     // Should have updated the channel cache
     const channels = queryClient.getQueryData(channelKeys.all) as Array<{ id: number; unreadCount: number }>;
     expect(channels[0].unreadCount).toBe(5);
+    expect(channels[0]).toMatchObject({ isUnavailable: 0 });
   });
 });
 
@@ -155,6 +177,35 @@ describe('useReorderChannels', () => {
 
 describe('useMarkReadAndFetch', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('reconciles channels and news and notifies when fetch fails after marking read', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    const error = new Error('Telegram channel is unavailable');
+    mockedApi.post.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useMarkReadAndFetch(), { wrapper: Wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync(1)).rejects.toBe(error);
+    });
+    expect(spy).toHaveBeenCalledWith({ queryKey: channelKeys.all });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['news', 1] });
+    expect(notifyError).toHaveBeenCalledWith('channels.refresh_failed: Telegram channel is unavailable');
+  });
+
+  it('reconciles every channel and reports errors during concurrent bulk refresh', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    mockedApi.post.mockRejectedValueOnce(new Error('Telegram channel is unavailable'));
+    const { result } = renderHook(() => useFetchChannel(), { wrapper: Wrapper });
+    await act(async () => {
+      const results = await Promise.allSettled([1, 2].map((id) => result.current.mutateAsync({ id })));
+      expect(results.map((item) => item.status)).toEqual(['rejected', 'fulfilled']);
+    });
+    expect(spy).toHaveBeenCalledWith({ queryKey: channelKeys.all });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['news', 1] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['news', 2] });
+    expect(notifyError).toHaveBeenCalledTimes(1);
+  });
 
   it('posts to mark-read-and-fetch endpoint', async () => {
     const { Wrapper, queryClient } = createWrapper();

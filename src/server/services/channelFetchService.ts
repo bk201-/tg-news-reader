@@ -17,6 +17,8 @@ import type { PostProcessArgs } from './channelStrategies.js';
 import { downloadProgressEmitter } from './downloadProgress.js';
 import { applyFiltersToInserted } from './filterEngine.js';
 import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, resolveInstantViewImages } from './telegram.js';
+import type { TelegramMessage } from './telegram.js';
+import { ChannelUnavailableError, isUnavailableTelegramChannelError } from './telegramChannelErrors.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -108,9 +110,16 @@ async function deleteReadNewsMedia(channelId: number): Promise<{ deletedCount: n
       // Telegram read-sync is asynchronous. Preserve the local watermark before
       // discarding the rows, otherwise refresh may immediately fetch them again.
       const latest = deleted.reduce((max, row) => Math.max(max, row.postedAt), 0);
+      const [countRow] = await tx
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(news)
+        .where(eq(news.channelId, channelId));
       const [channel] = await tx
         .update(channels)
-        .set({ lastReadAt: sql`MAX(COALESCE(${channels.lastReadAt}, 0), ${latest})` })
+        .set({
+          lastReadAt: sql`MAX(COALESCE(${channels.lastReadAt}, 0), ${latest})`,
+          totalNewsCount: countRow.count,
+        })
         .where(eq(channels.id, channelId))
         .returning({ lastReadAt: channels.lastReadAt });
       lastReadAt = channel.lastReadAt;
@@ -151,17 +160,20 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
     logger.info({ module: 'channels', channelId, deletedCount }, 'deleted read news before fetch');
   }
 
-  const sinceDate = await computeSinceDate({ ...channel, lastReadAt: lastReadAt ?? channel.lastReadAt }, opts.since);
-
   // When the user explicitly requests a date range (rare: Fetch-period dropdown),
   // honour it fully — no message-count cap. Otherwise apply NEWS_FETCH_LIMIT
   // to bound the routine "give me what's new" auto-fetch.
   const fetchLimit = opts.limit ?? (opts.since ? undefined : NEWS_FETCH_LIMIT);
 
-  const messages = await fetchChannelMessages(channel.telegramId, {
-    sinceDate,
-    limit: fetchLimit,
-  });
+  let messages: TelegramMessage[];
+  try {
+    const sinceDate = await computeSinceDate({ ...channel, lastReadAt: lastReadAt ?? channel.lastReadAt }, opts.since);
+    messages = await fetchChannelMessages(channel.telegramId, { sinceDate, limit: fetchLimit });
+  } catch (error) {
+    if (!isUnavailableTelegramChannelError(error)) throw error;
+    await db.update(channels).set({ isUnavailable: 1 }).where(eq(channels.id, channelId));
+    throw new ChannelUnavailableError(error);
+  }
 
   const strategy = getChannelStrategy(channel.channelType as ChannelType);
 
@@ -278,7 +290,7 @@ export async function fetchChannelNews(channelId: number, opts: FetchChannelOpts
 
   await db
     .update(channels)
-    .set({ lastFetchedAt: now, totalNewsCount: actualTotal, unreadCount: actualUnread })
+    .set({ lastFetchedAt: now, totalNewsCount: actualTotal, unreadCount: actualUnread, isUnavailable: 0 })
     .where(eq(channels.id, channelId));
 
   // Apply user-defined filters to newly inserted items (sets is_filtered + records stats)

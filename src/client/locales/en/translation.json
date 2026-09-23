@@ -26,13 +26,13 @@
     "add_first_channel": "Add your first channel"
   },
   "channels": {
+    "refresh_failed": "Refresh failed: {{error}}",
     "info": {
       "title": "Channel information",
+      "details": "Channel details",
       "open": "Information about {{name}}",
       "close": "Close",
       "actions": "Channel actions",
-      "no_description": "No saved description.",
-      "description_source": "Saved description (Telegram lookup or your edits; not refreshed live).",
       "type": "Type",
       "group": "Group",
       "posts": "Stored posts",
@@ -50,8 +50,7 @@
       "storage_error": "Server storage could not be measured.",
       "retry": "Retry",
       "storage_bytes": "{{bytes}} bytes in {{count}} files",
-      "checked_at": "Measured: {{date}}",
-      "storage_scope": "File sizes in this channel’s server folder, including partial and unreferenced files. Excludes shared database/TTS and browser cache. Cached for up to 1 minute on server and client."
+      "checked_at": "Measured: {{date}}"
     },
     "updated": "Updated: {{date}}",
     "update_success": "Channel updated",

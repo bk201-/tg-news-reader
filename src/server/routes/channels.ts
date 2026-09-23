@@ -13,6 +13,7 @@ import { reprocessChannelFilters } from '../services/filterEngine.js';
 import { mediaProgressEmitter } from '../services/mediaProgress.js';
 import type { MediaProgressEvent } from '../services/mediaProgress.js';
 import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
+import { ChannelUnavailableError } from '../services/telegramChannelErrors.js';
 import {
   createChannelSchema,
   fetchChannelSchema,
@@ -241,7 +242,10 @@ router.post('/:id/fetch', async (c) => {
       return c.json({ error: 'Channel not found' }, 404);
     }
     logger.error({ module: 'channels', channelId, err }, 'Fetch error');
-    return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
+    return c.json(
+      { error: error.message || 'Failed to fetch messages' },
+      err instanceof ChannelUnavailableError ? 422 : 500,
+    );
   }
 });
 
@@ -289,7 +293,10 @@ router.post('/:id/mark-read-and-fetch', async (c) => {
   } catch (err: unknown) {
     const error = err as { message?: string };
     logger.error({ module: 'channels', channelId, err }, 'Fetch error after mark-read');
-    return c.json({ error: error.message || 'Failed to fetch messages' }, 500);
+    return c.json(
+      { error: error.message || 'Failed to fetch messages' },
+      err instanceof ChannelUnavailableError ? 422 : 500,
+    );
   }
 });
 
