@@ -68,18 +68,29 @@ export function useMarkRead() {
       await api.patch<NewsItem>(`/news/${id}/read`, { isRead: target });
     },
     onMutate: ({ id, isRead = 1, channelId }) => {
+      const target = isRead === 0 ? 0 : 1;
+      const previous = qc
+        .getQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] })
+        .flatMap(([, data]) => flattenPaginatedItems(data))
+        .find((item) => item.id === id);
+      const delta = previous ? previous.isRead - target : 0;
       // Update the item in-place — no refetch needed
       qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', channelId] }, (old) =>
-        updatePaginatedItems(old, (items) => items.map((n) => (n.id === id ? { ...n, isRead } : n))),
+        updatePaginatedItems(old, (items) => items.map((n) => (n.id === id ? { ...n, isRead: target } : n))),
       );
-      // Adjust unread badge on the channel
-      qc.setQueryData<Channel[]>(['channels'], (old) =>
-        old
-          ? old.map((ch) =>
-              ch.id === channelId ? { ...ch, unreadCount: Math.max(0, ch.unreadCount + (isRead === 1 ? -1 : 1)) } : ch,
-            )
-          : old,
-      );
+      // Count state transitions, not calls: several views can mark the same post.
+      if (delta !== 0) {
+        qc.setQueryData<Channel[]>(['channels'], (old) =>
+          old?.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: Math.max(0, ch.unreadCount + delta) } : ch)),
+        );
+      }
+      return { needsRecount: !previous };
+    },
+    onSuccess: async (_data, _args, context) => {
+      if (context?.needsRecount) {
+        if (MARK_READ_BATCHING_ENABLED) await markReadBatcher.flush();
+        await qc.invalidateQueries({ queryKey: ['channels'] });
+      }
     },
   });
 }

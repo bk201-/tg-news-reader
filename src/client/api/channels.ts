@@ -3,7 +3,7 @@ import type { Channel } from '@shared/types.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-export const channelKeys = { all: ['channels'] as const };
+export const channelKeys = { all: ['channels'] as const, fetch: ['channels', 'fetch'] as const };
 
 export function useChannels() {
   return useQuery({ queryKey: channelKeys.all, queryFn: () => api.get<Channel[]>('/channels') });
@@ -36,6 +36,7 @@ export function useDeleteChannel() {
 export function useFetchChannel() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: channelKeys.fetch,
     mutationFn: ({ id, since, limit }: FetchChannelInput & { id: number }) =>
       api.post<{
         inserted: number;
@@ -83,6 +84,7 @@ export function useReorderChannels() {
 export function useMarkReadAndFetch() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: channelKeys.fetch,
     mutationFn: (id: number) =>
       api.post<{
         inserted: number;

@@ -5,9 +5,10 @@ import { and, eq, max } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
-import { channels, news } from '../db/schema.js';
+import { channels, groups, news, sessions } from '../db/schema.js';
 import { logger } from '../logger.js';
 import { fetchChannelNews } from '../services/channelFetchService.js';
+import { channelStorage } from '../services/channelStorage.js';
 import { reprocessChannelFilters } from '../services/filterEngine.js';
 import { mediaProgressEmitter } from '../services/mediaProgress.js';
 import type { MediaProgressEvent } from '../services/mediaProgress.js';
@@ -20,7 +21,7 @@ import {
   updateChannelSchema,
 } from './schemas.js';
 
-const router = new Hono();
+const router = new Hono<{ Variables: { userId: number; sessionId: string } }>();
 
 // GET /api/channels/lookup?username=durov  — fetch channel title+description from Telegram
 router.get('/lookup', async (c) => {
@@ -62,6 +63,48 @@ router.get('/', async (c) => {
       supportsDigest: r.channelType !== 'media',
     })),
   );
+});
+
+// GET /api/channels/:id/storage — authorize before consulting even the stats cache.
+router.get('/:id/storage', async (c) => {
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+  const rawId = c.req.param('id');
+  const id = Number(rawId);
+  if (!/^[1-9]\d*$/.test(rawId) || !Number.isSafeInteger(id)) {
+    return c.json({ error: 'Invalid channel ID' }, 400);
+  }
+  c.header('Cache-Control', 'no-store');
+  const [channel] = await db
+    .select({ telegramId: channels.telegramId, groupId: channels.groupId, pinHash: groups.pinHash })
+    .from(channels)
+    .leftJoin(groups, eq(channels.groupId, groups.id))
+    .where(eq(channels.id, id));
+  if (!channel) return c.json({ error: 'Channel not found' }, 404);
+  if (channel.pinHash) {
+    const sessionId = c.get('sessionId');
+    const [session] = sessionId ? await db.select().from(sessions).where(eq(sessions.id, sessionId)) : [];
+    let unlocked: unknown = [];
+    try {
+      unlocked = JSON.parse(session?.unlockedGroupIds ?? '[]');
+    } catch {
+      // Invalid persisted state must fail closed.
+    }
+    if (
+      !session ||
+      session.userId !== userId ||
+      session.expiresAt <= Math.floor(Date.now() / 1000) ||
+      !Array.isArray(unlocked) ||
+      !unlocked.includes(channel.groupId)
+    ) {
+      return c.json({ error: 'Group is locked' }, 403);
+    }
+  }
+  try {
+    return c.json(await channelStorage.getStats(channel.telegramId));
+  } catch {
+    return c.json({ error: 'Channel storage unavailable' }, 503);
+  }
 });
 
 // POST /api/channels

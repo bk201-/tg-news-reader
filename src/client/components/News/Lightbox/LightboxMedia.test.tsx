@@ -8,7 +8,7 @@ describe('LightboxMedia', () => {
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   });
 
-  it('disables PiP/remote playback and suppresses native context menu for video', () => {
+  it('allows native video download while keeping PiP, remote playback and the context menu disabled', () => {
     render(
       <LightboxMedia
         path="channel/video.mp4"
@@ -26,6 +26,8 @@ describe('LightboxMedia', () => {
     expect(mediaEl.hasAttribute('disablePictureInPicture')).toBe(true);
     expect(mediaEl.hasAttribute('disableRemotePlayback')).toBe(true);
     expect(mediaEl.getAttribute('controlsList')).toContain('nopictureinpicture');
+    expect(mediaEl.getAttribute('controlsList')).toContain('noremoteplayback');
+    expect(mediaEl.getAttribute('controlsList')).not.toContain('nodownload');
 
     const dispatched = fireEvent.contextMenu(mediaEl);
     expect(dispatched).toBe(false);

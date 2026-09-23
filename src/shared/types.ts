@@ -50,6 +50,14 @@ export interface Channel {
   supportsDigest: boolean;
 }
 
+/** Logical file bytes in this channel's server directory; excludes shared DB/TTS and browser cache. */
+export interface ChannelStorageStats {
+  bytes: number;
+  fileCount: number;
+  /** Unix seconds when the directory scan completed. */
+  checkedAt: number;
+}
+
 export interface NewsItem {
   id: number;
   channelId: number;

@@ -23,6 +23,7 @@ vi.mock('../../../api/filters', () => ({
 
 const mockAllChannels: Channel[] = [];
 vi.mock('../../../api/channels', () => ({
+  channelKeys: { fetch: ['channels', 'fetch'] },
   useFetchChannel: () => ({ mutate: mockFetchChannelMutate }),
   useChannels: () => ({ data: mockAllChannels }),
   useMarkReadAndFetch: () => ({ mutate: mockMarkReadAndFetchMutate }),
@@ -51,6 +52,7 @@ function makeChannel(id: number, overrides: Partial<Channel> = {}): Channel {
     telegramId: `ch${id}`,
     name: `Channel ${id}`,
     channelType: 'news',
+    filterForwards: 0,
     sortOrder: id,
     isUnavailable: 0,
     unreadCount: 5,
@@ -279,6 +281,13 @@ describe('useNewsFeedActions', () => {
     expect(mockMarkReadAndFetchMutate).not.toHaveBeenCalled();
   });
 
+  it('never sends an empty scoped ID list when the hashtag view is empty', () => {
+    useUIStore.setState({ hashTagFilter: '#tech' });
+    const { result } = renderActions([]);
+    act(() => result.current.handleMarkAllReadAndAdvance());
+    expect(mockMarkAllReadMutate).not.toHaveBeenCalled();
+  });
+
   it('handleMarkAllReadAndAdvance in "all" mode still marks whole channel', () => {
     useUIStore.setState({ autoAdvance: false, newsFilterMode: 'all' });
     const items = [makeItem(20), makeItem(21)];
@@ -305,6 +314,54 @@ describe('useNewsFeedActions', () => {
       expect(onSuccess).toBeTypeOf('function');
       callbackArg(onSuccess);
     }
+
+    it.each(['default', 'period'] as const)('starts a fresh mark after a %s refresh replaces the view', (refresh) => {
+      useUIStore.setState({ newsFilterMode: 'hidden' });
+      const { result, rerender } = renderHookWithProviders(
+        ({ items }: { items: NewsItem[] }) => useNewsFeedActions(channel, items, 5, 0, setMediaProgressKey),
+        { initialProps: { items: [makeItem(11), makeItem(12)] } },
+      );
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      act(() => firstClickThen((cb) => cb({ success: true, affectedIds: [11, 12] })));
+      act(() => {
+        if (refresh === 'default') result.current.handleFetchDefault();
+        else result.current.handleFetchPeriod('3');
+      });
+      act(() => mockFetchChannelMutate.mock.calls.at(-1)?.[1]?.onSuccess({ inserted: 0 }));
+      rerender({ items: [makeItem(21), makeItem(22)] });
+      mockMarkAllReadMutate.mockClear();
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { newsIds: [21, 22] },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it('does not restore a stale undo when mark-all finishes after refresh starts', () => {
+      const { result } = renderActions([]);
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      act(() => result.current.handleFetchDefault());
+      act(() => firstClickThen((cb) => cb({ success: true, affectedIds: [11, 12] })));
+      mockMarkAllReadMutate.mockClear();
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { channelId: 1 },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it('starts a fresh mark after changing the view filter mode', () => {
+      const { result } = renderActions([makeItem(21)]);
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      act(() => firstClickThen((cb) => cb({ success: true, affectedIds: [11, 12] })));
+      act(() => useUIStore.setState({ newsFilterMode: 'hidden' }));
+      mockMarkAllReadMutate.mockClear();
+      act(() => result.current.handleMarkAllReadAndAdvance());
+      expect(mockMarkAllReadMutate).toHaveBeenCalledWith(
+        { newsIds: [21] },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
 
     it('second click sends isRead=0 with the affectedIds from the first click', () => {
       useUIStore.setState({ autoAdvance: false, newsFilterMode: 'filtered' });

@@ -224,7 +224,7 @@ export function LightboxMedia({
           loop
           controls
           playsInline
-          controlsList="nodownload noremoteplayback nopictureinpicture"
+          controlsList="noremoteplayback nopictureinpicture"
           disablePictureInPicture
           disableRemotePlayback
           onContextMenu={handleVideoContextMenu}
