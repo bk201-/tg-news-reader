@@ -113,6 +113,45 @@ describe('Downloads routes (integration)', () => {
   });
 
   describe('GET /api/downloads', () => {
+    it.each([null, ['channel/preview.jpg', 'channel/photo.jpg']])(
+      'returns retained done images with path context (%j), including no-path completions',
+      async (paths) => {
+        const tasks = [
+          {
+            id: 1,
+            newsId: 10,
+            type: 'image',
+            status: 'done',
+            priority: 0,
+            localMediaPath: paths?.[0] ?? null,
+            localMediaPaths: paths,
+          },
+        ];
+        vi.mocked(getActiveTasks).mockResolvedValueOnce(tasks as never);
+
+        const res = await app.request('/api/downloads', { headers });
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual(tasks);
+      },
+    );
+
+    it('includes retained done images in the SSE reconnect snapshot', async () => {
+      const tasks = [{ id: 1, newsId: 10, type: 'image', status: 'done', localMediaPath: null, localMediaPaths: null }];
+      vi.mocked(getActiveTasks).mockResolvedValueOnce(tasks as never);
+      const controller = new AbortController();
+      const response = await app.request('/api/downloads/stream', { headers, signal: controller.signal });
+      const reader = response.body!.getReader();
+      try {
+        expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+          `event: init\ndata: ${JSON.stringify(tasks)}`,
+        );
+      } finally {
+        controller.abort();
+        await reader.cancel();
+      }
+    });
+
     it('returns 401 without auth', async () => {
       const res = await app.request('/api/downloads');
       expect(res.status).toBe(401);
@@ -132,6 +171,33 @@ describe('Downloads routes (integration)', () => {
   // ── POST /api/downloads ───────────────────────────────────────────────────
 
   describe('POST /api/downloads', () => {
+    it.each(['image', 'media', 'article'])('requires authentication for %s tasks', async (type) => {
+      for (const authorization of [undefined, 'Bearer invalid-token']) {
+        const res = await app.request('/api/downloads', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authorization ? { Authorization: authorization } : {}),
+          },
+          body: JSON.stringify({ newsId: 1, type }),
+        });
+        expect(res.status).toBe(401);
+      }
+      expect(enqueueTask).not.toHaveBeenCalled();
+    });
+
+    it.each([undefined, 0])('accepts authenticated image tasks with priority %s', async (priority) => {
+      const res = await app.request('/api/downloads', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsId: 1, type: 'image', priority }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(enqueueTask).toHaveBeenCalledWith(1, 'image', undefined, priority ?? 10);
+    });
+
     it('enqueues a download task with default priority=10', async () => {
       const res = await app.request('/api/downloads', {
         method: 'POST',

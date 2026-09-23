@@ -46,6 +46,11 @@ export async function enqueueTask(newsId: number, type: DownloadType, url?: stri
           ELSE downloads.status
         END`,
         error: sql`CASE WHEN downloads.status = 'failed' THEN NULL ELSE downloads.error END`,
+        processedAt: sql`CASE
+          WHEN downloads.status = 'failed'
+            OR (downloads.status = 'done' AND excluded.priority >= 10) THEN NULL
+          ELSE downloads.processed_at
+        END`,
         url: sql`COALESCE(excluded.url, downloads.url)`,
       },
     });
@@ -84,11 +89,13 @@ export async function getActiveTasks(): Promise<DownloadTask[]> {
       newsText: news.text,
       channelId: news.channelId,
       channelName: channels.name,
+      localMediaPath: news.localMediaPath,
+      localMediaPaths: news.localMediaPaths,
     })
     .from(downloads)
     .innerJoin(news, eq(downloads.newsId, news.id))
     .innerJoin(channels, eq(news.channelId, channels.id))
-    .where(sql`${downloads.status} != 'done'`)
+    .where(sql`${downloads.status} != 'done' OR ${downloads.type} = 'image'`)
     .orderBy(...downloadOrderBy);
 
   return rows.map((r) => ({

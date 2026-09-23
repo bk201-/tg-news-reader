@@ -28,6 +28,7 @@ export interface TgDownloadMediaMsg {
   channelTelegramId: string;
   msgId: number;
   ignoreLimit: boolean;
+  imagesOnly?: boolean;
 }
 
 export interface TgResultMsg {
@@ -86,7 +87,8 @@ async function downloadMediaForWorker(worker: Worker, msg: TgDownloadMediaMsg, w
     }
 
     const localPath = await downloadMessageMedia(tgMsg, msg.channelTelegramId, {
-      ignoreLimit: msg.ignoreLimit,
+      ignoreLimit: msg.imagesOnly ? false : msg.ignoreLimit,
+      ...(msg.imagesOnly ? { imagesOnly: true } : {}),
     });
 
     // null means the file was skipped due to size limit (ignoreLimit=false)

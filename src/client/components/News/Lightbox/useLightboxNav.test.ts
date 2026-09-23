@@ -1,10 +1,11 @@
 import type { NewsItem } from '@shared/types.ts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NewsResponse } from '../../../api/news';
+import { useUIStore } from '../../../store/uiStore';
 import { useLightboxNav } from './useLightboxNav';
 
 function makeItem(id: number, overrides: Partial<NewsItem> = {}): NewsItem {
@@ -41,7 +42,10 @@ function setup(items: NewsItem[], newsId: number, albumIndex = 0) {
 }
 
 describe('useLightboxNav', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useUIStore.setState({ newsFilterMode: 'all', hashTagFilter: null });
+  });
 
   it('filters photo/video/document items, excluding webpage/audio', () => {
     const items = [
@@ -63,11 +67,68 @@ describe('useLightboxNav', () => {
     expect(result.current.firstMediaPath).toBe('ch/1.mp4');
   });
 
+  it('skips undownloaded videos and non-image files, but keeps missing photos and image documents', () => {
+    const { result, onNavigate } = setup(
+      [
+        makeItem(1),
+        makeItem(2, { mediaType: 'video', localMediaPath: undefined }),
+        makeItem(3, { mediaType: 'document', localMediaPath: 'ch/file.pdf' }),
+        makeItem(4, { localMediaPath: undefined }),
+        makeItem(5, { mediaType: 'document', localMediaPath: 'ch/image.png' }),
+      ],
+      1,
+    );
+    expect(result.current.entries.map((entry) => entry.newsId)).toEqual([1, 4, 5]);
+    result.current.go(1);
+    expect(onNavigate).toHaveBeenCalledWith(4, 0);
+  });
+
+  it('uses the selected hidden feed, not a stale all-items cache, and reacts to download completion', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(['news', 1, 'all'], makePaginatedData([makeItem(1)]));
+    qc.setQueryData(['news', 1, 'hidden'], makePaginatedData([makeItem(2, { localMediaPath: undefined })]));
+    useUIStore.setState({ newsFilterMode: 'hidden' });
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: qc }, children);
+    const { result } = renderHook(() => useLightboxNav(1, 2, 0, vi.fn()), { wrapper });
+    expect(result.current.entries.map((entry) => entry.newsId)).toEqual([2]);
+    act(() => qc.setQueryData(['news', 1, 'hidden'], makePaginatedData([makeItem(2)])));
+    expect(result.current.firstMediaPath).toBe('ch/2.jpg');
+  });
+
   it('go(1) moves to the next item', () => {
     const items = [makeItem(1), makeItem(2), makeItem(3)];
     const { result, onNavigate } = setup(items, 1);
     result.current.go(1);
     expect(onNavigate).toHaveBeenCalledWith(2, 0);
+  });
+
+  it('continues pagination through video-only and nonmatching hashtag pages', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    useUIStore.setState({ hashTagFilter: '#photo' });
+    const firstPage = {
+      items: [makeItem(1, { mediaType: 'video', localMediaPath: undefined, hashtags: ['#photo'] })],
+      hasMore: true,
+      filteredOut: 0,
+      nextCursor: 'first',
+    };
+    qc.setQueryData(['news', 1, 'all'], { pages: [firstPage], pageParams: [undefined] });
+    const fetchNextPage = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: qc }, children);
+    const { result, rerender } = renderHook(() => useLightboxNav(1, 1, 0, vi.fn(), fetchNextPage, true), { wrapper });
+    expect(result.current.entries).toEqual([]);
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    rerender();
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    act(() =>
+      qc.setQueryData(['news', 1, 'all'], {
+        pages: [firstPage, { ...firstPage, items: [makeItem(2, { hashtags: ['#other'] })], nextCursor: 'second' }],
+        pageParams: [undefined, 'first'],
+      }),
+    );
+    expect(fetchNextPage).toHaveBeenCalledTimes(2);
+    expect(result.current.entries).toEqual([]);
   });
 
   it('go(-1) moves to the previous item', () => {

@@ -1,7 +1,7 @@
 /**
  * Download Coordinator — worker thread management.
  *
- * Spawns N worker_threads. Each worker handles both task types (article + media).
+ * Spawns N worker_threads for article, media and image tasks.
  * The coordinator:
  *   - Polls DB for pending tasks and dispatches them to available workers
  *   - Routes Telegram IPC messages (tg:*) from workers to telegramBridge
@@ -10,7 +10,7 @@
  */
 
 import { Worker } from 'worker_threads';
-import { and, eq, getTableColumns } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
 import type { DownloadTask } from '../../shared/types.js';
 import {
   ARTICLE_WORKER_CONCURRENCY,
@@ -31,6 +31,17 @@ import { downloadStorage, isStorageCapacityError, StoragePausedError } from './d
 import { handleBridgeMessage, isBridgeMessage } from './telegramBridge.js';
 
 const WAKEUP_EVENT = 'wakeup';
+
+// Apply to both selection and the atomic claim: concurrent polls can hold stale candidates.
+const noMediaConflict = sql`(
+  ${downloads.type} NOT IN ('media', 'image') OR NOT EXISTS (
+    SELECT 1 FROM downloads AS active_download
+    WHERE active_download.news_id = ${downloads.newsId}
+      AND active_download.id != ${downloads.id}
+      AND active_download.type IN ('media', 'image')
+      AND active_download.status = 'processing'
+  )
+)`;
 
 // ─── Context query (for SSE payloads) ────────────────────────────────────────
 
@@ -93,6 +104,7 @@ export class DownloadCoordinator {
   private readonly available = new Set<number>();
   private readonly crashLog: number[] = [];
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly cleanupTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly concurrency: number;
   private _stopped = false;
   /** Track slots independently of DB rows, which read-news cleanup may delete. */
@@ -112,6 +124,16 @@ export class DownloadCoordinator {
 
   async start(): Promise<void> {
     await db.update(downloads).set({ status: 'pending' }).where(eq(downloads.status, 'processing'));
+    const completed = await db
+      .select({ id: downloads.id, processedAt: downloads.processedAt })
+      .from(downloads)
+      .where(eq(downloads.status, 'done'));
+    for (const task of completed) {
+      const remaining =
+        task.processedAt === null ? 0 : task.processedAt * 1000 + DOWNLOAD_TASK_CLEANUP_DELAY_MS - Date.now();
+      if (remaining <= 0) await this.removeDoneTask(task.id, task.processedAt);
+      else this.scheduleCleanup(task.id, task.processedAt, Math.min(remaining, DOWNLOAD_TASK_CLEANUP_DELAY_MS));
+    }
     for (let i = 0; i < this.concurrency; i++) this.spawnWorker(i);
     downloadProgressEmitter.on(WAKEUP_EVENT, () => void this.tryDispatch());
     downloadProgressEmitter.on('storage_freed', () => void this.onStorageFreed());
@@ -216,12 +238,43 @@ export class DownloadCoordinator {
     const doneTask = await getTaskWithContext(taskId);
     if (doneTask) {
       emitTaskUpdate({ ...doneTask, status: 'done' });
-      setTimeout(() => {
-        void db.delete(downloads).where(eq(downloads.id, taskId));
-      }, DOWNLOAD_TASK_CLEANUP_DELAY_MS);
+      this.scheduleCleanup(taskId, now);
     }
     this.available.add(workerId);
     void this.tryDispatch();
+  }
+
+  private cancelCleanup(taskId: number): void {
+    const timer = this.cleanupTimers.get(taskId);
+    if (timer !== undefined) clearTimeout(timer);
+    this.cleanupTimers.delete(taskId);
+  }
+
+  private scheduleCleanup(taskId: number, processedAt: number | null, delay = DOWNLOAD_TASK_CLEANUP_DELAY_MS): void {
+    this.cancelCleanup(taskId);
+    const timer = setTimeout(() => {
+      this.cleanupTimers.delete(taskId);
+      void this.removeDoneTask(taskId, processedAt);
+    }, delay);
+    this.cleanupTimers.set(taskId, timer);
+  }
+
+  private async removeDoneTask(taskId: number, processedAt: number | null): Promise<void> {
+    try {
+      const [removed] = await db
+        .delete(downloads)
+        .where(
+          and(
+            eq(downloads.id, taskId),
+            eq(downloads.status, 'done'),
+            processedAt === null ? isNull(downloads.processedAt) : eq(downloads.processedAt, processedAt),
+          ),
+        )
+        .returning({ id: downloads.id });
+      if (removed) downloadProgressEmitter.emit('task_removed', removed.id);
+    } catch (err) {
+      logger.error({ module: 'download', taskId, err }, 'done task cleanup failed');
+    }
   }
 
   private async onTaskError(workerId: number, { taskId, message: errorMsg, code }: ErrorMsg): Promise<void> {
@@ -265,8 +318,8 @@ export class DownloadCoordinator {
     //
     // Task selection strategy:
     //   - If an article worker is available, prefer fetching any pending task
-    //     (article OR media) — article workers can process both.
-    //   - If only media-only workers are available, fetch a media task only.
+    //     (article, media or image) — article workers can process all types.
+    //   - If only media-only workers are available, fetch media or image tasks.
     const articleCapableIds: number[] = [];
     const mediaOnlyIds: number[] = [];
     for (const id of this.available) {
@@ -291,9 +344,11 @@ export class DownloadCoordinator {
             .from(downloads)
             .innerJoin(news, eq(downloads.newsId, news.id))
             .where(
-              canClaimArticle
-                ? eq(downloads.status, 'pending')
-                : and(eq(downloads.status, 'pending'), eq(downloads.type, 'media')),
+              and(
+                eq(downloads.status, 'pending'),
+                canClaimArticle ? undefined : inArray(downloads.type, ['media', 'image']),
+                noMediaConflict,
+              ),
             )
             .orderBy(...downloadOrderBy)
             .limit(1);
@@ -333,7 +388,7 @@ export class DownloadCoordinator {
     const [claimed] = await db
       .update(downloads)
       .set({ status: 'processing', error: null, processedAt: null })
-      .where(and(eq(downloads.id, task.id), eq(downloads.status, 'pending')))
+      .where(and(eq(downloads.id, task.id), eq(downloads.status, 'pending'), noMediaConflict))
       .returning();
 
     if (!claimed) {
@@ -342,6 +397,9 @@ export class DownloadCoordinator {
       return;
     }
 
+    // A retry may finish in the same second as its previous generation.
+    // Status/timestamp guards alone cannot distinguish those completions.
+    this.cancelCleanup(task.id);
     const taskCtx = await getTaskWithContext(task.id);
     if (downloadStorage.status.paused) {
       await db.update(downloads).set({ status: 'pending' }).where(eq(downloads.id, task.id));

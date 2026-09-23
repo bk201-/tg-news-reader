@@ -113,63 +113,65 @@ export function ChannelItem({
   );
 
   return (
-    <Popover
-      content={infoContent}
-      open={infoOpen}
-      onOpenChange={setInfoOpen}
-      trigger={POPOVER_TRIGGER}
-      mouseEnterDelay={0.4}
-      placement="right"
-      destroyOnHidden
-      fresh
+    <div
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
+      className={cx(styles.item, isSelected && styles.itemActive)}
+      onClick={handleSelect}
+      onKeyDown={handleKeyDown}
     >
-      <div
-        role="option"
-        aria-selected={isSelected}
-        tabIndex={0}
-        className={cx(styles.item, isSelected && styles.itemActive)}
-        onClick={handleSelect}
-        onKeyDown={handleKeyDown}
-      >
-        <div className={styles.info}>
-          <Text strong ellipsis>
-            {ch.isUnavailable ? (
-              <Tooltip title={t('channels.unavailable_tooltip')}>
-                <WarningOutlined className={styles.warningIcon} />
-              </Tooltip>
-            ) : null}
-            {ch.name}
-          </Text>
+      <div className={styles.info}>
+        <Text strong ellipsis>
+          {ch.isUnavailable ? (
+            <Tooltip title={t('channels.unavailable_tooltip')}>
+              <WarningOutlined className={styles.warningIcon} />
+            </Tooltip>
+          ) : null}
+          {ch.name}
+        </Text>
+        <Text type="secondary" className={styles.metaText}>
+          @{ch.telegramId}
+        </Text>
+        {ch.lastFetchedAt && (
           <Text type="secondary" className={styles.metaText}>
-            @{ch.telegramId}
+            {t('channels.updated', { date: dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm') })}
           </Text>
-          {ch.lastFetchedAt && (
-            <Text type="secondary" className={styles.metaText}>
-              {t('channels.updated', { date: dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm') })}
-            </Text>
-          )}
-        </div>
-        <div className={styles.rightSide}>
-          <Badge count={formatUnreadBadgeCount(unreadCount)} overflowCount={9999} size="small" />
-          <Button
-            icon={ICON_INFO}
-            size="small"
-            type="text"
-            onClick={toggleInfo}
-            onTouchStart={stopTouch}
-            aria-label={t('channels.info.open', { name: ch.name })}
-            aria-expanded={infoOpen}
-            aria-haspopup="dialog"
-          />
-          <ChannelItemMenu
-            channel={ch}
-            isFetching={isFetchingThis}
-            onFetch={onFetch}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        </div>
+        )}
       </div>
-    </Popover>
+      <div className={styles.rightSide}>
+        <Badge count={formatUnreadBadgeCount(unreadCount)} overflowCount={9999} size="small" />
+        <Popover
+          content={infoContent}
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          trigger={POPOVER_TRIGGER}
+          mouseEnterDelay={0.4}
+          placement="right"
+          destroyOnHidden
+          fresh
+        >
+          <span>
+            <Button
+              icon={ICON_INFO}
+              size="small"
+              type="text"
+              onClick={toggleInfo}
+              onTouchStart={stopTouch}
+              aria-label={t('channels.info.open', { name: ch.name })}
+              aria-expanded={infoOpen}
+              aria-haspopup="dialog"
+            />
+          </span>
+        </Popover>
+        <ChannelItemMenu
+          channel={ch}
+          isFetching={isFetchingThis}
+          onFetch={onFetch}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </div>
+    </div>
   );
 }

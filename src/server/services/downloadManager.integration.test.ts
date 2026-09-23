@@ -78,6 +78,28 @@ describe('downloadManager — public API (integration)', () => {
   // ── enqueueTask ──────────────────────────────────────────────────────────
 
   describe('enqueueTask', () => {
+    it('queues images for filtered news without allowing background full media', async () => {
+      await testDb.client.execute('UPDATE news SET is_filtered = 1 WHERE id = ?', [newsId]);
+      await enqueueTask(newsId, 'image');
+      await enqueueTask(newsId, 'media');
+
+      expect(await getActiveTasks()).toEqual([expect.objectContaining({ newsId, type: 'image', status: 'pending' })]);
+    });
+
+    it.each(['failed', 'done'])('clears processedAt when re-enqueuing a %s image', async (status) => {
+      await enqueueTask(newsId, 'image');
+      await testDb.client.execute('UPDATE downloads SET status = ?, processed_at = 123 WHERE news_id = ?', [
+        status,
+        newsId,
+      ]);
+
+      await enqueueTask(newsId, 'image', undefined, 10);
+
+      expect(await getActiveTasks()).toEqual([
+        expect.objectContaining({ type: 'image', status: 'pending', processedAt: null }),
+      ]);
+    });
+
     it('does not enqueue background media for filtered news', async () => {
       await testDb.client.execute('UPDATE news SET is_filtered = 1 WHERE id = ?', [newsId]);
 
@@ -243,6 +265,35 @@ describe('downloadManager — public API (integration)', () => {
   // ── getActiveTasks ───────────────────────────────────────────────────────
 
   describe('getActiveTasks', () => {
+    it.each([null, ['channel/preview.jpg', 'channel/photo.jpg']])(
+      'retains done image tasks with their current paths (%j) for reconnect',
+      async (paths) => {
+        await enqueueTask(newsId, 'image');
+        await testDb.client.execute("UPDATE downloads SET status = 'done', processed_at = 123 WHERE news_id = ?", [
+          newsId,
+        ]);
+        await testDb.client.execute('UPDATE news SET local_media_path = ?, local_media_paths = ? WHERE id = ?', [
+          paths?.[0] ?? null,
+          paths ? JSON.stringify(paths) : null,
+          newsId,
+        ]);
+        await enqueueTask(newsId, 'media');
+        await testDb.client.execute("UPDATE downloads SET status = 'done' WHERE type = 'media'");
+
+        expect(await getActiveTasks()).toEqual([
+          expect.objectContaining({
+            newsId,
+            type: 'image',
+            status: 'done',
+            processedAt: 123,
+            channelId,
+            localMediaPath: paths?.[0] ?? null,
+            localMediaPaths: paths,
+          }),
+        ]);
+      },
+    );
+
     it('lists manual requests before all images, including previously queued photos, then other media', async () => {
       const video = await seedNews(testDb.db, channelId, { mediaType: 'video' });
       const photo = await seedNews(testDb.db, channelId, { mediaType: 'photo' });

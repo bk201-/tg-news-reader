@@ -288,23 +288,34 @@ export async function readChannelHistory(channelUsername: string, maxId: number)
 export async function downloadMessageMedia(
   msg: TelegramMessage,
   channelTelegramId: string,
-  options: { ignoreLimit?: boolean } = {},
+  options: { ignoreLimit?: boolean; imagesOnly?: boolean } = {},
 ): Promise<string | null> {
   const _Api = await ensureAndGetApi();
   if (!msg.rawMedia) return null;
 
   let ext: string;
   let expectedBytes = msg.mediaSizeBytes ?? 0;
+  const ignoreLimit = options.ignoreLimit && !options.imagesOnly;
 
   if (msg.rawMedia instanceof _Api.MessageMediaPhoto) {
     ext = 'jpg';
-    if (!options.ignoreLimit && msg.mediaSizeBytes && msg.mediaSizeBytes > MAX_PHOTO_SIZE_BYTES) return null;
+    const photo = msg.rawMedia.photo;
+    if (photo instanceof _Api.Photo) {
+      for (const size of photo.sizes) {
+        if (size instanceof _Api.PhotoSize) expectedBytes = Math.max(expectedBytes, size.size);
+        else if (size instanceof _Api.PhotoSizeProgressive) expectedBytes = Math.max(expectedBytes, ...size.sizes);
+        else if (size instanceof _Api.PhotoCachedSize) expectedBytes = Math.max(expectedBytes, size.bytes.length);
+      }
+    }
+    if (!ignoreLimit && expectedBytes > MAX_PHOTO_SIZE_BYTES) return null;
   } else if (msg.rawMedia instanceof _Api.MessageMediaDocument) {
     const doc = msg.rawMedia.document;
     if (!(doc instanceof _Api.Document)) return null;
     const sizeNum = Number(doc.size ?? 0);
     expectedBytes = sizeNum;
     const mime = doc.mimeType ?? '';
+    // Enforce on raw Telegram media, not parsed mediaType (albums can mix images and videos).
+    if (options.imagesOnly && !mime.startsWith('image/')) return null;
     if (mime === 'image/jpeg') ext = 'jpg';
     else if (mime === 'image/png') ext = 'png';
     else if (mime === 'image/gif') ext = 'gif';
@@ -320,7 +331,7 @@ export async function downloadMessageMedia(
     else return null;
 
     const isAudio = mime.startsWith('audio/') || mime === 'application/ogg';
-    if (!options.ignoreLimit) {
+    if (!ignoreLimit) {
       if (isAudio) return null;
       const isVideo = ext === 'mp4' || ext === 'webm' || ext === 'mov';
       const limit = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMG_DOC_SIZE_BYTES;

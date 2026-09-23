@@ -301,6 +301,11 @@
   },
   "lightbox": {
     "title": "Media viewer",
+    "loading_images": "Loading images",
+    "rotate_left": "Rotate video 90° left",
+    "rotate_right": "Rotate video 90° right",
+    "load_failed": "Could not load this image. You can continue to the next post.",
+    "no_media": "No images or downloaded videos to show.",
     "close": "Close [Esc]",
     "prev": "Previous [↑]",
     "next": "Next [↓]",

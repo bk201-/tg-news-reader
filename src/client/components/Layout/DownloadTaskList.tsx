@@ -46,9 +46,16 @@ export interface TaskListProps {
 export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskListProps) {
   const { t } = useTranslation();
   const { styles } = useStyles();
-  const mediaTasks = useMemo(() => tasks.filter((task) => task.type === 'media'), [tasks]);
-  const articleTasks = useMemo(() => tasks.filter((task) => task.type === 'article'), [tasks]);
-  const showGroups = mediaTasks.length > 0 && articleTasks.length > 0;
+  const visibleTasks = useMemo(() => tasks.filter((task) => task.status !== 'done'), [tasks]);
+  const groups = useMemo(
+    () =>
+      [
+        { label: 'downloads.section_media', tasks: visibleTasks.filter((task) => task.type === 'media') },
+        { label: 'downloads.typeImage', tasks: visibleTasks.filter((task) => task.type === 'image') },
+        { label: 'downloads.section_articles', tasks: visibleTasks.filter((task) => task.type === 'article') },
+      ].filter((group) => group.tasks.length > 0),
+    [visibleTasks],
+  );
   const renderItem = useCallback(
     (task: DownloadTask) => (
       <DownloadTaskRow task={task} cancelDownload={cancelDownload} prioritizeDownload={prioritizeDownload} />
@@ -60,22 +67,22 @@ export function TaskList({ tasks, cancelDownload, prioritizeDownload }: TaskList
   return (
     <>
       {error && <Alert type="error" showIcon title={error.message} />}
-      {tasks.length === 0 ? (
+      {visibleTasks.length === 0 ? (
         <div className={styles.empty}>
           <CloudDownloadOutlined className={styles.emptyIcon} />
           <div className={styles.emptyText}>
             <Typography.Text type="secondary">{t('downloads.empty')}</Typography.Text>
           </div>
         </div>
-      ) : showGroups ? (
-        <>
-          <div className={styles.sectionDivider}>{t('downloads.section_media')}</div>
-          <List dataSource={mediaTasks} renderItem={renderItem} />
-          <div className={styles.sectionDivider}>{t('downloads.section_articles')}</div>
-          <List dataSource={articleTasks} renderItem={renderItem} />
-        </>
+      ) : groups.length > 1 ? (
+        groups.map((group) => (
+          <React.Fragment key={group.label}>
+            <div className={styles.sectionDivider}>{t(group.label)}</div>
+            <List dataSource={group.tasks} renderItem={renderItem} />
+          </React.Fragment>
+        ))
       ) : (
-        <List dataSource={tasks} renderItem={renderItem} />
+        <List dataSource={visibleTasks} renderItem={renderItem} />
       )}
     </>
   );

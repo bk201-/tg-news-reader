@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { mediaUrl } from '../../../api/mediaUrl';
 import { useMarkRead } from '../../../api/news';
 import type { LightboxState } from '../../../store/uiStore';
+import { isImagePath } from './lightboxMediaPaths';
 import type { UseLightboxNavResult } from './useLightboxNav';
 
 export function useLightboxMediaEffects(
@@ -22,7 +23,7 @@ export function useLightboxMediaEffects(
     const entryPaths = (e: (typeof entries)[number] | undefined): string[] => {
       if (!e) return [];
       const paths = e.item.localMediaPaths ?? (e.item.localMediaPath ? [e.item.localMediaPath] : []);
-      return paths.filter((p) => !/\.(mp4|webm|mov)$/i.test(p));
+      return paths.filter(isImagePath);
     };
 
     const toPreload: string[] = [

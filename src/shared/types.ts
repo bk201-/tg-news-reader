@@ -1,6 +1,6 @@
 export type ChannelType = 'news' | 'news_link' | 'media' | 'blog';
 
-export type DownloadType = 'media' | 'article';
+export type DownloadType = 'media' | 'article' | 'image';
 export type DownloadStatus = 'pending' | 'processing' | 'done' | 'failed';
 
 export interface DownloadTask {

@@ -1,7 +1,7 @@
 import type { CreateDownloadInput } from '@shared/schemas.ts';
 import type { DownloadTask, DownloadType, NewsItem } from '@shared/types.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { createReconnectingEventSource } from '../services/reconnectingEventSource';
 import { useAuthStore } from '../store/authStore';
@@ -13,10 +13,38 @@ export const downloadsKeys = {
   all: ['downloads'] as const,
 };
 
+function patchMediaPaths(qc: QueryClient, task: DownloadTask) {
+  if (!task.channelId) return;
+  qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
+    updatePaginatedItems(old, (items) =>
+      items.map((item) =>
+        item.id === task.newsId
+          ? {
+              ...item,
+              localMediaPath: task.localMediaPath ?? item.localMediaPath,
+              localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
+            }
+          : item,
+      ),
+    ),
+  );
+}
+
+function reconcileImageTasks(qc: QueryClient, tasks: DownloadTask[]) {
+  for (const task of tasks) {
+    if (task.type === 'image' && task.status === 'done') patchMediaPaths(qc, task);
+  }
+}
+
 export function useDownloads() {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: downloadsKeys.all,
-    queryFn: () => api.get<DownloadTask[]>('/downloads'),
+    queryFn: async () => {
+      const tasks = await api.get<DownloadTask[]>('/downloads');
+      reconcileImageTasks(qc, tasks);
+      return tasks;
+    },
     // SSE (useDownloadsSSE) keeps this data up-to-date via push events —
     // no polling needed.
     refetchOnWindowFocus: false,
@@ -89,6 +117,7 @@ export function useDownloadsSSE() {
       onConnect: (es) => {
         es.addEventListener('init', (e: MessageEvent) => {
           const tasks = JSON.parse(e.data as string) as DownloadTask[];
+          reconcileImageTasks(qc, tasks);
           qc.setQueryData(downloadsKeys.all, tasks);
         });
 
@@ -113,26 +142,18 @@ export function useDownloadsSSE() {
           const task = JSON.parse(e.data as string) as DownloadTask;
 
           if (task.status === 'done') {
-            if (task.type === 'media' && task.channelId) {
-              qc.setQueriesData<InfiniteData<NewsResponse>>({ queryKey: ['news', task.channelId] }, (old) =>
-                updatePaginatedItems(old, (items) =>
-                  items.map((item: NewsItem) => {
-                    if (item.id !== task.newsId) return item;
-                    return {
-                      ...item,
-                      localMediaPath: task.localMediaPath ?? item.localMediaPath,
-                      localMediaPaths: task.localMediaPaths ?? item.localMediaPaths,
-                    };
-                  }),
-                ),
-              );
-              qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
-                (old ?? []).filter((t) => t.id !== task.id),
-              );
-              return;
+            if ((task.type === 'media' || task.type === 'image') && task.channelId) {
+              patchMediaPaths(qc, task);
+              // Keep image terminal states until task_removed, including done-without-path results.
+              if (task.type === 'media') {
+                qc.setQueryData<DownloadTask[]>(downloadsKeys.all, (old = []) =>
+                  (old ?? []).filter((t) => t.id !== task.id),
+                );
+                return;
+              }
             }
 
-            if (task.channelId) {
+            if (task.type === 'article' && task.channelId) {
               // Article done — fetch the single updated news item and patch it in cache.
               // Avoids refetching the entire channel's news list (which races with markRead).
               // Preserve client-side isRead to avoid overwriting optimistic mark-read updates.

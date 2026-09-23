@@ -101,7 +101,7 @@ export const downloads = sqliteTable(
     newsId: integer('news_id')
       .notNull()
       .references(() => news.id, { onDelete: 'cascade' }),
-    type: text('type', { enum: ['media', 'article'] }).notNull(),
+    type: text('type', { enum: ['media', 'article', 'image'] }).notNull(),
     url: text('url'),
     priority: integer('priority').notNull().default(0),
     status: text('status', { enum: ['pending', 'processing', 'done', 'failed'] })

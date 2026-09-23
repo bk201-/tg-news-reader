@@ -37,7 +37,9 @@ vi.mock('../db/index.js', () => ({
 type Message = {
   type: string;
   reqId?: number;
-  result?: string;
+  result?: string | null;
+  msgId?: number;
+  reason?: 'no_media' | 'size_limit';
   payload?: { id: number; newsId: number; type: string; url: string | null; priority: number };
 };
 let receive: (msg: Message) => void;
@@ -63,7 +65,7 @@ describe('downloadWorker filtered media', () => {
     });
   });
 
-  async function runTask(newsId: number, priority = 0, type: 'media' | 'article' = 'media') {
+  async function runTask(newsId: number, priority = 0, type: 'media' | 'article' | 'image' = 'media') {
     receive({
       type: 'task',
       payload: { id: 1, newsId, type, url: type === 'article' ? 'https://example.com' : null, priority },
@@ -74,6 +76,89 @@ describe('downloadWorker filtered media', () => {
   it('finishes without downloading or failing if the news was deleted before dispatch', async () => {
     await runTask(999);
     expect(port.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'tg:downloadMedia' }));
+  });
+
+  it('previews hidden images with enforced limits on every mixed-album member and preserves cached video', async () => {
+    const channel = await seedChannel(testDb.db);
+    const item = await seedNews(testDb.db, channel.id, {
+      isFiltered: 1,
+      albumMsgIds: [10, 11, 12],
+      telegramMsgId: 10,
+      localMediaPath: 'test/10.mp4',
+      localMediaPaths: ['test/10.mp4', 'test/12.jpg'],
+    });
+    port.postMessage.mockImplementation((msg: Message) => {
+      if (msg.type === 'tg:downloadMedia') {
+        queueMicrotask(() =>
+          receive({
+            type: 'tg:result',
+            reqId: msg.reqId,
+            result: msg.msgId === 10 ? null : `test/${msg.msgId}.jpg`,
+            reason: msg.msgId === 10 ? 'no_media' : undefined,
+          }),
+        );
+      }
+    });
+    await runTask(item.id, 10, 'image');
+    const requests = port.postMessage.mock.calls.filter(([msg]) => msg.type === 'tg:downloadMedia');
+    expect(requests).toHaveLength(3);
+    for (const [request] of requests) expect(request).toMatchObject({ imagesOnly: true, ignoreLimit: false });
+    const result = await testDb.client.execute('SELECT local_media_path, local_media_paths FROM news WHERE id = ?', [
+      item.id,
+    ]);
+    expect(result.rows[0].local_media_path).toBe('test/10.mp4');
+    expect(JSON.parse(result.rows[0].local_media_paths as string)).toEqual([
+      'test/10.mp4',
+      'test/11.jpg',
+      'test/12.jpg',
+    ]);
+    expect(deleteAllMediaFiles).not.toHaveBeenCalled();
+  });
+
+  it.each(['no_media', 'size_limit'] as const)('completes an image preview with no paths on %s', async (reason) => {
+    const channel = await seedChannel(testDb.db);
+    const item = await seedNews(testDb.db, channel.id, { isFiltered: 1 });
+    port.postMessage.mockImplementation((msg: Message) => {
+      if (msg.type === 'tg:downloadMedia')
+        queueMicrotask(() =>
+          receive({
+            type: 'tg:result',
+            reqId: msg.reqId,
+            result: null,
+            reason,
+          }),
+        );
+    });
+    await runTask(item.id, 10, 'image');
+    const result = await testDb.client.execute('SELECT local_media_path, local_media_paths FROM news WHERE id = ?', [
+      item.id,
+    ]);
+    expect(result.rows[0]).toMatchObject({ local_media_path: null, local_media_paths: null });
+    expect(deleteAllMediaFiles).not.toHaveBeenCalled();
+  });
+
+  it('does not mistake partial image-only paths for a fully downloaded media album', async () => {
+    const channel = await seedChannel(testDb.db);
+    const item = await seedNews(testDb.db, channel.id, {
+      albumMsgIds: [10, 11],
+      localMediaPath: 'test/11.jpg',
+      localMediaPaths: ['test/11.jpg'],
+    });
+    port.postMessage.mockImplementation((msg: Message) => {
+      if (msg.type === 'tg:downloadMedia')
+        queueMicrotask(() =>
+          receive({
+            type: 'tg:result',
+            reqId: msg.reqId,
+            result: `test/${msg.msgId}.${msg.msgId === 10 ? 'mp4' : 'jpg'}`,
+          }),
+        );
+    });
+    await runTask(item.id);
+    const requests = port.postMessage.mock.calls.filter(([msg]) => msg.type === 'tg:downloadMedia');
+    expect(requests).toHaveLength(2);
+    const result = await testDb.client.execute('SELECT local_media_paths FROM news WHERE id = ?', [item.id]);
+    expect(JSON.parse(result.rows[0].local_media_paths as string)).toEqual(['test/10.mp4', 'test/11.jpg']);
   });
 
   it('does not fetch an article for deleted news', async () => {
@@ -109,6 +194,19 @@ describe('downloadWorker filtered media', () => {
       expect(deleteAllMediaFiles).toHaveBeenCalledWith('test/photo.jpg', albumMsgIds ? ['test/photo.jpg'] : null);
     },
   );
+
+  it('removes a recreated cached image when its news is deleted during the preview', async () => {
+    const channel = await seedChannel(testDb.db);
+    const item = await seedNews(testDb.db, channel.id, { localMediaPath: 'test/photo.jpg' });
+    port.postMessage.mockImplementation(async (msg: Message) => {
+      if (msg.type === 'tg:downloadMedia') {
+        await testDb.client.execute('DELETE FROM news WHERE id = ?', [item.id]);
+        receive({ type: 'tg:result', reqId: msg.reqId, result: 'test/photo.jpg' });
+      }
+    });
+    await runTask(item.id, 10);
+    expect(deleteAllMediaFiles).toHaveBeenCalledWith('test/photo.jpg', null);
+  });
 
   it.each([{ albumMsgIds: null }, { albumMsgIds: [10, 11] }])(
     'skips previously queued hidden media ($albumMsgIds)',
