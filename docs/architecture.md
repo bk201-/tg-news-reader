@@ -37,6 +37,13 @@ Hover the channel's information button or click it (also available on touch/keyb
 popover. It shows the saved description as safe Markdown, channel type/group, post counts, timestamps,
 and server media storage in readable units plus exact bytes and file count. Descriptions come from
 Telegram lookup or user edits, not a live Telegram request.
+Missing descriptions are omitted. The card shows the measurement timestamp without cache/extraction notes.
+Hover opens a transient card without a Close button; clicking/tapping or keyboard activation pins it with
+an explicit Close button. The header remains outside the scrollable details region on short screens.
+Permanent Telegram access/username errors during refresh persist `isUnavailable` and return HTTP 422;
+a successful retry clears the flag. Transient failures do not mark a channel unavailable.
+Refresh errors are shown to the user, and both successful and failed refreshes reconcile the channel
+and news caches, including bulk refresh and mark-read-and-fetch.
 
 `GET /api/channels/:id/storage` is requested only when the popover is open. It measures the channel's
 actual server directory, including partial/orphaned files, but excludes the shared database, TTS, and

@@ -1,6 +1,8 @@
 import type { CreateChannelInput, FetchChannelInput, UpdateChannelInput } from '@shared/schemas.ts';
 import type { Channel } from '@shared/types.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { App } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { api } from './client';
 
 export const channelKeys = { all: ['channels'] as const, fetch: ['channels', 'fetch'] as const };
@@ -35,6 +37,8 @@ export function useDeleteChannel() {
 
 export function useFetchChannel() {
   const qc = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
   return useMutation({
     mutationKey: channelKeys.fetch,
     mutationFn: ({ id, since, limit }: FetchChannelInput & { id: number }) =>
@@ -57,6 +61,7 @@ export function useFetchChannel() {
               ch.id === variables.id
                 ? {
                     ...ch,
+                    isUnavailable: 0,
                     lastFetchedAt: now,
                     unreadCount: data.unreadCount ?? ch.unreadCount + (data.inserted ?? 0),
                     totalNewsCount: data.totalNewsCount ?? ch.totalNewsCount + (data.inserted ?? 0),
@@ -65,10 +70,15 @@ export function useFetchChannel() {
             )
           : old,
       );
-
-      // Refresh the news list after fetch
-      void qc.invalidateQueries({ queryKey: ['news', variables.id] });
     },
+    onError: (error) => {
+      void message.error(t('channels.refresh_failed', { error: error.message }));
+    },
+    onSettled: (_data, _error, variables) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: channelKeys.all }),
+        qc.invalidateQueries({ queryKey: ['news', variables.id] }),
+      ]),
   });
 }
 
@@ -83,6 +93,8 @@ export function useReorderChannels() {
 
 export function useMarkReadAndFetch() {
   const qc = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
   return useMutation({
     mutationKey: channelKeys.fetch,
     mutationFn: (id: number) =>
@@ -101,6 +113,7 @@ export function useMarkReadAndFetch() {
               ch.id === channelId
                 ? {
                     ...ch,
+                    isUnavailable: 0,
                     lastFetchedAt: now,
                     unreadCount: data.unreadCount ?? data.inserted ?? 0,
                     totalNewsCount: data.totalNewsCount ?? ch.totalNewsCount + (data.inserted ?? 0),
@@ -109,8 +122,15 @@ export function useMarkReadAndFetch() {
             )
           : old,
       );
-      void qc.invalidateQueries({ queryKey: ['news', channelId] });
     },
+    onError: (error) => {
+      void message.error(t('channels.refresh_failed', { error: error.message }));
+    },
+    onSettled: (_data, _error, channelId) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: channelKeys.all }),
+        qc.invalidateQueries({ queryKey: ['news', channelId] }),
+      ]),
   });
 }
 

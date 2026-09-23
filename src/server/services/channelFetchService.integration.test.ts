@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config.js', async (importOriginal) => ({
@@ -14,6 +14,8 @@ vi.mock('../logger.js', () => ({
 }));
 
 vi.mock('./telegram.js', () => ({
+  getChannelInfo: vi.fn(),
+  readChannelHistory: vi.fn().mockResolvedValue(undefined),
   fetchChannelMessages: vi.fn(),
   fetchMessageById: vi.fn(),
   getReadInboxMaxId: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock('../db/index.js', () => ({
 }));
 
 import { filters } from '../db/schema.js';
+import channelsRouter from '../routes/channels.js';
 import { deleteAllMediaFiles } from '../utils/mediaFiles.js';
 import { fetchChannelNews } from './channelFetchService.js';
 import { enqueueTask } from './downloadManager.js';
@@ -62,7 +65,7 @@ describe('channelFetchService (integration)', () => {
   // Uses a file-backed DB: fetchChannelNews runs an interactive db.transaction(),
   // which libsql can't service against a :memory: connection (each connection is a
   // separate empty in-memory database).
-  const dbFile = join(tmpdir(), `tg-fetch-${process.pid}-${Date.now()}.sqlite`);
+  const dbFile = join(process.cwd(), `tg-fetch-${process.pid}-${Date.now()}.sqlite`);
 
   beforeAll(async () => {
     testDb = await createTestDb(`file:${dbFile}`);
@@ -95,6 +98,87 @@ describe('channelFetchService (integration)', () => {
       .mockImplementation(async (msg) => {
         msg.instantViewContent = '![photo](test/iv.jpg)';
       });
+  });
+
+  const app = new Hono().route('/api/channels', channelsRouter);
+
+  it.each([
+    new Error('USERNAME_NOT_OCCUPIED'),
+    new Error('No user has "deleted_channel" as username'),
+    new Error('400: CHANNEL_PRIVATE (caused by messages.GetHistory)'),
+    Object.assign(new Error('RPC failed'), { errorMessage: 'CHANNEL_INVALID' }),
+    new Error('USERNAME_INVALID'),
+    new Error('CHANNEL_PUBLIC_GROUP_NA'),
+  ])('persists unavailable status and returns an explicit refresh error for %s', async (error) => {
+    const ch = await seedChannel(testDb.db, { unreadCount: 2, totalNewsCount: 2 });
+    await seedNews(testDb.db, ch.id);
+    await seedNews(testDb.db, ch.id);
+    vi.mocked(fetchChannelMessages).mockRejectedValueOnce(error);
+
+    const response = await app.request(`/api/channels/${ch.id}/fetch`, { method: 'POST' });
+    const list = await (await app.request('/api/channels')).json();
+    expect(list[0]).toMatchObject({ isUnavailable: 1, unreadCount: 2, totalNewsCount: 2, lastFetchedAt: null });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: expect.stringMatching(/unavailable/i) });
+  });
+
+  it.each(['fetch', 'mark-read-and-fetch'])(
+    'retries unavailable channels and clears the flag via %s',
+    async (route) => {
+      const ch = await seedChannel(testDb.db, { isUnavailable: 1 });
+      const response = await app.request(`/api/channels/${ch.id}/${route}`, { method: 'POST' });
+      expect(response.status).toBe(200);
+      expect(fetchChannelMessages).toHaveBeenCalledWith(ch.telegramId, expect.any(Object));
+      const list = await (await app.request('/api/channels')).json();
+      expect(list[0]).toMatchObject({ isUnavailable: 0, unreadCount: 0, totalNewsCount: 0 });
+    },
+  );
+
+  it.each(['ETIMEDOUT', 'ECONNRESET', 'FLOOD_WAIT_30', 'Telegram circuit breaker OPEN', 'AUTH_KEY_UNREGISTERED'])(
+    'does not mark a channel unavailable for %s',
+    async (message) => {
+      const ch = await seedChannel(testDb.db);
+      vi.mocked(fetchChannelMessages).mockRejectedValueOnce(new Error(message));
+      const response = await app.request(`/api/channels/${ch.id}/fetch`, { method: 'POST' });
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: message });
+      const list = await (await app.request('/api/channels')).json();
+      expect(list[0].isUnavailable).toBe(0);
+    },
+  );
+
+  it('preserves an unavailable flag if its retry fails transiently', async () => {
+    const ch = await seedChannel(testDb.db, { isUnavailable: 1 });
+    vi.mocked(fetchChannelMessages).mockRejectedValueOnce(new Error('Network error'));
+    await expect(fetchChannelNews(ch.id)).rejects.toThrow('Network error');
+    const list = await (await app.request('/api/channels')).json();
+    expect(list[0].isUnavailable).toBe(1);
+  });
+
+  it('propagates permanent read-watermark failures instead of treating the channel as empty', async () => {
+    const ch = await seedChannel(testDb.db);
+    vi.mocked(getReadInboxMaxId).mockRejectedValueOnce(new Error('CHANNEL_PRIVATE'));
+    const response = await app.request(`/api/channels/${ch.id}/fetch`, { method: 'POST' });
+    expect(response.status).toBe(422);
+    const list = await (await app.request('/api/channels')).json();
+    expect(list[0].isUnavailable).toBe(1);
+  });
+
+  it.each(['fetch', 'mark-read-and-fetch'])('keeps cleanup counts accurate when %s fails', async (route) => {
+    const ch = await seedChannel(testDb.db, { unreadCount: 1, totalNewsCount: 2, lastFetchedAt: NOW });
+    await seedNews(testDb.db, ch.id, { isRead: 1 });
+    await seedNews(testDb.db, ch.id, { isRead: 0 });
+    vi.mocked(fetchChannelMessages).mockRejectedValueOnce(new Error('CHANNEL_PRIVATE'));
+    const response = await app.request(`/api/channels/${ch.id}/${route}`, { method: 'POST' });
+    expect(response.status).toBe(422);
+    const list = await (await app.request('/api/channels')).json();
+    const remaining = route === 'fetch' ? 1 : 0;
+    expect(list[0]).toMatchObject({
+      isUnavailable: 1,
+      unreadCount: remaining,
+      totalNewsCount: remaining,
+      lastFetchedAt: NOW,
+    });
   });
 
   it.each(['pending', 'processing', 'failed', 'done'] as const)(

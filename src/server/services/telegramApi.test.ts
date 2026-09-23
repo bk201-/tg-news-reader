@@ -6,6 +6,7 @@ import type { TelegramMessage } from './telegramParser.js';
 const {
   mockInvoke,
   mockGetMessages,
+  mockGetInputEntity,
   mockParseMessageFields,
   mockExtractInstantViewPage,
   mockApi,
@@ -80,6 +81,7 @@ const {
   return {
     mockInvoke: _mockInvoke,
     mockGetMessages: _mockGetMessages,
+    mockGetInputEntity: vi.fn(),
     mockParseMessageFields: _mockParseMessageFields,
     mockExtractInstantViewPage: _mockExtractInstantViewPage,
     mockApi: _mockApi,
@@ -106,6 +108,7 @@ vi.mock('./telegramClient.js', () => ({
   getTelegramClient: vi.fn(() => ({
     invoke: mockInvoke,
     getMessages: mockGetMessages,
+    getInputEntity: mockGetInputEntity,
   })),
   ensureAndGetApi: vi.fn(() => mockApi),
 }));
@@ -124,7 +127,7 @@ vi.mock('./downloadMediaFile.js', () => ({ downloadMediaFile: vi.fn().mockResolv
 
 import { logger } from '../logger.js';
 import { downloadMediaFile } from './downloadMediaFile.js';
-import { fetchChannelMessages, fetchMessageById, resolveInstantViewImages } from './telegramApi.js';
+import { fetchChannelMessages, fetchMessageById, getReadInboxMaxId, resolveInstantViewImages } from './telegramApi.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +146,17 @@ describe('telegramApi — resolvePartialInstantView', () => {
       ...overrides,
     };
   }
+
+  it('propagates a missing channel from the read-watermark lookup', async () => {
+    const error = new Error('No user has "deleted_channel" as username');
+    mockGetInputEntity.mockRejectedValueOnce(error);
+    await expect(getReadInboxMaxId('deleted_channel')).rejects.toBe(error);
+  });
+
+  it('keeps a transient read-watermark lookup failure best-effort', async () => {
+    mockGetInputEntity.mockRejectedValueOnce(new Error('Network error'));
+    await expect(getReadInboxMaxId('channel')).resolves.toBeNull();
+  });
 
   describe('fetchChannelMessages', () => {
     it('leaves Instant View images unresolved until channel filters have been applied', async () => {

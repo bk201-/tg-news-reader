@@ -51,6 +51,7 @@ import { news } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { fetchChannelNews } from '../services/channelFetchService.js';
 import { getChannelInfo, readChannelHistory } from '../services/telegram.js';
+import { ChannelUnavailableError } from '../services/telegramChannelErrors.js';
 import channelsRouter from './channels.js';
 
 function createApp() {
@@ -266,6 +267,20 @@ describe('Channels routes (integration)', () => {
   // ── POST /api/channels/:id/fetch ──────────────────────────────────────────
 
   describe('POST /api/channels/:id/fetch', () => {
+    it.each(['fetch', 'mark-read-and-fetch'])(
+      'returns an explicit 422 for unavailable channels on %s',
+      async (action) => {
+        const ch = await seedChannel(testDb.db);
+        vi.mocked(fetchChannelNews).mockRejectedValueOnce(new ChannelUnavailableError(new Error('CHANNEL_PRIVATE')));
+        const res = await app.request(`/api/channels/${ch.id}/${action}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({}),
+        });
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toBe('Telegram channel is unavailable (deleted, private, or inaccessible)');
+      },
+    );
     it('calls fetchChannelNews and returns result', async () => {
       const ch = await seedChannel(testDb.db);
       const mockResult = {

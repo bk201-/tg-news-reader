@@ -1,8 +1,8 @@
 import type { Channel, NewsItem } from '@shared/types';
-import { act, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
-import { useFetchChannel, useMarkReadAndFetch, useUpdateChannel } from '../../../api/channels';
+import { useChannels, useFetchChannel, useMarkReadAndFetch, useUpdateChannel } from '../../../api/channels';
 import { api } from '../../../api/client';
 import { useUIStore } from '../../../store/uiStore';
 import { useNewsFeedActions } from './useNewsFeedActions';
@@ -66,6 +66,39 @@ beforeEach(() => {
 });
 
 describe('bulk-read undo with shared refresh mutations', () => {
+  it.each(['sidebar', 'combined'] as const)(
+    'shows a notification and refreshes observed availability after a failed %s refresh',
+    async (source) => {
+      vi.mocked(api.get).mockResolvedValue([channel]);
+      const { result } = renderHookWithProviders(() => ({
+        channels: useChannels(),
+        sidebar: useFetchChannel(),
+        combined: useMarkReadAndFetch(),
+      }));
+      await waitFor(() => expect(result.current.channels.data?.[0].isUnavailable).toBe(0));
+
+      const error = new Error('Telegram channel is unavailable');
+      vi.mocked(api.post).mockRejectedValueOnce(error);
+      vi.mocked(api.get).mockResolvedValue([{ ...channel, isUnavailable: 1 }]);
+      await act(async () => {
+        const refresh =
+          source === 'sidebar'
+            ? result.current.sidebar.mutateAsync({ id: channel.id })
+            : result.current.combined.mutateAsync(channel.id);
+        await expect(refresh).rejects.toBe(error);
+      });
+      await waitFor(() => expect(result.current.channels.data?.[0].isUnavailable).toBe(1));
+      expect(await screen.findByText(/channels.refresh_failed.*Telegram channel is unavailable/)).toBeVisible();
+
+      vi.mocked(api.get).mockResolvedValue([channel]);
+      await act(async () => {
+        if (source === 'sidebar') await result.current.sidebar.mutateAsync({ id: channel.id });
+        else await result.current.combined.mutateAsync(channel.id);
+      });
+      await waitFor(() => expect(result.current.channels.data?.[0].isUnavailable).toBe(0));
+    },
+  );
+
   it.each(['sidebar', 'combined'] as const)(
     'resets undo after %s refresh, even without inserted posts',
     async (source) => {

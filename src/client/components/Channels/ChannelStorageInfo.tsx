@@ -44,7 +44,6 @@ export function ChannelStorageInfo({ channelId }: { channelId: number }) {
           </Typography.Text>
         </>
       ) : null}
-      <Typography.Text type="secondary">{t('channels.info.storage_scope')}</Typography.Text>
     </section>
   );
 }
