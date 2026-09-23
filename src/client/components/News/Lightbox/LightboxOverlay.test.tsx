@@ -63,7 +63,7 @@ async function next() {
 describe('lightbox unread count', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useUIStore.setState({ lightbox: null });
+    useUIStore.setState({ lightbox: null, newsFilterMode: 'all', hashTagFilter: null });
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -131,10 +131,10 @@ describe('lightbox unread count', () => {
       };
 
       await waitFor(() => expect(unread()).toBe(2));
-      expect(screen.getByText('1 / 3 · 1/3')).toBeInTheDocument();
+      expect(screen.getByText('1 / 3 · 1/2')).toBeInTheDocument();
       await navigate(1);
       expect(useUIStore.getState().lightbox).toMatchObject({ newsId: 1, albumIndex: 1 });
-      expect(screen.getByText('1 / 3 · 2/3')).toBeInTheDocument();
+      expect(screen.getByText('1 / 3 · 2/2')).toBeInTheDocument();
       expect(unread()).toBe(2);
       expect(api.patch).toHaveBeenCalledTimes(1);
       await navigate(1);

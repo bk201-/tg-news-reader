@@ -86,8 +86,10 @@ vi.mock('./downloadProgress.js', async () => {
 });
 
 import { statfs } from 'node:fs/promises';
+import { withRetry } from '../utils/retry.js';
 import { sendAlert } from './alertBot.js';
 import { DownloadCoordinator } from './DownloadCoordinator.js';
+import { enqueueTask, getActiveTasks } from './downloadManager.js';
 import { downloadProgressEmitter, emitTaskUpdate } from './downloadProgress.js';
 import { DownloadStorage } from './downloadStorage.js';
 import { handleBridgeMessage } from './telegramBridge.js';
@@ -127,6 +129,29 @@ describe('DownloadCoordinator (integration)', () => {
   // ── start() ──────────────────────────────────────────────────────────────
 
   describe('start()', () => {
+    it.each([null, 1_767_225_599, 1_767_225_600])(
+      'cleans up persisted done images after restart (processedAt=%s)',
+      async (processedAt) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+        const task = await seedDownload(testDb.db, newsId, { type: 'image', status: 'done', processedAt });
+        const coordinator = new DownloadCoordinator(1);
+        await coordinator.start();
+
+        const recent = processedAt === 1_767_225_600;
+        expect((await getActiveTasks()).map((item) => item.id)).toEqual(recent ? [task.id] : []);
+        expect(
+          vi.mocked(downloadProgressEmitter.emit).mock.calls.filter(([event]) => event === 'task_removed'),
+        ).toEqual(recent ? [] : [['task_removed', task.id]]);
+        await vi.advanceTimersByTimeAsync(101);
+        await vi.waitFor(() => expect(downloadProgressEmitter.emit).toHaveBeenCalledWith('task_removed', task.id), {
+          interval: 1,
+        });
+        expect(await getActiveTasks()).toEqual([]);
+        expect(createdWorkers[0].postMessage).not.toHaveBeenCalled();
+      },
+    );
+
     it('resets processing tasks to pending on startup', async () => {
       await seedDownload(testDb.db, newsId, { status: 'processing' });
 
@@ -156,6 +181,97 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Task dispatch ────────────────────────────────────────────────────────
 
   describe('task dispatch', () => {
+    it('runs images on a media-only worker while preserving the article cap', async () => {
+      const articles: Awaited<ReturnType<typeof seedDownload>>[] = [];
+      for (let i = 0; i < 4; i++) {
+        const item = i === 0 ? { id: newsId } : await seedNews(testDb.db, channelId);
+        articles.push(await seedDownload(testDb.db, item.id, { type: 'article', priority: 10 }));
+      }
+      const image = await seedDownload(testDb.db, newsId, { type: 'image' });
+      const coordinator = new DownloadCoordinator(4);
+      await coordinator.start();
+
+      await vi.waitFor(() =>
+        expect(createdWorkers[3].postMessage).toHaveBeenCalledWith({
+          type: 'task',
+          payload: expect.objectContaining({ id: image.id, type: 'image' }),
+        }),
+      );
+      const active = await getActiveTasks();
+      expect(active.filter((task) => task.type === 'article' && task.status === 'processing')).toHaveLength(3);
+      expect(active.find((task) => task.id === articles[3].id)?.status).toBe('pending');
+      expect(
+        createdWorkers.slice(0, 3).every((worker) => worker.postMessage.mock.calls[0][0].payload.type === 'article'),
+      ).toBe(true);
+
+      const firstArticle = createdWorkers[0].postMessage.mock.calls[0][0].payload.id;
+      createdWorkers[0].emit('message', { type: 'done', taskId: firstArticle });
+      await vi.waitFor(() =>
+        expect(createdWorkers[0].postMessage).toHaveBeenCalledWith({
+          type: 'task',
+          payload: expect.objectContaining({ id: articles[3].id, type: 'article' }),
+        }),
+      );
+    });
+
+    it.each(['media', 'image'] as const)(
+      'serializes a stale %s candidate against a racing sibling claim without blocking other news',
+      async (firstType) => {
+        const coordinator = new DownloadCoordinator(2);
+        await coordinator.start();
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const first = await seedDownload(testDb.db, newsId, { type: firstType, priority: 10 });
+        const siblingType = firstType === 'media' ? 'image' : 'media';
+        const sibling = await seedDownload(testDb.db, newsId, { type: siblingType });
+        const otherNews = await seedNews(testDb.db, channelId);
+        const other = await seedDownload(testDb.db, otherNews.id);
+        const selected = Promise.withResolvers<void>();
+        const release = Promise.withResolvers<void>();
+        vi.mocked(withRetry).mockImplementationOnce(async (fn) => {
+          const result = await fn();
+          selected.resolve();
+          await release.promise;
+          return result;
+        });
+
+        downloadProgressEmitter.emit('wakeup');
+        await selected.promise;
+        try {
+          await enqueueTask(newsId, siblingType, undefined, 20);
+          await vi.waitFor(() =>
+            expect(
+              createdWorkers.some((worker) =>
+                worker.postMessage.mock.calls.some(([msg]: any[]) => msg.payload.id === sibling.id),
+              ),
+            ).toBe(true),
+          );
+        } finally {
+          release.resolve();
+        }
+
+        await vi.waitFor(() =>
+          expect(createdWorkers.flatMap((worker) => worker.postMessage.mock.calls)).toHaveLength(2),
+        );
+        const dispatchedIds = createdWorkers.flatMap((worker) =>
+          worker.postMessage.mock.calls.map(([msg]: any[]) => msg.payload.id),
+        );
+        expect(dispatchedIds).toEqual(expect.arrayContaining([sibling.id, other.id]));
+        expect(dispatchedIds).not.toContain(first.id);
+        expect((await getActiveTasks()).find((task) => task.id === first.id)?.status).toBe('pending');
+
+        const siblingWorker = createdWorkers.find((worker) =>
+          worker.postMessage.mock.calls.some(([msg]: any[]) => msg.payload.id === sibling.id),
+        );
+        siblingWorker.emit('message', { type: 'done', taskId: sibling.id });
+        await vi.waitFor(() =>
+          expect(siblingWorker.postMessage).toHaveBeenCalledWith({
+            type: 'task',
+            payload: expect.objectContaining({ id: first.id }),
+          }),
+        );
+      },
+    );
+
     it.each(['main', 'worker'])('resumes a paused pending task immediately after %s-thread cleanup', async (source) => {
       vi.mocked(statfs).mockResolvedValueOnce({ bavail: 100, bsize: 4096 } as Awaited<ReturnType<typeof statfs>>);
       await seedDownload(testDb.db, newsId);
@@ -296,6 +412,99 @@ describe('DownloadCoordinator (integration)', () => {
   // ── Worker message handling ──────────────────────────────────────────────
 
   describe('worker messages', () => {
+    it.each(['pending', 'processing', 'done'] as const)(
+      'does not let an old cleanup timer remove a re-enqueued image that is %s',
+      async (status) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+        const task = await seedDownload(testDb.db, newsId, { type: 'image' });
+        const coordinator = new DownloadCoordinator(1);
+        await coordinator.start();
+        await vi.waitFor(() => expect(createdWorkers[0].postMessage).toHaveBeenCalled(), { interval: 1 });
+        createdWorkers[0].emit('message', { type: 'done', taskId: task.id });
+        await vi.waitFor(
+          () => expect(emitTaskUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: task.id, status: 'done' })),
+          { interval: 1 },
+        );
+        const [firstDone] = await getActiveTasks();
+        await vi.advanceTimersByTimeAsync(40);
+        if (status === 'pending') {
+          await storage.check(100 * 1024 ** 3).catch(() => undefined);
+        }
+
+        await enqueueTask(newsId, 'image', undefined, 10);
+        if (status !== 'pending') {
+          await vi.waitUntil(() => createdWorkers[0].postMessage.mock.calls.length === 2, { interval: 1 });
+        }
+        if (status === 'done') {
+          vi.mocked(emitTaskUpdate).mockClear();
+          createdWorkers[0].emit('message', { type: 'done', taskId: task.id });
+          await vi.waitUntil(
+            () => vi.mocked(emitTaskUpdate).mock.calls.some(([item]) => item.id === task.id && item.status === 'done'),
+            { interval: 1 },
+          );
+        }
+
+        await vi.advanceTimersByTimeAsync(65);
+        expect(await getActiveTasks()).toEqual([
+          expect.objectContaining({
+            id: task.id,
+            status,
+            processedAt: status === 'done' ? firstDone.processedAt : null,
+          }),
+        ]);
+        expect(downloadProgressEmitter.emit).not.toHaveBeenCalledWith('task_removed', task.id);
+        await vi.advanceTimersByTimeAsync(100);
+        await vi.waitFor(
+          async () =>
+            expect((await getActiveTasks()).map((item) => item.id)).toEqual(status === 'done' ? [] : [task.id]),
+          { interval: 1 },
+        );
+        expect(
+          vi.mocked(downloadProgressEmitter.emit).mock.calls.filter(([event]) => event === 'task_removed'),
+        ).toEqual(status === 'done' ? [['task_removed', task.id]] : []);
+      },
+    );
+
+    it.each([null, ['channel/preview.jpg', 'channel/photo.jpg']])(
+      'retains done image context (%j) until cleanup broadcasts removal',
+      async (paths) => {
+        vi.useFakeTimers();
+        const task = await seedDownload(testDb.db, newsId, { type: 'image' });
+        const coordinator = new DownloadCoordinator(1);
+        await coordinator.start();
+        await vi.waitFor(() => expect(createdWorkers[0].postMessage).toHaveBeenCalled(), { interval: 1 });
+        await testDb.client.execute('UPDATE news SET local_media_path = ?, local_media_paths = ? WHERE id = ?', [
+          paths?.[0] ?? null,
+          paths ? JSON.stringify(paths) : null,
+          newsId,
+        ]);
+        createdWorkers[0].emit('message', { type: 'done', taskId: task.id });
+        await vi.waitFor(
+          () =>
+            expect(emitTaskUpdate).toHaveBeenCalledWith(
+              expect.objectContaining({
+                id: task.id,
+                type: 'image',
+                status: 'done',
+                localMediaPath: paths?.[0] ?? null,
+                localMediaPaths: paths,
+              }),
+            ),
+          { interval: 1 },
+        );
+
+        await vi.advanceTimersByTimeAsync(50);
+        expect((await getActiveTasks()).find((item) => item.id === task.id)?.status).toBe('done');
+        expect(downloadProgressEmitter.emit).not.toHaveBeenCalledWith('task_removed', task.id);
+        await vi.advanceTimersByTimeAsync(100);
+        await vi.waitFor(() => expect(downloadProgressEmitter.emit).toHaveBeenCalledWith('task_removed', task.id), {
+          interval: 1,
+        });
+        expect(await getActiveTasks()).toEqual([]);
+      },
+    );
+
     it.each(['done', 'error'])('releases the article slot after a deleted task reports %s', async (type) => {
       const task = await seedDownload(testDb.db, newsId, { type: 'article', url: 'https://example.com' });
       const coordinator = new DownloadCoordinator(1);

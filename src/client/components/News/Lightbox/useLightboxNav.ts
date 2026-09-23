@@ -1,14 +1,14 @@
 import type { NewsItem } from '@shared/types.ts';
-import { useQueryClient } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
-import type { NewsResponse } from '../../../api/news';
+import { useEffect, useMemo, useRef } from 'react';
+import { isVideoPath, lightboxMediaPaths, needsImagePreview } from './lightboxMediaPaths';
+import { useLightboxFeed } from './useLightboxFeed';
 
 /** Media types that appear in the lightbox (photo, video, and document image/video files) */
 const LIGHTBOX_MEDIA_TYPES = new Set(['photo', 'video', 'document']);
 
 /** How many entries before the end of the list to trigger fetchNextPage */
 const PREFETCH_THRESHOLD = 5;
+const NO_SKIPPED_ITEMS = new Set<number>();
 
 export interface LightboxEntry {
   newsId: number;
@@ -47,27 +47,26 @@ export function useLightboxNav(
   onNavigate: (newsId: number, albumIndex: number) => void,
   fetchNextPage?: () => void,
   hasNextPage?: boolean,
+  skippedIds: ReadonlySet<number> = NO_SKIPPED_ITEMS,
 ): UseLightboxNavResult {
-  const qc = useQueryClient();
-
-  // Try all possible cache keys — whichever was loaded last is fine for building the media list
-  const infiniteData =
-    qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'all']) ??
-    qc.getQueryData<InfiniteData<NewsResponse>>(['news', channelId, 'filtered']);
+  const { items, pageKey } = useLightboxFeed(channelId);
 
   const entries = useMemo<LightboxEntry[]>(() => {
-    const items = infiniteData?.pages.flatMap((page) => page.items) ?? [];
     return items
       .filter((item) => item.mediaType && LIGHTBOX_MEDIA_TYPES.has(item.mediaType))
-      .map((item) => ({ newsId: item.id, item }));
-  }, [infiniteData]);
+      .filter((item) => lightboxMediaPaths(item).length > 0 || (!skippedIds.has(item.id) && needsImagePreview(item)))
+      .map((item) => {
+        const paths = lightboxMediaPaths(item);
+        return { newsId: item.id, item: { ...item, localMediaPath: paths[0], localMediaPaths: paths } };
+      });
+  }, [items, skippedIds]);
 
   const cursor = useMemo(() => entries.findIndex((e) => e.newsId === newsId), [entries, newsId]);
   const currentEntry = cursor >= 0 ? entries[cursor] : null;
 
   const item = currentEntry?.item;
   const firstMediaPath = item?.localMediaPaths?.[0] ?? item?.localMediaPath;
-  const isVideo = /\.(mp4|webm|mov)$/i.test(firstMediaPath ?? '');
+  const isVideo = isVideoPath(item?.localMediaPaths?.[albumIndex] ?? firstMediaPath ?? '');
   const albumLength = item?.localMediaPaths?.length ?? 0;
   const albumExpectedLength = item?.albumMsgIds?.length ?? albumLength;
   const isAlbum = albumLength > 1;
@@ -77,16 +76,35 @@ export function useLightboxNav(
   const positionLabel = useMemo(() => {
     if (cursor < 0) return '';
     const itemPos = `${cursor + 1} / ${totalCount}`;
-    if (isAlbum) return `${itemPos} · ${albumIndex + 1}/${albumExpectedLength}`;
+    if (isAlbum) return `${itemPos} · ${albumIndex + 1}/${albumLength}`;
     return itemPos;
-  }, [cursor, totalCount, isAlbum, albumIndex, albumExpectedLength]);
+  }, [cursor, totalCount, isAlbum, albumIndex, albumLength]);
 
   // ── Auto-fetch next page when near the end of loaded entries ──────────
+  const fetchedThrough = useRef<string | null>(null);
+  const direction = useRef<-1 | 1>(1);
   useEffect(() => {
-    if (cursor >= 0 && totalCount - cursor <= PREFETCH_THRESHOLD && hasNextPage) {
+    if (
+      (cursor < 0 || totalCount - cursor <= PREFETCH_THRESHOLD) &&
+      hasNextPage &&
+      fetchedThrough.current !== pageKey
+    ) {
+      fetchedThrough.current = pageKey;
       fetchNextPage?.();
     }
-  }, [cursor, totalCount, hasNextPage, fetchNextPage]);
+  }, [cursor, totalCount, hasNextPage, fetchNextPage, pageKey]);
+
+  useEffect(() => {
+    if (cursor >= 0 || entries.length === 0) return;
+    const sourceIndex = items.findIndex((entry) => entry.id === newsId);
+    const eligible = new Set(entries.map((entry) => entry.newsId));
+    const candidates = direction.current === 1 ? items.slice(sourceIndex + 1) : items.slice(0, sourceIndex).reverse();
+    const nextItem = candidates.find((entry) => eligible.has(entry.id));
+    const next =
+      entries.find((entry) => entry.newsId === nextItem?.id) ??
+      entries[direction.current === 1 ? 0 : entries.length - 1];
+    onNavigate(next.newsId, direction.current === -1 ? Math.max(0, (next.item.localMediaPaths?.length ?? 1) - 1) : 0);
+  }, [cursor, entries, items, newsId, onNavigate]);
 
   // ── Unified navigation: albums are part of the flat list ──────────────
   // Forward (delta=1): advance album image first, then next item.
@@ -94,6 +112,7 @@ export function useLightboxNav(
   // new item that is an album, land on its LAST image.
   const go = (delta: -1 | 1) => {
     if (entries.length === 0) return;
+    direction.current = delta;
 
     // Try to advance within the current album first
     if (isAlbum) {

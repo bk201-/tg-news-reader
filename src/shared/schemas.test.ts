@@ -104,6 +104,13 @@ describe('updateFilterSchema', () => {
 });
 
 describe('createDownloadSchema', () => {
+  it('accepts an image download with user priority and no URL', () => {
+    expect(createDownloadSchema.safeParse({ newsId: 42, type: 'image', priority: 10 })).toEqual({
+      success: true,
+      data: { newsId: 42, type: 'image', priority: 10 },
+    });
+  });
+
   it('requires newsId and type', () => {
     expect(createDownloadSchema.safeParse({ newsId: 1, type: 'media' }).success).toBe(true);
     expect(createDownloadSchema.safeParse({ type: 'media' }).success).toBe(false);

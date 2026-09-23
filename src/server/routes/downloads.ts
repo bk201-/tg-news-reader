@@ -16,7 +16,7 @@ function parseTaskId(value: string): number | null {
   return /^\d+$/.test(value) && Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-// GET /api/downloads — list all active (non-done) tasks with context
+// GET /api/downloads — active tasks plus retained done images for reconnects
 router.get('/', async (c) => {
   const tasks = await getActiveTasks();
   return c.json(tasks);

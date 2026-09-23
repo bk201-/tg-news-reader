@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { and, asc, eq, gt, inArray, max, notInArray, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -367,20 +368,10 @@ router.get('/', async (c) => {
   const items: NewsItem[] = pageRows.map(toNewsItem);
   const nextCursor = hasMore && pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : null;
 
-  // ETag: must capture ALL dimensions of response state — including fields
-  // that change asynchronously after insertion (localMediaPath via download worker,
-  // fullContent via article extractor) AND the per-item isRead flag. Without
-  // isRead in the ETag, marking items as read (e.g. when opening the lightbox)
-  // does not invalidate the previously cached 200 response: a subsequent
-  // refetch sees identical count/maxPostedAt/mediaCount/contentCount, the
-  // server returns 304, and the browser HTTP cache replays the OLD body with
-  // isRead=0, reverting the just-flipped checkboxes in the news list.
-  const maxPostedAt = pageRows.length > 0 ? pageRows[pageRows.length - 1].postedAt : 0;
-  const mediaCount = pageRows.filter((r) => r.localMediaPath).length;
-  const contentCount = pageRows.filter((r) => r.fullContent).length;
-  const readCount = pageRows.filter((r) => r.isRead === 1).length;
-  // Include view in ETag so different modes don't collide in the HTTP cache.
-  const etag = `"${view}-${items.length}-${maxPostedAt}-${filteredOut}-${mediaCount}-${contentCount}-${readCount}"`;
+  // Hash the representation, not counts: adding videos to an image-only album
+  // changes its contents without changing the number of posts with media.
+  const response = { items, filteredOut, nextCursor, hasMore };
+  const etag = `"${createHash('sha256').update(JSON.stringify(response)).digest('hex')}"`;
 
   const ifNoneMatch = c.req.header('If-None-Match');
   if (ifNoneMatch === etag) {
@@ -395,7 +386,7 @@ router.get('/', async (c) => {
   // The browser handles ETag/304 transparently — JS fetch() sees a normal 200.
   c.header('Cache-Control', 'no-cache, must-revalidate, private');
   c.header('ETag', etag);
-  return c.json({ items, filteredOut, nextCursor, hasMore });
+  return c.json(response);
 });
 
 // Helper for the filteredOut count path that needs channel type when not

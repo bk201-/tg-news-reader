@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { migrateDownloadsImageType } from './downloadsMigration.js';
 import { client } from './index.js';
 
 export async function runMigration(): Promise<void> {
@@ -79,6 +80,8 @@ export async function runMigration(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_downloads_queue ON downloads(status, priority DESC, created_at ASC);
   `);
+
+  await migrateDownloadsImageType(client);
 
   const alterMigrations = [
     "ALTER TABLE channels ADD COLUMN channel_type TEXT NOT NULL DEFAULT 'none'",

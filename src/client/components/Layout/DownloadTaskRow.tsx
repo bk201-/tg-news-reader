@@ -93,6 +93,8 @@ export function DownloadTaskRow({
         avatar={
           task.status === 'processing' ? (
             <Spin size="small" />
+          ) : task.type === 'image' ? (
+            <PictureOutlined className={styles.typeIcon} aria-label={t('downloads.typeImage')} />
           ) : task.type === 'media' ? (
             <PictureOutlined className={styles.typeIcon} />
           ) : (

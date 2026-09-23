@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mediaUrl } from '../../../api/mediaUrl';
+import { LightboxVideoControls } from './LightboxVideoControls';
 
 const ICON_LINK = <LinkOutlined />;
 const ICON_CLOSE = <CloseOutlined />;
@@ -21,6 +22,7 @@ interface LightboxToolbarProps {
   /** Current displayed media path (used for native file sharing) */
   currentMediaPath?: string;
   onClose: () => void;
+  onRotate?: (direction: -1 | 1) => void;
 }
 
 const useStyles = createStyles(({ css }) => ({
@@ -97,6 +99,7 @@ export function LightboxToolbar({
   positionLabel,
   currentMediaPath,
   onClose,
+  onRotate,
 }: LightboxToolbarProps) {
   const { styles } = useStyles();
   const { t } = useTranslation();
@@ -161,6 +164,7 @@ export function LightboxToolbar({
         </div>
       </div>
 
+      {onRotate && <LightboxVideoControls className={styles.linkBtn} onRotate={onRotate} />}
       {canShare && currentMediaPath && (
         <Button
           size="small"

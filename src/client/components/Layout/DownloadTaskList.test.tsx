@@ -20,6 +20,32 @@ const task: DownloadTask = {
 describe('download queue actions', () => {
   afterEach(cleanup);
 
+  it.each([false, true])('shows image downloads with an image label in mixed queues: %s', (mixed) => {
+    const image: DownloadTask = { ...task, id: 3, type: 'image', newsText: 'Image preview' };
+    render(
+      <TaskList
+        tasks={mixed ? [task, { ...task, id: 2, type: 'article' }, image] : [image]}
+        cancelDownload={{ mutate: vi.fn() }}
+        prioritizeDownload={{ mutate: vi.fn() }}
+      />,
+    );
+    expect(screen.getByText('Image preview')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'downloads.typeImage' })).toBeInTheDocument();
+    expect(screen.queryAllByText('downloads.typeImage')).toHaveLength(mixed ? 1 : 0);
+  });
+
+  it('keeps retained completed image tasks out of the visible queue', () => {
+    render(
+      <TaskList
+        tasks={[{ ...task, type: 'image', status: 'done' }]}
+        cancelDownload={{ mutate: vi.fn() }}
+        prioritizeDownload={{ mutate: vi.fn() }}
+      />,
+    );
+    expect(screen.getByText('downloads.empty')).toBeInTheDocument();
+    expect(screen.queryByText('downloads.status_priority')).not.toBeInTheDocument();
+  });
+
   it('lets a failed manual download be retried', () => {
     const prioritize = vi.fn();
     render(

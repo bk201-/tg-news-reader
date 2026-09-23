@@ -63,11 +63,11 @@ afterEach(() => {
 });
 
 describe('ChannelItem information popover', () => {
-  it('loads storage only after hovering and renders existing metadata', async () => {
+  it('loads storage only after hovering the info button and renders existing metadata', async () => {
     const user = userEvent.setup();
     const props = setup();
     expect(api.get).not.toHaveBeenCalled();
-    await user.hover(screen.getByRole('option'));
+    await user.hover(screen.getByRole('button', { name: /channels.info.open/ }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/channels/1/storage'));
     expect(await screen.findByText(/channels.info.storage_bytes/)).toHaveTextContent('"bytes":"1,234"');
@@ -75,6 +75,22 @@ describe('ChannelItem information popover', () => {
     expect(screen.getByText('10')).toBeInTheDocument();
     expect(screen.getByText('channels.info.description_source')).toBeInTheDocument();
     expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not open details or load storage when hovering the channel row or its menu', async () => {
+    vi.useFakeTimers();
+    try {
+      setup();
+      fireEvent.mouseOver(screen.getByText(channel.name));
+      act(() => vi.advanceTimersByTime(500));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.mouseOver(screen.getByRole('button', { name: 'channels.info.actions' }));
+      act(() => vi.advanceTimersByTime(500));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(api.get).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens by explicit click on touch without selecting and closes explicitly', async () => {

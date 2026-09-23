@@ -61,6 +61,19 @@ describe('telegramBridge', () => {
   // ── handleBridgeMessage ────────────────────────────────────────────────
 
   describe('handleBridgeMessage — tg:downloadMedia', () => {
+    it('passes image-only intent while forcing size limits at the Telegram boundary', async () => {
+      mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
+      mockDownloadMessageMedia.mockResolvedValueOnce(null);
+      const worker = createFakeWorker();
+      handleBridgeMessage(worker, createDownloadMsg({ imagesOnly: true, ignoreLimit: true }), 0);
+      await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalled());
+      expect(mockDownloadMessageMedia).toHaveBeenCalledWith(expect.anything(), 'test_channel', {
+        imagesOnly: true,
+        ignoreLimit: false,
+      });
+      expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'tg:result', result: null }));
+    });
+
     it('downloads media and posts result back to worker', async () => {
       mockFetchMessageById.mockResolvedValueOnce({ rawMedia: {} } as any);
       mockDownloadMessageMedia.mockResolvedValueOnce('data/channel/file.jpg');

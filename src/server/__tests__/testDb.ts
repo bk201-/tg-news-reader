@@ -7,6 +7,7 @@ import { createClient } from '@libsql/client';
 import type { Client } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { migrateDownloadsImageType } from '../db/downloadsMigration.js';
 import * as schema from '../db/schema.js';
 
 export interface TestDb {
@@ -128,6 +129,8 @@ export async function createTestDb(url = ':memory:'): Promise<TestDb> {
       PRIMARY KEY (filter_id, date)
     );
   `);
+
+  await migrateDownloadsImageType(client);
 
   const db = drizzle(client, { schema });
   return { client, db };

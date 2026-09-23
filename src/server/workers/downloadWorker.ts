@@ -1,11 +1,12 @@
 /**
  * Download Worker — runs in a worker_threads context.
  *
- * Handles both task types:
+ * Handles download task types:
  *   - 'article': fetches HTML (with retry), parses with jsdom + Readability (CPU-bound),
  *                writes fullContent to DB via its own libsql connection.
  *   - 'media':   requests gramjs operations from the main thread via IPC bridge,
  *                writes localMediaPath(s) to DB via its own libsql connection.
+ *   - 'image':   same path, but only images, even for hidden posts, with size limits.
  *
  * Each worker thread owns:
  *   - Its own libsql client (created when the module is first imported)
@@ -19,6 +20,7 @@ if (isMainThread) {
 }
 
 import { eq } from 'drizzle-orm';
+import type { DownloadType } from '../../shared/types.js';
 import { ARTICLE_MAX_HTML_BYTES } from '../config.js';
 import { db } from '../db/index.js';
 import { news, channels } from '../db/schema.js';
@@ -51,6 +53,7 @@ async function ipcDownloadMedia(
   channelTelegramId: string,
   msgId: number,
   ignoreLimit: boolean,
+  imagesOnly: boolean,
 ): Promise<{ path: string | null; reason?: 'no_media' | 'size_limit' | 'filtered' | 'deleted' }> {
   // Recheck before every file (and retry): filters can change while a task is queued
   // or an album is downloading. Explicit user downloads still bypass this gate.
@@ -59,7 +62,7 @@ async function ipcDownloadMedia(
     logger.debug({ module: 'download', workerId, newsId }, 'media cancelled: news was deleted');
     return { path: null, reason: 'deleted' };
   }
-  if (!ignoreLimit && item.isFiltered === 1) {
+  if (!imagesOnly && !ignoreLimit && item.isFiltered === 1) {
     logger.debug({ module: 'download', workerId, newsId }, 'background media skipped: news is filtered');
     return { path: null, reason: 'filtered' };
   }
@@ -67,7 +70,14 @@ async function ipcDownloadMedia(
   return new Promise((resolve, reject) => {
     const reqId = ++reqCounter;
     pendingIpc = { reqId, resolve, reject };
-    const msg: TgDownloadMediaMsg = { type: 'tg:downloadMedia', reqId, channelTelegramId, msgId, ignoreLimit };
+    const msg: TgDownloadMediaMsg = {
+      type: 'tg:downloadMedia',
+      reqId,
+      channelTelegramId,
+      msgId,
+      ignoreLimit,
+      ...(imagesOnly ? { imagesOnly: true } : {}),
+    };
     parentPort!.postMessage(msg);
   });
 }
@@ -77,7 +87,7 @@ async function ipcDownloadMedia(
 interface TaskPayload {
   id: number;
   newsId: number;
-  type: 'media' | 'article';
+  type: DownloadType;
   url: string | null;
   priority: number;
 }
@@ -128,7 +138,11 @@ parentPort!.on('message', (msg: IncomingMsg) => {
 
 // ─── Task handlers ────────────────────────────────────────────────────────────
 
-async function processMediaTask(newsId: number, priority: number): Promise<void> {
+function pathMessageId(path: string): number {
+  return Number(path.match(/(?:^|\/)(\d+)\.[^/]+$/)?.[1]);
+}
+
+async function processMediaTask(newsId: number, priority: number, imagesOnly = false): Promise<void> {
   const [row] = await db
     .select({
       telegramMsgId: news.telegramMsgId,
@@ -149,16 +163,20 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
   // Already downloaded — skip for background tasks (idempotent).
   // User-initiated (priority ≥ 10) always re-downloads — handles the case where
   // files were lost (disk unmount, cleanup) but localMediaPath is still set in DB.
-  const alreadyDownloaded = row.albumMsgIds ? row.localMediaPaths !== null : row.localMediaPath !== null;
-  if (alreadyDownloaded && priority < 10) return;
+  const existingPaths = new Set([...(row.localMediaPath ? [row.localMediaPath] : []), ...(row.localMediaPaths ?? [])]);
+  const cachedIds = new Set([...existingPaths].map(pathMessageId));
+  const alreadyDownloaded = row.albumMsgIds
+    ? row.albumMsgIds.every((id) => cachedIds.has(id))
+    : row.localMediaPath !== null;
+  if (!imagesOnly && alreadyDownloaded && priority < 10) return;
 
-  const ignoreLimit = priority >= 10;
+  const ignoreLimit = !imagesOnly && priority >= 10;
 
   const paths: string[] = [];
   let saved = false;
   try {
     for (const msgId of row.albumMsgIds ?? [row.telegramMsgId]) {
-      const { path, reason } = await ipcDownloadMedia(newsId, row.channelTelegramId, msgId, ignoreLimit);
+      const { path, reason } = await ipcDownloadMedia(newsId, row.channelTelegramId, msgId, ignoreLimit, imagesOnly);
       if (reason === 'filtered' || reason === 'deleted') break;
       if (reason === 'no_media' || reason === 'size_limit') continue;
       if (!path) throw new Error('Download returned no path');
@@ -166,9 +184,19 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
     }
 
     if (paths.length === 0) return;
+    // The coordinator serializes media/image tasks for this news. Merge rather
+    // than replace: previews and size skips must never erase cached video paths.
+    const merged = [...new Set([...existingPaths, ...paths])];
+    if (row.albumMsgIds) {
+      const order = new Map(row.albumMsgIds.map((id, index) => [id, index]));
+      merged.sort((a, b) => (order.get(pathMessageId(a)) ?? Infinity) - (order.get(pathMessageId(b)) ?? Infinity));
+    }
     const [updated] = await db
       .update(news)
-      .set({ localMediaPath: paths[0], ...(row.albumMsgIds ? { localMediaPaths: paths } : {}) })
+      .set({
+        localMediaPath: imagesOnly ? (row.localMediaPath ?? merged[0]) : merged[0],
+        ...(row.albumMsgIds || merged.length > 1 ? { localMediaPaths: merged } : {}),
+      })
       .where(eq(news.id, newsId))
       .returning({ id: news.id });
     saved = !!updated;
@@ -176,7 +204,11 @@ async function processMediaTask(newsId: number, priority: number): Promise<void>
     // Cleanup may delete the row while Telegram is writing a file. Do not leave
     // files from that in-flight download (or an interrupted album) orphaned.
     if (!saved && paths.length > 0) {
-      deleteAllMediaFiles(paths[0], row.albumMsgIds ? paths : null);
+      const [owner] = await db.select({ id: news.id }).from(news).where(eq(news.id, newsId));
+      const orphanPaths = owner ? paths.filter((path) => !existingPaths.has(path)) : paths;
+      if (orphanPaths.length > 0) {
+        deleteAllMediaFiles(orphanPaths[0], row.albumMsgIds ? orphanPaths : null);
+      }
     }
   }
 }
@@ -269,8 +301,8 @@ async function handleTask(task: TaskPayload): Promise<void> {
   try {
     await withRetry(
       async () => {
-        if (task.type === 'media') {
-          await processMediaTask(task.newsId, task.priority);
+        if (task.type === 'media' || task.type === 'image') {
+          await processMediaTask(task.newsId, task.priority, task.type === 'image');
         } else {
           if (!task.url) throw new Error('Article task missing URL');
           await processArticleTask(task.newsId, task.url);

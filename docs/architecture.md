@@ -18,6 +18,9 @@
 - Badge = `unreadCount` from the channel list query
 - Single-post optimistic updates adjust the badge only when cached `isRead` actually changes, once across all feed caches. If the post is not cached, the channel count is refreshed after saving instead of guessing a delta.
 - The lightbox marks downloaded media/blog posts read through one effect. Album-image changes and revisiting read posts do not decrement the badge or send additional read requests.
+- The lightbox observes the active All/Filtered/Hidden feed cache, including its tag scope, without refetching the feed on open. Missing images are requested automatically once per viewing session using an image-only queue task; undownloaded videos and non-image files are skipped without marking them read. Download completion updates the visible image in place; REST polling while waiting recovers missed SSE updates.
+- The lightbox has no manual Telegram-to-server Download/Re-download control. Already downloaded videos remain playable, and the native video menu still offers saving to the device. Album counters count available media, not skipped video slots.
+- Video-only toolbar buttons rotate the current clip left/right by 90 degrees. Rotation is presentation-only, resets on media navigation, and preserves playback position and the original download/share file. The rotated frame is fitted to the available area using video metadata and a resize observer.
 - Mark All supports one immediate undo for the current view. Channel refresh (including sidebar/bulk refresh), changing channel/group/tag/view filter, or changing auto-advance resets that undo. Late responses from an older view cannot restore it. Empty scoped views never send an unscoped mark-all request.
 - **Refresh** button → `POST /api/channels/count-unread` — counts only, uses `lastFetchedAt`
 - `lastFetchedAt` is the DB boundary: everything before it is already stored; only newer messages need to be fetched
@@ -30,7 +33,7 @@
 
 ### Channel information
 
-Hover a channel or use its information button (also available on touch/keyboard) to open a rich metadata
+Hover the channel's information button or click it (also available on touch/keyboard) to open a rich metadata
 popover. It shows the saved description as safe Markdown, channel type/group, post counts, timestamps,
 and server media storage in readable units plus exact bytes and file count. Descriptions come from
 Telegram lookup or user edits, not a live Telegram request.
@@ -185,7 +188,7 @@ Structure: `{ level, time, module, ...fields, msg }`. In Azure Container Apps, s
 CREATE TABLE downloads (
   id INTEGER PRIMARY KEY,
   news_id INTEGER NOT NULL REFERENCES news ON DELETE CASCADE,
-  type TEXT NOT NULL,  -- 'media' | 'article'
+  type TEXT NOT NULL,  -- 'media' | 'article' | 'image'
   url TEXT,
   priority INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',
@@ -242,7 +245,7 @@ Worker thread (downloadWorker.ts / downloadWorkerShim.mjs)
 
 Removing queued tasks also triggers a capacity recheck: the size of a deleted, oversized download must not keep smaller remaining tasks paused. Each new file still undergoes its own size/reserve check.
 
-**Read/filtered news**: filtered items do not auto-download media. Channel refresh deletes read news and cascades deletion of their download tasks, notifying the queue via `tasks_removed`. Workers discard media returned after a news row was deleted instead of leaving orphan files.
+**Read/filtered news**: filtered items do not auto-download media during channel fetch. Opening an image in the lightbox explicitly requests an `image` preview, including in Hidden only; this downloads photos/image documents only, retaining image size limits and skipping video even in mixed albums. Channel refresh deletes read news and cascades deletion of their download tasks, notifying the queue via `tasks_removed`. Workers discard media returned after a news row was deleted instead of leaving orphan files.
 
 - `DownloadsPanel` / `DownloadsPinnedContent`: when both `media` and `article` tasks are active, the task list renders two sections ("Media" / "Articles") separated by a labelled divider.
 

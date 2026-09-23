@@ -498,6 +498,25 @@ describe('News routes (integration)', () => {
   // ── ETag support ─────────────────────────────────────────────────────────
 
   describe('GET /api/news (ETag)', () => {
+    it('invalidates an image-only album response when later media adds a video', async () => {
+      const ch = await seedChannel(testDb.db);
+      const item = await seedNews(testDb.db, ch.id, {
+        localMediaPath: 'ch/10.jpg',
+        localMediaPaths: ['ch/10.jpg'],
+        albumMsgIds: [10, 11],
+      });
+      const before = await app.request(`/api/news?channelId=${ch.id}`, { headers });
+      await testDb.client.execute({
+        sql: 'UPDATE news SET local_media_paths = ? WHERE id = ?',
+        args: [JSON.stringify(['ch/10.jpg', 'ch/11.mp4']), item.id],
+      });
+      const after = await app.request(`/api/news?channelId=${ch.id}`, {
+        headers: { ...headers, 'If-None-Match': before.headers.get('ETag')! },
+      });
+      expect(after.status).toBe(200);
+      expect((await after.json()).items[0].localMediaPaths).toEqual(['ch/10.jpg', 'ch/11.mp4']);
+    });
+
     it('returns 304 when If-None-Match matches ETag', async () => {
       const ch = await seedChannel(testDb.db);
       await seedNews(testDb.db, ch.id, { postedAt: 5000 });

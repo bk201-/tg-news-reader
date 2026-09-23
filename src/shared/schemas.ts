@@ -108,7 +108,7 @@ export const batchFiltersSchema = z.object({
 
 export const createDownloadSchema = z.object({
   newsId: z.number({ error: 'newsId is required' }),
-  type: z.enum(['media', 'article'], { error: 'type is required' }),
+  type: z.enum(['media', 'article', 'image'], { error: 'type is required' }),
   url: z.string().optional(),
   priority: z.number().optional(),
 });
