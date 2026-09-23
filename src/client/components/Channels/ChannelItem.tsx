@@ -1,19 +1,13 @@
-import {
-  DeleteOutlined,
-  EditOutlined,
-  LinkOutlined,
-  MoreOutlined,
-  ReloadOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
+import { InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import type { Channel } from '@shared/types.ts';
-import { Badge, Button, Dropdown, Typography } from 'antd';
-import type { MenuProps } from 'antd';
+import { Badge, Button, Popover, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
+import { ChannelInfoContent } from './ChannelInfoContent';
+import { ChannelItemMenu } from './ChannelItemMenu';
 import { formatUnreadBadgeCount } from './formatUnreadBadgeCount';
 
 const { Text } = Typography;
@@ -62,13 +56,10 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
 }));
 
-const ICON_MORE = <MoreOutlined />;
-const ICON_LINK = <LinkOutlined />;
-const ICON_EDIT = <EditOutlined />;
-const ICON_DELETE = <DeleteOutlined />;
-const DROPDOWN_TRIGGER: ('click' | 'hover' | 'contextMenu')[] = ['click'];
-
-const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+const ICON_INFO = <InfoCircleOutlined />;
+const POPOVER_TRIGGER: 'hover'[] = ['hover'];
+// Ant Design also opens hover popovers on touchstart; let the button's click own touch activation.
+const stopTouch = (e: React.TouchEvent) => e.stopPropagation();
 
 interface ChannelItemProps {
   channel: Channel;
@@ -94,61 +85,25 @@ export function ChannelItem({
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
 
-  const reloadIcon = useMemo(() => <ReloadOutlined spin={isFetchingThis} />, [isFetchingThis]);
-
+  const [infoOpen, setInfoOpen] = useState(false);
   const handleSelect = useCallback(() => onSelect(ch.id), [onSelect, ch.id]);
-  const handleFetch = useCallback(() => onFetch(ch), [onFetch, ch]);
-  const handleEdit = useCallback(() => onEdit(ch), [onEdit, ch]);
-  const handleDelete = useCallback(() => onDelete(ch), [onDelete, ch]);
-
-  const menuItems: MenuProps['items'] = useMemo(
-    () => [
-      {
-        key: 'open',
-        icon: ICON_LINK,
-        label: (
-          <a href={`https://t.me/${ch.telegramId}`} target="_blank" rel="noopener noreferrer">
-            {t('channels.open_tg_tooltip')}
-          </a>
-        ),
-      },
-      {
-        key: 'fetch',
-        icon: reloadIcon,
-        label: t('channels.fetch_tooltip'),
-        disabled: isFetchingThis,
-        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
-          domEvent.stopPropagation();
-          handleFetch();
-        },
-      },
-      {
-        key: 'edit',
-        icon: ICON_EDIT,
-        label: t('channels.edit_tooltip'),
-        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
-          domEvent.stopPropagation();
-          handleEdit();
-        },
-      },
-      {
-        key: 'delete',
-        icon: ICON_DELETE,
-        label: t('channels.delete_tooltip'),
-        danger: true,
-        onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
-          domEvent.stopPropagation();
-          handleDelete();
-        },
-      },
-    ],
-    [ch.telegramId, isFetchingThis, reloadIcon, t, handleFetch, handleEdit, handleDelete],
+  const closeInfo = useCallback(() => setInfoOpen(false), []);
+  const toggleInfo = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setInfoOpen((open) => !open);
+  }, []);
+  const infoContent = useMemo(
+    () => <>{infoOpen && <ChannelInfoContent channel={ch} onClose={closeInfo} />}</>,
+    [ch, infoOpen, closeInfo],
   );
-
-  const dropdownMenu = useMemo(() => ({ items: menuItems }), [menuItems]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setInfoOpen(false);
+        return;
+      }
+      if (e.target !== e.currentTarget) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         handleSelect();
@@ -158,38 +113,63 @@ export function ChannelItem({
   );
 
   return (
-    <div
-      role="option"
-      aria-selected={isSelected}
-      tabIndex={0}
-      className={cx(styles.item, isSelected && styles.itemActive)}
-      onClick={handleSelect}
-      onKeyDown={handleKeyDown}
+    <Popover
+      content={infoContent}
+      open={infoOpen}
+      onOpenChange={setInfoOpen}
+      trigger={POPOVER_TRIGGER}
+      mouseEnterDelay={0.4}
+      placement="right"
+      destroyOnHidden
+      fresh
     >
-      <div className={styles.info}>
-        <Text strong ellipsis>
-          {ch.isUnavailable ? (
-            <Tooltip title={t('channels.unavailable_tooltip')}>
-              <WarningOutlined className={styles.warningIcon} />
-            </Tooltip>
-          ) : null}
-          {ch.name}
-        </Text>
-        <Text type="secondary" className={styles.metaText}>
-          @{ch.telegramId}
-        </Text>
-        {ch.lastFetchedAt && (
-          <Text type="secondary" className={styles.metaText}>
-            {t('channels.updated', { date: dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm') })}
+      <div
+        role="option"
+        aria-selected={isSelected}
+        tabIndex={0}
+        className={cx(styles.item, isSelected && styles.itemActive)}
+        onClick={handleSelect}
+        onKeyDown={handleKeyDown}
+      >
+        <div className={styles.info}>
+          <Text strong ellipsis>
+            {ch.isUnavailable ? (
+              <Tooltip title={t('channels.unavailable_tooltip')}>
+                <WarningOutlined className={styles.warningIcon} />
+              </Tooltip>
+            ) : null}
+            {ch.name}
           </Text>
-        )}
+          <Text type="secondary" className={styles.metaText}>
+            @{ch.telegramId}
+          </Text>
+          {ch.lastFetchedAt && (
+            <Text type="secondary" className={styles.metaText}>
+              {t('channels.updated', { date: dayjs.unix(ch.lastFetchedAt).format('DD.MM.YY HH:mm') })}
+            </Text>
+          )}
+        </div>
+        <div className={styles.rightSide}>
+          <Badge count={formatUnreadBadgeCount(unreadCount)} overflowCount={9999} size="small" />
+          <Button
+            icon={ICON_INFO}
+            size="small"
+            type="text"
+            onClick={toggleInfo}
+            onTouchStart={stopTouch}
+            aria-label={t('channels.info.open', { name: ch.name })}
+            aria-expanded={infoOpen}
+            aria-haspopup="dialog"
+          />
+          <ChannelItemMenu
+            channel={ch}
+            isFetching={isFetchingThis}
+            onFetch={onFetch}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
       </div>
-      <div className={styles.rightSide}>
-        <Badge count={formatUnreadBadgeCount(unreadCount)} overflowCount={9999} size="small" />
-        <Dropdown menu={dropdownMenu} trigger={DROPDOWN_TRIGGER} placement="bottomRight">
-          <Button icon={ICON_MORE} size="small" type="text" onClick={stopPropagation} />
-        </Dropdown>
-      </div>
-    </div>
+    </Popover>
   );
 }

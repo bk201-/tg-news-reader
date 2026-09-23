@@ -95,6 +95,13 @@ describe('getYouTubeEmbedId', () => {
 });
 
 describe('formatBytes', () => {
+  it('formats channel-sized totals as GB and TB', () => {
+    expect(formatBytes(1024 ** 3)).toBe('1.0 GB');
+    expect(formatBytes(2.5 * 1024 ** 3)).toBe('2.5 GB');
+    expect(formatBytes(1024 ** 4)).toBe('1.0 TB');
+    expect(formatBytes(2.5 * 1024 ** 4)).toBe('2.5 TB');
+  });
+
   it('formats KB', () => {
     expect(formatBytes(500 * 1024)).toBe('500 KB');
   });

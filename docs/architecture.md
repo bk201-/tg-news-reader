@@ -16,6 +16,9 @@
 
 - `unreadCount` in `GET /api/channels` (LEFT JOIN news WHERE is_read = 0)
 - Badge = `unreadCount` from the channel list query
+- Single-post optimistic updates adjust the badge only when cached `isRead` actually changes, once across all feed caches. If the post is not cached, the channel count is refreshed after saving instead of guessing a delta.
+- The lightbox marks downloaded media/blog posts read through one effect. Album-image changes and revisiting read posts do not decrement the badge or send additional read requests.
+- Mark All supports one immediate undo for the current view. Channel refresh (including sidebar/bulk refresh), changing channel/group/tag/view filter, or changing auto-advance resets that undo. Late responses from an older view cannot restore it. Empty scoped views never send an unscoped mark-all request.
 - **Refresh** button → `POST /api/channels/count-unread` — counts only, uses `lastFetchedAt`
 - `lastFetchedAt` is the DB boundary: everything before it is already stored; only newer messages need to be fetched
 - `lastReadAt` is the unread display boundary: used only on first-ever channel fetch to align with Telegram's read position
@@ -24,6 +27,21 @@
 ### Splitter
 
 `<Splitter>` from Ant Design 6, `defaultSize=280`, `min=200`, `max=500`.
+
+### Channel information
+
+Hover a channel or use its information button (also available on touch/keyboard) to open a rich metadata
+popover. It shows the saved description as safe Markdown, channel type/group, post counts, timestamps,
+and server media storage in readable units plus exact bytes and file count. Descriptions come from
+Telegram lookup or user edits, not a live Telegram request.
+
+`GET /api/channels/:id/storage` is requested only when the popover is open. It measures the channel's
+actual server directory, including partial/orphaned files, but excludes the shared database, TTS, and
+browser cache. Measurements include a timestamp and use separate one-minute server/client caches.
+The endpoint checks authentication and persisted PIN unlock state before consulting the cache.
+Scans have bounded concurrency, queue, entry/depth/time limits and reject symlink paths; failures are
+shown explicitly with a retry button rather than reported as zero bytes. This is a logical file-size
+total, not filesystem allocation or an atomic snapshot while downloads/cleanup are running.
 
 ### Adaptive buttons (text→icons)
 

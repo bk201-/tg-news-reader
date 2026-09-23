@@ -9,23 +9,8 @@ import type { Channel, NewsItem } from '../../../../shared/types';
 import { useChannels, useFetchChannel, useMarkReadAndFetch } from '../../../api/channels';
 import { useCreateFilter } from '../../../api/filters';
 import { useMarkAllRead, useMarkRead } from '../../../api/news';
-import type { MarkAllReadResult } from '../../../api/news';
 import { useUIStore } from '../../../store/uiStore';
-
-/**
- * Snapshot of the most recent bulk mark-all-read action — used to implement the
- * "click twice to undo" toggle requested by users who accidentally hit the button.
- *
- * The snapshot is invalidated whenever the user changes channel, group, or hashtag
- * filter so that the next click in a new context is always a fresh "mark", never
- * a stray "unmark".
- */
-interface BulkMarkSnapshot {
-  affectedIds: number[];
-  channelId: number;
-  groupId: number | null;
-  hashTagFilter: string | null;
-}
+import { useBulkMarkUndo } from './useBulkMarkUndo';
 
 export function useNewsFeedActions(
   channel: Channel,
@@ -51,6 +36,14 @@ export function useNewsFeedActions(
   const fetchChannel = useFetchChannel();
   const createFilter = useCreateFilter(channel.id);
   const markReadAndFetch = useMarkReadAndFetch();
+  const {
+    reset: resetBulkMark,
+    capture: captureBulkMark,
+    take: takeBulkMark,
+  } = useBulkMarkUndo(
+    channel.id,
+    JSON.stringify([channel.groupId ?? null, hashTagFilter, newsFilterMode, autoAdvance]),
+  );
 
   // fetchPeriod resets on channel change: [channelId, period] tuple — React
   // setState in render is fine when gated by a value comparison (see React docs
@@ -123,9 +116,10 @@ export function useNewsFeedActions(
   );
 
   const handleFetchDefault = useCallback(() => {
+    resetBulkMark();
     setFetchPeriod('');
     fetchChannel.mutate({ id: channel.id }, { onSuccess: onUserFetchSuccess });
-  }, [channel.id, fetchChannel, onUserFetchSuccess, setFetchPeriod]);
+  }, [channel.id, fetchChannel, onUserFetchSuccess, setFetchPeriod, resetBulkMark]);
 
   // Stable ref for the auto-fetch callback — avoids re-triggering the effect
   // when fetchChannel/setMediaProgressKey change identity across renders.
@@ -149,6 +143,7 @@ export function useNewsFeedActions(
 
   const handleFetchPeriod = useCallback(
     (val: string | number) => {
+      resetBulkMark();
       const v = String(val);
       setFetchPeriod(v);
       const since = new Date();
@@ -156,7 +151,7 @@ export function useNewsFeedActions(
       since.setHours(0, 0, 0, 0);
       fetchChannel.mutate({ id: channel.id, since: since.toISOString() }, { onSuccess: onUserFetchSuccess });
     },
-    [channel.id, fetchChannel, onUserFetchSuccess, setFetchPeriod],
+    [channel.id, fetchChannel, onUserFetchSuccess, setFetchPeriod, resetBulkMark],
   );
 
   const handleSpaceKey = useCallback(
@@ -176,66 +171,22 @@ export function useNewsFeedActions(
     [displayItems, markRead, handleMarkedRead, setSelectedNewsId, handleFetchDefault],
   );
 
-  // ── Mark all read (+ auto-advance when enabled) ─────────────────────
-  //
-  // Toggle behaviour: if the previous click already bulk-marked items in the
-  // current channel/group/hashtag context, this click sends `isRead: 0` for
-  // those exact IDs (undo). The snapshot is cleared by an effect below
-  // whenever the user changes channel / group / hashtag.
-  //
-  // Note: the `markReadAndFetch` (autoAdvance) path is NOT toggled — it usually
-  // navigates to the next channel, which clears the snapshot anyway.
-  const [lastBulkMark, setLastBulkMark] = useState<BulkMarkSnapshot | null>(null);
-
-  // Reset the snapshot whenever the context the user is looking at changes.
-  // Watching channel.id covers channel switches; channel.groupId covers a
-  // moved-into-group case; hashTagFilter covers the tag-filter pill toggle.
-  useEffect(() => {
-    setLastBulkMark(null);
-  }, [channel.id, channel.groupId, hashTagFilter]);
-
-  const captureBulkMark = useCallback(
-    (result: MarkAllReadResult) => {
-      if (result.affectedIds.length === 0) {
-        // Nothing was actually flipped (everything was already read) — leave the
-        // snapshot empty so the next click triggers a normal mark, not a no-op undo.
-        setLastBulkMark(null);
-        return;
-      }
-      setLastBulkMark({
-        affectedIds: result.affectedIds,
-        channelId: channel.id,
-        groupId: channel.groupId ?? null,
-        hashTagFilter,
-      });
-    },
-    [channel.id, channel.groupId, hashTagFilter],
-  );
-
   const handleMarkAllReadAndAdvance = useCallback(() => {
-    // ── Undo: previous click bulk-marked items; this click reverts them ──────
-    if (lastBulkMark && lastBulkMark.affectedIds.length > 0) {
-      markAllRead.mutate({ newsIds: lastBulkMark.affectedIds, isRead: 0 });
-      setLastBulkMark(null);
+    const undoIds = takeBulkMark();
+    if (undoIds) {
+      markAllRead.mutate({ newsIds: undoIds, isRead: 0 });
       return;
     }
 
-    // When tag filter is active — only mark the currently visible items, no auto-advance
-    if (hashTagFilter) {
-      markAllRead.mutate({ newsIds: displayItems.map((i) => i.id) }, { onSuccess: captureBulkMark });
-      return;
-    }
-
-    // 'hidden' mode: user is intentionally viewing only the filter-rejected items.
-    // Mark just the currently loaded hidden items, don't sweep the whole channel.
-    if (newsFilterMode === 'hidden') {
+    // Scoped views must never send empty IDs: the server treats that as an unscoped sweep.
+    if (hashTagFilter || newsFilterMode === 'hidden') {
       if (displayItems.length === 0) return;
-      markAllRead.mutate({ newsIds: displayItems.map((i) => i.id) }, { onSuccess: captureBulkMark });
+      markAllRead.mutate({ newsIds: displayItems.map((i) => i.id) }, { onSuccess: captureBulkMark() });
       return;
     }
 
     if (!autoAdvance) {
-      markAllRead.mutate({ channelId: channel.id }, { onSuccess: captureBulkMark });
+      markAllRead.mutate({ channelId: channel.id }, { onSuccess: captureBulkMark() });
       return;
     }
     markReadAndFetch.mutate(channel.id, {
@@ -245,7 +196,7 @@ export function useNewsFeedActions(
       },
     });
   }, [
-    lastBulkMark,
+    takeBulkMark,
     hashTagFilter,
     newsFilterMode,
     autoAdvance,

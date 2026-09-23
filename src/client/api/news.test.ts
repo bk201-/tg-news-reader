@@ -152,6 +152,7 @@ describe('useMarkRead', () => {
 
   it('increments unread count when marking as unread', async () => {
     const { Wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(newsKeys.byChannel(1), makePaginatedData([[makeItem(5, { isRead: 1 })]]));
     queryClient.setQueryData<Channel[]>(['channels'], [{ id: 1, unreadCount: 0 } as Channel]);
 
     const { result } = renderHook(() => useMarkRead(), { wrapper: Wrapper });
@@ -163,6 +164,81 @@ describe('useMarkRead', () => {
     expect(mockedApi.patch).toHaveBeenCalledWith('/news/5/read', { isRead: 0 });
     const channels = queryClient.getQueryData<Channel[]>(['channels']);
     expect(channels![0].unreadCount).toBe(1);
+  });
+
+  it.each([0, 1])('adjusts the badge only once for repeated concurrent writes of isRead=%s', async (isRead) => {
+    const { Wrapper, queryClient } = createWrapper();
+    const data = makePaginatedData([[makeItem(1, { isRead: 1 - isRead })]]);
+    queryClient.setQueryData(newsKeys.byChannel(1), data);
+    queryClient.setQueryData(newsKeys.byChannel(1, 'filtered'), data);
+    queryClient.setQueryData(newsKeys.byChannel(1, 'hidden'), data);
+    queryClient.setQueryData(
+      ['channels'],
+      [
+        { id: 1, unreadCount: 5 },
+        { id: 2, unreadCount: 7 },
+      ],
+    );
+    const { result } = renderHook(() => [useMarkRead(), useMarkRead()], { wrapper: Wrapper });
+
+    await act(async () => {
+      await Promise.all(result.current.map((mutation) => mutation.mutateAsync({ id: 1, channelId: 1, isRead })));
+      await result.current[0].mutateAsync({ id: 1, channelId: 1, isRead });
+    });
+
+    expect(queryClient.getQueryData<Channel[]>(['channels'])?.map((channel) => channel.unreadCount)).toEqual([
+      isRead === 1 ? 4 : 6,
+      7,
+    ]);
+    for (const mode of ['all', 'filtered', 'hidden'] as const) {
+      expect(flattenPaginatedItems(queryClient.getQueryData(newsKeys.byChannel(1, mode)))[0].isRead).toBe(isRead);
+    }
+  });
+
+  it('does not guess a badge delta for an uncached post and reconciles after saving', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(['channels'], [{ id: 1, unreadCount: 5 }]);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useMarkRead(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: 99, channelId: 1 });
+    });
+    expect(queryClient.getQueryData<Channel[]>(['channels'])?.[0].unreadCount).toBe(5);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['channels'] });
+  });
+
+  it('counts actual read/unread transitions when only the filtered feed is cached', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    const key = newsKeys.byChannel(1, 'filtered');
+    queryClient.setQueryData(key, makePaginatedData([[makeItem(1)]]));
+    queryClient.setQueryData(['channels'], [{ id: 1, unreadCount: 1 }]);
+    const { result } = renderHook(() => useMarkRead(), { wrapper: Wrapper });
+    for (const [isRead, expectedCount] of [
+      [1, 0],
+      [1, 0],
+      [0, 1],
+      [0, 1],
+      [1, 0],
+    ]) {
+      await act(async () => {
+        await result.current.mutateAsync({ id: 1, channelId: 1, isRead });
+      });
+      expect(queryClient.getQueryData<Channel[]>(['channels'])?.[0].unreadCount).toBe(expectedCount);
+      expect(flattenPaginatedItems(queryClient.getQueryData(key))[0].isRead).toBe(isRead);
+    }
+  });
+
+  it('normalizes the optimistic read state exactly like the server request', async () => {
+    const { Wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(newsKeys.byChannel(1), makePaginatedData([[makeItem(1)]]));
+    queryClient.setQueryData(['channels'], [{ id: 1, unreadCount: 1 }]);
+    const { result } = renderHook(() => useMarkRead(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: 1, channelId: 1, isRead: 2 });
+    });
+    expect(api.patch).toHaveBeenCalledWith('/news/1/read', { isRead: 1 });
+    expect(flattenPaginatedItems(queryClient.getQueryData(newsKeys.byChannel(1)))[0].isRead).toBe(1);
+    expect(queryClient.getQueryData<Channel[]>(['channels'])?.[0].unreadCount).toBe(0);
   });
 });
 
