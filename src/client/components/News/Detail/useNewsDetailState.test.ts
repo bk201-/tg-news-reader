@@ -1,10 +1,11 @@
-import type { NewsItem } from '@shared/types';
+import type { DownloadStatus, NewsItem } from '@shared/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHookWithProviders } from '../../../__tests__/renderWithProviders';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 const mockRefreshMutate = vi.fn();
 let mockMarkReadIsPending = false;
+let mockMediaStatus: DownloadStatus | undefined;
 
 vi.mock('../../../api/news', () => ({
   useMarkRead: () => ({ mutate: vi.fn(), isPending: mockMarkReadIsPending }),
@@ -14,11 +15,12 @@ vi.mock('../../../api/news', () => ({
 }));
 
 vi.mock('../../../api/downloads', () => ({
-  useNewsDownloadTask: () => null,
+  useNewsDownloadTask: (_id: number, type: string) =>
+    type === 'media' && mockMediaStatus ? { status: mockMediaStatus } : null,
 }));
 
 vi.mock('./useNewsDetailHotkeys', () => ({
-  useNewsDetailHotkeys: (_opts: { item: NewsItem }) => ({
+  useNewsDetailHotkeys: vi.fn((_opts: { item: NewsItem }) => ({
     albumIndex: 0,
     setAlbumIndex: vi.fn(),
     topPanel: null,
@@ -27,9 +29,10 @@ vi.mock('./useNewsDetailHotkeys', () => ({
     setLinkModalOpen: vi.fn(),
     selectedUrl: '',
     setSelectedUrl: vi.fn(),
-  }),
+  })),
 }));
 
+import { useNewsDetailHotkeys } from './useNewsDetailHotkeys';
 import { useNewsDetailState } from './useNewsDetailState';
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
@@ -50,7 +53,29 @@ describe('useNewsDetailState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockMarkReadIsPending = false;
+    mockMediaStatus = undefined;
   });
+
+  it.each(['pending', 'processing', 'done', 'failed', undefined] as const)(
+    'passes download status %s to the album Space guard',
+    (status) => {
+      mockMediaStatus = status;
+      renderHookWithProviders(() =>
+        useNewsDetailState({
+          item: makeItem({ localMediaPaths: ['a.jpg'], albumMsgIds: [1, 2, 3] }),
+          channelTelegramId: 'ch',
+          variant: 'panel',
+        }),
+      );
+      expect(useNewsDetailHotkeys).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mediaPending: status === 'pending' || status === 'processing',
+          albumLength: 1,
+          albumExpectedLength: 3,
+        }),
+      );
+    },
+  );
 
   it('openUrl falls back to t.me when no links', () => {
     const { result } = renderHookWithProviders(() =>

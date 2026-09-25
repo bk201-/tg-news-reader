@@ -1,4 +1,11 @@
-import { DeleteOutlined, EditOutlined, LinkOutlined, MoreOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  InfoCircleOutlined,
+  LinkOutlined,
+  MoreOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
 import type { Channel } from '@shared/types.ts';
 import { Button, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
@@ -18,13 +25,27 @@ interface Props {
   onFetch: (channel: Channel) => void;
   onEdit: (channel: Channel) => void;
   onDelete: (channel: Channel) => void;
+  onInfo?: () => void;
 }
 
-export function ChannelItemMenu({ channel, isFetching, onFetch, onEdit, onDelete }: Props) {
+export function ChannelItemMenu({ channel, isFetching, onFetch, onEdit, onDelete, onInfo }: Props) {
   const { t } = useTranslation();
   const menu = useMemo<MenuProps>(
     () => ({
       items: [
+        ...(onInfo
+          ? [
+              {
+                key: 'info',
+                icon: <InfoCircleOutlined />,
+                label: t('channels.info.title'),
+                onClick: ({ domEvent }: { domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+                  domEvent.stopPropagation();
+                  onInfo();
+                },
+              },
+            ]
+          : []),
         {
           key: 'open',
           icon: ICON_LINK,
@@ -66,10 +87,10 @@ export function ChannelItemMenu({ channel, isFetching, onFetch, onEdit, onDelete
       ],
       onClick: ({ domEvent }) => domEvent.stopPropagation(),
     }),
-    [channel, isFetching, onFetch, onEdit, onDelete, t],
+    [channel, isFetching, onFetch, onEdit, onDelete, onInfo, t],
   );
   return (
-    <Dropdown menu={menu} trigger={TRIGGER} placement="bottomRight">
+    <Dropdown menu={menu} trigger={TRIGGER} placement="bottomRight" destroyOnHidden>
       <Button
         icon={ICON_MORE}
         size="small"

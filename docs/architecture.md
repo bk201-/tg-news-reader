@@ -17,9 +17,10 @@
 - `unreadCount` in `GET /api/channels` (LEFT JOIN news WHERE is_read = 0)
 - Badge = `unreadCount` from the channel list query
 - Single-post optimistic updates adjust the badge only when cached `isRead` actually changes, once across all feed caches. If the post is not cached, the channel count is refreshed after saving instead of guessing a delta.
-- The lightbox marks downloaded media/blog posts read through one effect. Album-image changes and revisiting read posts do not decrement the badge or send additional read requests.
+- The lightbox automatically marks downloaded media/blog posts read. Explicit close (toolbar, Escape, backdrop, or browser Back) also marks the current downloaded post read in news/news-link channels, without requiring navigation. Unavailable media remains unread; revisiting read posts does not decrement the badge or send additional read requests.
 - The lightbox observes the active All/Filtered/Hidden feed cache, including its tag scope, without refetching the feed on open. Missing images are requested automatically once per viewing session using an image-only queue task; undownloaded videos and non-image files are skipped without marking them read. Download completion updates the visible image in place; REST polling while waiting recovers missed SSE updates.
 - The lightbox has no manual Telegram-to-server Download/Re-download control. Already downloaded videos remain playable, and the native video menu still offers saving to the device. Album counters count available media, not skipped video slots.
+- In the detail view, Space advances through available album media before marking the post read. Missing album slots block Space only while a media download is pending or processing; skipped or failed downloads do not trap navigation. Detail hotkeys are suspended while the lightbox is open, and focused videos retain their native playback and volume keys.
 - Video-only toolbar buttons rotate the current clip left/right by 90 degrees. Rotation is presentation-only, resets on media navigation, and preserves playback position and the original download/share file. The rotated frame is fitted to the available area using video metadata and a resize observer.
 - Mark All supports one immediate undo for the current view. Channel refresh (including sidebar/bulk refresh), changing channel/group/tag/view filter, or changing auto-advance resets that undo. Late responses from an older view cannot restore it. Empty scoped views never send an unscoped mark-all request.
 - **Refresh** button → `POST /api/channels/count-unread` — counts only, uses `lastFetchedAt`
@@ -33,8 +34,9 @@
 
 ### Channel information
 
-Hover the channel's information button or click it (also available on touch/keyboard) to open a rich metadata
-popover. It shows the saved description as safe Markdown, channel type/group, post counts, timestamps,
+On desktop, hover or click the channel's information button to open a rich metadata popover.
+On mobile, open information from the three-dot menu instead; there is no separate info button or hover trigger.
+The popover shows the saved description as safe Markdown, channel type/group, post counts, timestamps,
 and server media storage in readable units plus exact bytes and file count. Descriptions come from
 Telegram lookup or user edits, not a live Telegram request.
 Missing descriptions are omitted. The card shows the measurement timestamp without cache/extraction notes.

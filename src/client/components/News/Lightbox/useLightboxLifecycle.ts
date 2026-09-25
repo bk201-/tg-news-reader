@@ -5,6 +5,11 @@ const HISTORY_KEY = '_lightboxOpen';
 
 export function useLightboxLifecycle(isOpen: boolean, closeLightbox: () => void) {
   const closedByBackRef = useRef(false);
+  const closeRef = useRef(closeLightbox);
+  useEffect(() => {
+    closeRef.current = closeLightbox;
+  }, [closeLightbox]);
+
   useEffect(() => {
     if (!isOpen) return;
     closedByBackRef.current = false;
@@ -12,7 +17,7 @@ export function useLightboxLifecycle(isOpen: boolean, closeLightbox: () => void)
 
     const onPop = () => {
       closedByBackRef.current = true;
-      closeLightbox();
+      closeRef.current();
     };
     window.addEventListener('popstate', onPop);
     return () => {
@@ -21,7 +26,7 @@ export function useLightboxLifecycle(isOpen: boolean, closeLightbox: () => void)
         history.replaceState(null, '', window.location.href);
       }
     };
-  }, [isOpen, closeLightbox]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;

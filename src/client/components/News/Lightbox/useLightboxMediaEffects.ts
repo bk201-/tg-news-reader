@@ -1,5 +1,5 @@
 import type { ChannelType } from '@shared/types';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { mediaUrl } from '../../../api/mediaUrl';
 import { useMarkRead } from '../../../api/news';
 import type { LightboxState } from '../../../store/uiStore';
@@ -39,11 +39,16 @@ export function useLightboxMediaEffects(
     });
   }, [nav, albumIndex]);
 
-  // Read only downloaded, unread posts — never album-image changes or revisits.
-  useEffect(() => {
+  const markCurrentRead = useCallback(() => {
     if (!isOpen || newsId === null || channelId === null) return;
-    if (channelType !== 'media' && channelType !== 'blog') return;
     if (!nav.firstMediaPath || nav.currentEntry?.item.isRead !== 0) return;
     markRead({ id: newsId, isRead: 1, channelId });
-  }, [isOpen, newsId, channelId, channelType, markRead, nav.firstMediaPath, nav.currentEntry?.item.isRead]);
+  }, [isOpen, newsId, channelId, markRead, nav.firstMediaPath, nav.currentEntry?.item.isRead]);
+
+  // Automatic reads remain limited to media/blog; explicit close also finishes news posts.
+  useEffect(() => {
+    if (channelType === 'media' || channelType === 'blog') markCurrentRead();
+  }, [channelType, markCurrentRead]);
+
+  return markCurrentRead;
 }
