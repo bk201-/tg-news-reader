@@ -1,13 +1,12 @@
-import { InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { WarningOutlined } from '@ant-design/icons';
 import type { Channel } from '@shared/types.ts';
-import { Badge, Button, Popover, Typography } from 'antd';
+import { Badge, Typography } from 'antd';
 import { createStyles } from 'antd-style';
 import dayjs from 'dayjs';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaybeTooltip as Tooltip } from '../common/MaybeTooltip';
-import { ChannelInfoContent } from './ChannelInfoContent';
-import { ChannelItemMenu } from './ChannelItemMenu';
+import { ChannelItemActions } from './ChannelItemActions';
 import { formatUnreadBadgeCount } from './formatUnreadBadgeCount';
 
 const { Text } = Typography;
@@ -56,11 +55,6 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
 }));
 
-const ICON_INFO = <InfoCircleOutlined />;
-const POPOVER_TRIGGER: 'hover'[] = ['hover'];
-// Ant Design also opens hover popovers on touchstart; let the button's click own touch activation.
-const stopTouch = (e: React.TouchEvent) => e.stopPropagation();
-
 interface ChannelItemProps {
   channel: Channel;
   isSelected: boolean;
@@ -85,35 +79,17 @@ export function ChannelItem({
   const { t } = useTranslation();
   const { styles, cx } = useStyles();
 
-  const [infoMode, setInfoMode] = useState<'closed' | 'hover' | 'pinned'>('closed');
-  const infoOpen = infoMode !== 'closed';
   const handleSelect = useCallback(() => onSelect(ch.id), [onSelect, ch.id]);
-  const closeInfo = useCallback(() => setInfoMode('closed'), []);
-  const toggleInfo = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setInfoMode((mode) => (mode === 'pinned' ? 'closed' : 'pinned'));
-  }, []);
-  const handleInfoHover = useCallback((open: boolean) => {
-    setInfoMode((mode) => (mode === 'pinned' ? mode : open ? 'hover' : 'closed'));
-  }, []);
-  const infoContent = useMemo(
-    () => <>{infoOpen && <ChannelInfoContent channel={ch} onClose={closeInfo} showClose={infoMode === 'pinned'} />}</>,
-    [ch, infoOpen, infoMode, closeInfo],
-  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeInfo();
-        return;
-      }
       if (e.target !== e.currentTarget) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         handleSelect();
       }
     },
-    [handleSelect, closeInfo],
+    [handleSelect],
   );
 
   return (
@@ -145,30 +121,7 @@ export function ChannelItem({
       </div>
       <div className={styles.rightSide}>
         <Badge count={formatUnreadBadgeCount(unreadCount)} overflowCount={9999} size="small" />
-        <Popover
-          content={infoContent}
-          open={infoOpen}
-          onOpenChange={handleInfoHover}
-          trigger={POPOVER_TRIGGER}
-          mouseEnterDelay={0.4}
-          placement="right"
-          destroyOnHidden
-          fresh
-        >
-          <span>
-            <Button
-              icon={ICON_INFO}
-              size="small"
-              type="text"
-              onClick={toggleInfo}
-              onTouchStart={stopTouch}
-              aria-label={t('channels.info.open', { name: ch.name })}
-              aria-expanded={infoOpen}
-              aria-haspopup="dialog"
-            />
-          </span>
-        </Popover>
-        <ChannelItemMenu
+        <ChannelItemActions
           channel={ch}
           isFetching={isFetchingThis}
           onFetch={onFetch}

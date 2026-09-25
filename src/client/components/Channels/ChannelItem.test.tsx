@@ -2,12 +2,15 @@ import type { Channel, Group } from '@shared/types.ts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../api/client';
+import { useIsMd } from '../../hooks/breakpoints';
 import { useAuthStore } from '../../store/authStore';
 import { ChannelItem } from './ChannelItem';
 
 vi.mock('../../api/client', () => ({ api: { get: vi.fn() } }));
+vi.mock('../../hooks/breakpoints', () => ({ useIsMd: vi.fn(() => true) }));
 const channel: Channel = {
   id: 1,
   telegramId: 'test_channel',
@@ -42,7 +45,9 @@ function setup(overrides: Partial<Channel> = {}, groups: Group[] = []) {
   };
   render(
     <QueryClientProvider client={client}>
-      <ChannelItem {...props} />
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <ChannelItem {...props} />
+      </ConfigProvider>
     </QueryClientProvider>,
   );
   return props;
@@ -50,6 +55,7 @@ function setup(overrides: Partial<Channel> = {}, groups: Group[] = []) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(useIsMd).mockReturnValue(true);
   vi.mocked(api.get).mockImplementation(async (path) => (path === '/groups' ? [] : stats));
   useAuthStore.setState({
     accessToken: 'signed-in',
@@ -63,6 +69,60 @@ afterEach(() => {
 });
 
 describe('ChannelItem information popover', () => {
+  it.each([true, false])('dismisses the action menu with Escape (desktop=%s)', async (desktop) => {
+    vi.mocked(useIsMd).mockReturnValue(desktop);
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'channels.info.actions' }));
+    await screen.findByRole('menu');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  });
+
+  it('keeps mobile information closed after touch-generated hover', async () => {
+    vi.mocked(useIsMd).mockReturnValue(false);
+    const props = setup();
+    expect(screen.queryByRole('button', { name: /channels.info.open/ })).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'channels.info.actions' });
+    vi.useFakeTimers();
+    try {
+      fireEvent.mouseOver(trigger);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(api.get).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    fireEvent.click(trigger);
+    expect(api.get).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /channels.info.title/ }));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(await screen.findByText(/channels.info.storage_bytes/)).toBeInTheDocument();
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: '@test_channel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'channels.info.close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    vi.useFakeTimers();
+    try {
+      fireEvent.mouseOver(trigger);
+      fireEvent.touchStart(trigger);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(props.onSelect).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /channels.info.title/ }));
+    expect(await screen.findByRole('button', { name: 'channels.info.close' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
   it('loads storage only after hovering the info button and renders existing metadata', async () => {
     const user = userEvent.setup();
     const props = setup();
@@ -174,11 +234,17 @@ describe('ChannelItem information popover', () => {
     expect(await screen.findByText(/channels.info.storage_bytes/)).toHaveTextContent('"bytes":"0"');
   });
 
-  it('hides details and never requests stats for a locked group', async () => {
+  it.each([true, false])('hides details and never requests stats for a locked group (desktop=%s)', async (desktop) => {
+    vi.mocked(useIsMd).mockReturnValue(desktop);
     const group = { id: 5, name: 'Private', hasPIN: true, color: 'blue', sortOrder: 0, createdAt: 1 };
     vi.mocked(api.get).mockResolvedValue([group]);
     setup({ groupId: 5 }, [group]);
-    fireEvent.click(screen.getByRole('button', { name: /channels.info.open/ }));
+    if (desktop) {
+      fireEvent.click(screen.getByRole('button', { name: /channels.info.open/ }));
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'channels.info.actions' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: /channels.info.title/ }));
+    }
     expect(await screen.findByText('channels.info.locked')).toBeInTheDocument();
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
     expect(api.get).not.toHaveBeenCalledWith('/channels/1/storage');
@@ -196,12 +262,18 @@ describe('ChannelItem information popover', () => {
     expect(screen.queryByText(/channels.info.storage_bytes/)).not.toBeInTheDocument();
   });
 
-  it('preserves the channel action menu without selecting the row', async () => {
-    const user = userEvent.setup();
-    const props = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'channels.info.actions' }));
-    await user.click(await screen.findByText('channels.edit_tooltip'));
-    expect(props.onEdit).toHaveBeenCalledWith(channel);
-    expect(props.onSelect).not.toHaveBeenCalled();
-  });
+  it.each([true, false])(
+    'preserves the channel action menu without selecting the row (desktop=%s)',
+    async (desktop) => {
+      vi.mocked(useIsMd).mockReturnValue(desktop);
+      const user = userEvent.setup();
+      const props = setup();
+      fireEvent.click(screen.getByRole('button', { name: 'channels.info.actions' }));
+      await screen.findByRole('menu');
+      expect(!!screen.queryByRole('menuitem', { name: /channels.info.title/ })).toBe(!desktop);
+      await user.click(await screen.findByText('channels.edit_tooltip'));
+      expect(props.onEdit).toHaveBeenCalledWith(channel);
+      expect(props.onSelect).not.toHaveBeenCalled();
+    },
+  );
 });

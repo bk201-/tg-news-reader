@@ -87,6 +87,7 @@ export function useNewsDetailState({ item, channelTelegramId, onMarkedRead, vari
     isAlbum,
     albumLength,
     albumExpectedLength,
+    mediaPending: mediaLoading || mediaQueued,
     onRefresh: handleRefresh,
     onExtractArticle: handleExtract,
     onShare: () => void handleShare(),

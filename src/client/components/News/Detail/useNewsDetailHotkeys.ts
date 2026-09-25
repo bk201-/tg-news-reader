@@ -1,6 +1,7 @@
 import type { NewsItem } from '@shared/types.ts';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useUIStore } from '../../../store/uiStore';
 import { isYouTubeUrl } from '../newsUtils';
 
 interface UseNewsDetailHotkeysOptions {
@@ -10,6 +11,7 @@ interface UseNewsDetailHotkeysOptions {
   isAlbum: boolean;
   albumLength: number;
   albumExpectedLength: number;
+  mediaPending: boolean;
   /** Called on R — refresh news list */
   onRefresh: () => void;
   /** Called on F (single non-YT link) — queue article extraction */
@@ -56,6 +58,7 @@ export function useNewsDetailHotkeys({
   isAlbum,
   albumLength,
   albumExpectedLength,
+  mediaPending,
   onRefresh,
   onExtractArticle,
   onShare,
@@ -75,6 +78,7 @@ export function useNewsDetailHotkeys({
     // is used as the dependency (avoids a new [] on every render).
     const links = item.links || [];
     const onKey = (e: KeyboardEvent) => {
+      if (useUIStore.getState().lightbox) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement).tagName.toLowerCase();
       if (
@@ -82,6 +86,7 @@ export function useNewsDetailHotkeys({
         tag === 'textarea' ||
         tag === 'button' ||
         tag === 'a' ||
+        tag === 'video' ||
         (e.target as HTMLElement).isContentEditable
       )
         return;
@@ -149,10 +154,8 @@ export function useNewsDetailHotkeys({
           }
           break;
         case 'Space':
-          // Block Space → mark-as-read while there are more album images to view.
-          // Gated on albumExpectedLength (not isAlbum) so it works even when only
-          // 0–1 images are downloaded but the album is known to have more.
-          if (albumExpectedLength > 1 && albumIndex < albumExpectedLength - 1) {
+          // Wait for missing media only while a download can still deliver it.
+          if (albumIndex < albumLength - 1 || (mediaPending && albumIndex < albumExpectedLength - 1)) {
             e.preventDefault();
             e.stopImmediatePropagation();
             // Navigate only within already-downloaded images
@@ -176,6 +179,7 @@ export function useNewsDetailHotkeys({
     albumIndex,
     albumLength,
     albumExpectedLength,
+    mediaPending,
     onRefresh,
     onExtractArticle,
     onShare,

@@ -42,6 +42,7 @@ describe('useNewsDetailHotkeys', () => {
     isAlbum: false,
     albumLength: 0,
     albumExpectedLength: 0,
+    mediaPending: false,
     onRefresh,
     onExtractArticle,
     onShare,

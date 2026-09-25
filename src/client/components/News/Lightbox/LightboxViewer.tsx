@@ -33,7 +33,6 @@ export function LightboxViewer({ lightbox, fetchNextPage, hasNextPage }: Lightbo
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const { channelId, newsId, albumIndex } = lightbox;
-  useLightboxLifecycle(true, closeLightbox);
   const previews = useLightboxImages(channelId, newsId);
 
   const channel = channels.find((c) => c.id === channelId);
@@ -50,14 +49,19 @@ export function LightboxViewer({ lightbox, fetchNextPage, hasNextPage }: Lightbo
   const nav = useLightboxNav(channelId, newsId, albumIndex, navigate, fetchNextPage, hasNextPage, previews.skippedIds);
   const rotation = useVideoRotation(`${newsId}:${albumIndex}:${nav.firstMediaPath ?? ''}`);
 
-  useLightboxMediaEffects(lightbox, channelType, nav);
-  useLightboxInput(lightbox, nav, closeLightbox, overlayRef, videoRef);
+  const markCurrentRead = useLightboxMediaEffects(lightbox, channelType, nav);
+  const handleClose = useCallback(() => {
+    markCurrentRead();
+    closeLightbox();
+  }, [markCurrentRead, closeLightbox]);
+  useLightboxLifecycle(true, handleClose);
+  useLightboxInput(lightbox, nav, handleClose, overlayRef, videoRef);
 
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) closeLightbox();
+      if (e.target === e.currentTarget) handleClose();
     },
-    [closeLightbox],
+    [handleClose],
   );
 
   const handleNavPrev = useCallback(
@@ -99,7 +103,7 @@ export function LightboxViewer({ lightbox, fetchNextPage, hasNextPage }: Lightbo
         channelTelegramId={channel.telegramId}
         positionLabel={nav.positionLabel}
         currentMediaPath={currentMediaPath}
-        onClose={closeLightbox}
+        onClose={handleClose}
         onRotate={nav.isVideo ? rotation.rotate : undefined}
       />
 

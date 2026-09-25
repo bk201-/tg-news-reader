@@ -20,6 +20,7 @@ export function useNewsHotkeys(
         tag === 'textarea' ||
         tag === 'button' ||
         tag === 'a' ||
+        tag === 'video' ||
         (e.target as HTMLElement).isContentEditable
       )
         return;

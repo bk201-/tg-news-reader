@@ -151,7 +151,7 @@ interface NewsDetailMediaProps {
   isAudio: boolean;
   albumIndex: number;
   albumLength: number; // downloaded images count (navigation limit)
-  albumExpectedLength: number; // expected total from albumMsgIds (counter + Space-hint)
+  albumExpectedLength: number; // expected total from albumMsgIds (counter)
   onAlbumNav: (delta: -1 | 1) => void;
   mediaLoading: boolean;
   mediaQueued: boolean;
@@ -330,7 +330,7 @@ export function NewsDetailMedia({
           <span>
             {albumIndex + 1} / {albumExpectedLength}
           </span>
-          {albumIndex === albumExpectedLength - 1 && (
+          {albumIndex >= (mediaLoading || mediaQueued ? albumExpectedLength : albumLength) - 1 && (
             <span className={styles.counterHint}>{t('news.detail.space_hint')}</span>
           )}
         </div>
